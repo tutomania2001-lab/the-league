@@ -1,12 +1,14 @@
 import { Button } from '@/components/ui/Button';
 import { GlowText } from '@/components/ui/GlowText';
 import { Input } from '@/components/ui/Input';
-import { Screen } from '@/components/ui/Screen';
 import { Colors, Spacing, Typography } from '@/constants/theme';
+import { Splashes } from '@/constants/champions';
 import { supabase } from '@/lib/supabase';
+import { DEV_BYPASS } from '@/lib/dev';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { ImageBackground, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LogInScreen() {
   const router = useRouter();
@@ -23,17 +25,126 @@ export default function LogInScreen() {
     setLoading(false);
   }
 
+  function handleDevPreview() {
+    DEV_BYPASS.enabled = true;
+    router.replace('/(tabs)');
+  }
+
   return (
-    <Screen>
-      <View style={{ flex: 1, justifyContent: 'center', gap: Spacing.lg }}>
-        <GlowText style={[Typography.title, { textAlign: 'center', fontSize: 32 }]}>◈ THE LEAGUE</GlowText>
-        <Text style={[Typography.body, { textAlign: 'center' }]}>Sign in to compete</Text>
-        <Input label="Email" placeholder="you@email.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-        <Input label="Password" placeholder="••••••••" value={password} onChangeText={setPassword} secureTextEntry />
-        {error && <Text style={{ color: Colors.error, fontSize: 13, textAlign: 'center' }}>{error}</Text>}
-        <Button label="Log In" onPress={handleLogIn} loading={loading} />
-        <Button label="New here? Create an account" variant="ghost" onPress={() => router.push('/auth/sign-up')} />
-      </View>
-    </Screen>
+    <ImageBackground source={{ uri: Splashes.Jinx }} style={styles.bg} resizeMode="cover">
+      <View style={styles.overlay} />
+      <SafeAreaView style={styles.safe}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+
+            {/* Logo */}
+            <View style={styles.logoBlock}>
+              <Text style={styles.logoTop}>WILD RIFT</Text>
+              <GlowText style={styles.logoMain} intensity="high">◈ THE LEAGUE</GlowText>
+              <Text style={styles.logoSub}>Compete. Win. Dominate.</Text>
+            </View>
+
+            {/* Form card */}
+            <View style={styles.card}>
+              <Input
+                label="Email"
+                placeholder="you@email.com"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              <Input
+                label="Password"
+                placeholder="••••••••"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                style={{ marginTop: Spacing.md }}
+              />
+              {error && (
+                <Text style={{ color: Colors.error, fontSize: 13, textAlign: 'center', marginTop: Spacing.sm }}>
+                  {error}
+                </Text>
+              )}
+              <Button label="Log In" onPress={handleLogIn} loading={loading} style={{ marginTop: Spacing.md }} />
+              <Button
+                label="New here? Create an account"
+                variant="ghost"
+                onPress={() => router.push('/auth/sign-up')}
+                style={{ marginTop: Spacing.xs }}
+              />
+            </View>
+
+            {/* Dev bypass */}
+            <View style={styles.devRow}>
+              <Button
+                label="🎮 Dev Preview — Skip Login"
+                variant="secondary"
+                onPress={handleDevPreview}
+                style={{ borderColor: Colors.gold }}
+              />
+              <Text style={styles.devLabel}>Preview only · no Supabase required</Text>
+            </View>
+
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
+
+const styles = StyleSheet.create({
+  bg: { flex: 1, backgroundColor: Colors.background },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(7,11,20,0.72)',
+  },
+  safe: { flex: 1 },
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+    padding: Spacing.lg,
+    gap: Spacing.lg,
+  },
+  logoBlock: {
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: Spacing.sm,
+  },
+  logoTop: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 4,
+    color: Colors.gold,
+    textTransform: 'uppercase',
+  },
+  logoMain: {
+    fontSize: 36,
+    fontWeight: '900',
+    letterSpacing: 3,
+  },
+  logoSub: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  card: {
+    backgroundColor: 'rgba(13,21,32,0.92)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.accentBorder,
+    padding: Spacing.lg,
+  },
+  devRow: {
+    gap: Spacing.xs,
+    paddingBottom: Spacing.lg,
+  },
+  devLabel: {
+    textAlign: 'center',
+    fontSize: 10,
+    color: Colors.textDim,
+    letterSpacing: 0.5,
+  },
+});

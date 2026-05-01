@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { DEV_BYPASS } from '@/lib/dev';
 import { Session } from '@supabase/supabase-js';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -26,6 +27,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (loading) return;
+    if (DEV_BYPASS.enabled) return;
     const inAuthGroup = segments[0] === 'auth';
     if (!session && !inAuthGroup) {
       router.replace('/auth/log-in');
