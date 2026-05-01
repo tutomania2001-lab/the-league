@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The League – Visual Direction</title>
+<script src="/helper.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #03020a;
+    color: #e0e0ff;
+    font-family: 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+  }
+  h2 {
+    text-align: center;
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #888;
+    font-size: 13px;
+    margin-bottom: 28px;
+  }
+
+  .cards-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+
+  .style-card {
+    border-radius: 14px;
+    overflow: hidden;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+  .style-card:hover { transform: translateY(-2px); }
+  .style-card.selected { border-color: #c89b3c !important; }
+
+  /* ── OPTION A: Runeterra Dark ── */
+  .card-a {
+    background: linear-gradient(160deg, #0d0b1e 0%, #1a0a2e 100%);
+    border-color: #3d2a6e;
+  }
+  .card-a .preview {
+    background: url("data:image/svg+xml,%3Csvg width='400' height='180' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3CradialGradient id='g1' cx='50%25' cy='50%25' r='60%25'%3E%3Cstop offset='0%25' stop-color='%237b2dff' stop-opacity='0.25'/%3E%3Cstop offset='100%25' stop-color='%23000' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='400' height='180' fill='%230d0b1e'/%3E%3Cellipse cx='200' cy='90' rx='180' ry='80' fill='url(%23g1)'/%3E%3C/svg%3E") center/cover;
+    padding: 18px 16px 14px;
+    position: relative;
+  }
+  .card-a .nav-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .logo-a {
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, #c89b3c, #7b2dff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .icons-a { display: flex; gap: 10px; }
+  .icon-circle {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+  .match-card-a {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(123,45,255,0.4);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .team-a { display: flex; align-items: center; gap: 8px; }
+  .champ-icon {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, #7b2dff, #c89b3c);
+    border: 1px solid rgba(255,255,255,0.2);
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .team-name-a { font-size: 11px; font-weight: 600; color: #ddd; }
+  .score-a { font-size: 18px; font-weight: 900; color: #c89b3c; letter-spacing: 2px; }
+  .live-badge-a {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(255,50,50,0.15);
+    border: 1px solid rgba(255,50,50,0.4);
+    border-radius: 20px; padding: 2px 8px;
+    font-size: 10px; font-weight: 700; color: #ff5555;
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: #ff5555; animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+  .tabs-a {
+    display: flex; gap: 6px; margin-top: 10px;
+  }
+  .tab-a {
+    flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 6px 0; text-align: center; font-size: 10px; color: #888;
+  }
+  .tab-a.active { background: rgba(123,45,255,0.25); border-color: #7b2dff; color: #b088ff; }
+
+  .card-label {
+    padding: 14px 16px 16px;
+  }
+  .card-label h3 { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .card-label p { font-size: 12px; color: #888; line-height: 1.5; }
+
+  /* ── OPTION B: Hextech Gold ── */
+  .card-b {
+    background: linear-gradient(160deg, #0a0d14 0%, #0e1520 100%);
+    border-color: #1e3a5f;
+  }
+  .card-b .preview {
+    background: url("data:image/svg+xml,%3Csvg width='400' height='180' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3CradialGradient id='g2' cx='50%25' cy='50%25' r='60%25'%3E%3Cstop offset='0%25' stop-color='%2300c8ff' stop-opacity='0.15'/%3E%3Cstop offset='100%25' stop-color='%23000' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='400' height='180' fill='%230a0d14'/%3E%3Cellipse cx='200' cy='90' rx='180' ry='80' fill='url(%23g2)'/%3E%3Cpolygon points='60,30 80,18 100,30 100,54 80,66 60,54' fill='none' stroke='%2300c8ff' stroke-width='0.5' opacity='0.3'/%3E%3Cpolygon points='310,100 330,88 350,100 350,124 330,136 310,124' fill='none' stroke='%23c89b3c' stroke-width='0.5' opacity='0.3'/%3E%3C/svg%3E") center/cover;
+    padding: 18px 16px 14px;
+  }
+  .logo-b {
+    font-size: 14px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase;
+    color: #00c8ff;
+    text-shadow: 0 0 12px rgba(0,200,255,0.6);
+  }
+  .match-card-b {
+    background: rgba(0,200,255,0.06);
+    border: 1px solid rgba(0,200,255,0.25);
+    border-radius: 10px; padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .champ-icon-b {
+    width: 28px; height: 28px; border-radius: 4px;
+    background: linear-gradient(135deg, #0a3a5c, #00c8ff33);
+    border: 1px solid #00c8ff55;
+    font-size: 14px; display: flex; align-items: center; justify-content: center;
+  }
+  .score-b { font-size: 18px; font-weight: 900; color: #00c8ff; letter-spacing: 2px;
+    text-shadow: 0 0 8px rgba(0,200,255,0.5); }
+  .live-badge-b {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(0,200,255,0.1); border: 1px solid rgba(0,200,255,0.3);
+    border-radius: 20px; padding: 2px 8px;
+    font-size: 10px; font-weight: 700; color: #00c8ff; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .dot-b { width: 6px; height: 6px; border-radius: 50%; background: #00c8ff; animation: blink 1s infinite; }
+  .tabs-b { display: flex; gap: 6px; margin-top: 10px; }
+  .tab-b { flex:1; background: rgba(0,200,255,0.04); border: 1px solid rgba(0,200,255,0.12);
+    border-radius: 8px; padding: 6px 0; text-align: center; font-size: 10px; color: #446677; }
+  .tab-b.active { background: rgba(0,200,255,0.15); border-color: #00c8ff; color: #00c8ff; }
+
+  /* ── OPTION C: Infernal Red ── */
+  .card-c {
+    background: linear-gradient(160deg, #120808 0%, #1e0a0a 100%);
+    border-color: #5c1a1a;
+  }
+  .card-c .preview {
+    background: url("data:image/svg+xml,%3Csvg width='400' height='180' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3CradialGradient id='g3' cx='50%25' cy='50%25' r='60%25'%3E%3Cstop offset='0%25' stop-color='%23ff4500' stop-opacity='0.2'/%3E%3Cstop offset='100%25' stop-color='%23000' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='400' height='180' fill='%23120808'/%3E%3Cellipse cx='200' cy='90' rx='180' ry='80' fill='url(%23g3)'/%3E%3C/svg%3E") center/cover;
+    padding: 18px 16px 14px;
+  }
+  .logo-c {
+    font-size: 14px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase;
+    background: linear-gradient(90deg, #ff4500, #ffaa00);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 6px rgba(255,69,0,0.5));
+  }
+  .match-card-c {
+    background: rgba(255,69,0,0.06); border: 1px solid rgba(255,69,0,0.25);
+    border-radius: 10px; padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+  }
+  .champ-icon-c {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, #5c1a00, #ff450033);
+    border: 1px solid #ff450055; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .score-c { font-size: 18px; font-weight: 900; color: #ff6622; letter-spacing: 2px;
+    text-shadow: 0 0 8px rgba(255,69,0,0.5); }
+  .live-badge-c {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(255,69,0,0.1); border: 1px solid rgba(255,69,0,0.3);
+    border-radius: 20px; padding: 2px 8px;
+    font-size: 10px; font-weight: 700; color: #ff6622; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .dot-c { width: 6px; height: 6px; border-radius: 50%; background: #ff4500; animation: blink 1s infinite; }
+  .tabs-c { display: flex; gap: 6px; margin-top: 10px; }
+  .tab-c { flex:1; background: rgba(255,69,0,0.04); border: 1px solid rgba(255,69,0,0.12);
+    border-radius: 8px; padding: 6px 0; text-align: center; font-size: 10px; color: #664433; }
+  .tab-c.active { background: rgba(255,69,0,0.15); border-color: #ff4500; color: #ff6622; }
+
+  .nav-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .team-name { font-size: 11px; font-weight: 600; color: #ddd; }
+  .team { display: flex; align-items: center; gap: 8px; }
+
+  .selection-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(10,8,20,0.95); border-top: 1px solid rgba(255,255,255,0.1);
+    padding: 12px 16px; text-align: center;
+    font-size: 13px; color: #888;
+    backdrop-filter: blur(8px);
+  }
+  .selection-bar span { color: #c89b3c; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h2>Which visual style for The League?</h2>
+<p class="subtitle">Tap a card to select — gamer-forward, LoL-inspired designs</p>
+
+<div class="cards-grid">
+
+  <!-- OPTION A -->
+  <div class="style-card card-a" data-choice="runeterra-dark" onclick="toggleSelect(this)">
+    <div class="preview">
+      <div class="nav-bar">
+        <div class="logo-a">⚔ THE LEAGUE</div>
+        <div class="icons-a">
+          <div class="icon-circle">👤</div>
+          <div class="icon-circle">💰</div>
+          <div class="icon-circle">🔔</div>
+        </div>
+      </div>
+      <div class="live-badge-a"><div class="dot"></div> LIVE · GRAND FINAL</div>
+      <div class="match-card-a">
+        <div class="team-a">
+          <div class="champ-icon">🐉</div>
+          <div class="team-name-a">Dragon Fist</div>
+        </div>
+        <div class="score-a">2 – 1</div>
+        <div class="team-a">
+          <div class="team-name-a">Nexus Rush</div>
+          <div class="champ-icon">⚡</div>
+        </div>
+      </div>
+      <div class="tabs-a">
+        <div class="tab-a active">🏆 Bracket</div>
+        <div class="tab-a">⚔ Matches</div>
+        <div class="tab-a">💎 Prizes</div>
+        <div class="tab-a">📊 Stats</div>
+      </div>
+    </div>
+    <div class="card-label">
+      <h3>A — Runeterra Dark (Purple × Gold)</h3>
+      <p>Deep void purple with champion gold. Feels like Runeterra itself — mysterious, powerful, high-stakes. Most LoL-native.</p>
+    </div>
+  </div>
+
+  <!-- OPTION B -->
+  <div class="style-card card-b" data-choice="hextech-blue" onclick="toggleSelect(this)">
+    <div class="preview">
+      <div class="nav-bar">
+        <div class="logo-b">◈ THE LEAGUE</div>
+        <div class="icons-a">
+          <div class="icon-circle" style="border-color:#00c8ff33;color:#00c8ff">👤</div>
+          <div class="icon-circle" style="border-color:#00c8ff33;color:#00c8ff">💰</div>
+          <div class="icon-circle" style="border-color:#00c8ff33;color:#00c8ff">🔔</div>
+        </div>
+      </div>
+      <div class="live-badge-b"><div class="dot-b"></div> LIVE · GRAND FINAL</div>
+      <div class="match-card-b">
+        <div class="team">
+          <div class="champ-icon-b">🤖</div>
+          <div class="team-name">Storm Forge</div>
+        </div>
+        <div class="score-b">2 – 1</div>
+        <div class="team">
+          <div class="team-name">Iron Dawn</div>
+          <div class="champ-icon-b">🛡</div>
+        </div>
+      </div>
+      <div class="tabs-b">
+        <div class="tab-b active">🏆 Bracket</div>
+        <div class="tab-b">⚔ Matches</div>
+        <div class="tab-b">💎 Prizes</div>
+        <div class="tab-b">📊 Stats</div>
+      </div>
+    </div>
+    <div class="card-label">
+      <h3>B — Hextech Blue (Cyan × Navy)</h3>
+      <p>Electric cyan on dark navy — Hextech crystal energy. Clean, technological, futuristic. Closest to official LoL client aesthetic.</p>
+    </div>
+  </div>
+
+  <!-- OPTION C -->
+  <div class="style-card card-c" data-choice="infernal-red" onclick="toggleSelect(this)">
+    <div class="preview">
+      <div class="nav-bar">
+        <div class="logo-c">🔥 THE LEAGUE</div>
+        <div class="icons-a">
+          <div class="icon-circle" style="border-color:#ff450033;color:#ff6622">👤</div>
+          <div class="icon-circle" style="border-color:#ff450033;color:#ff6622">💰</div>
+          <div class="icon-circle" style="border-color:#ff450033;color:#ff6622">🔔</div>
+        </div>
+      </div>
+      <div class="live-badge-c"><div class="dot-c"></div> LIVE · GRAND FINAL</div>
+      <div class="match-card-c">
+        <div class="team">
+          <div class="champ-icon-c">🔥</div>
+          <div class="team-name">Inferno Pack</div>
+        </div>
+        <div class="score-c">2 – 1</div>
+        <div class="team">
+          <div class="team-name">Void Rift</div>
+          <div class="champ-icon-c">💀</div>
+        </div>
+      </div>
+      <div class="tabs-c">
+        <div class="tab-c active">🏆 Bracket</div>
+        <div class="tab-c">⚔ Matches</div>
+        <div class="tab-c">💎 Prizes</div>
+        <div class="tab-c">📊 Stats</div>
+      </div>
+    </div>
+    <div class="card-label">
+      <h3>C — Infernal Red (Fire × Dark)</h3>
+      <p>Volcanic orange-red on near-black. Aggressive, intense, hype-generating. Great for a competitive tournament platform.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="selection-bar" id="selBar">Tap a style to select it</div>
+
+<script>
+function toggleSelect(el) {
+  document.querySelectorAll('.style-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const choice = el.dataset.choice;
+  const names = {
+    'runeterra-dark': 'A — Runeterra Dark',
+    'hextech-blue': 'B — Hextech Blue',
+    'infernal-red': 'C — Infernal Red'
+  };
+  document.getElementById('selBar').innerHTML = '✓ Selected: <span>' + names[choice] + '</span> — confirm in terminal';
+  if (window.__superpowers_record) window.__superpowers_record({type:'click', choice, text: names[choice]});
+}
+</script>
+</body>
+</html>

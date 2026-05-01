@@ -1,53 +1,42 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
-import { Platform } from 'react-native';
-
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
-
 export const Colors = {
-  light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
-  },
-  dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
-  },
+  background: '#070b14',
+  surface: '#0d1520',
+  surfaceAlt: '#111d2e',
+  accent: '#00c8ff',
+  accentDim: 'rgba(0,200,255,0.15)',
+  accentBorder: 'rgba(0,200,255,0.25)',
+  gold: '#c89b3c',
+  text: '#e0eeff',
+  textMuted: '#556677',
+  textDim: '#334455',
+  live: '#ff4444',
+  success: '#00ff88',
+  warning: '#ffaa00',
+  error: '#ff4444',
+  white: '#ffffff',
 };
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
+export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+};
+
+export const Typography = {
+  title: { fontSize: 24, fontWeight: '800' as const, color: Colors.text },
+  heading: { fontSize: 18, fontWeight: '700' as const, color: Colors.text },
+  subheading: { fontSize: 15, fontWeight: '600' as const, color: Colors.text },
+  body: { fontSize: 13, fontWeight: '400' as const, color: Colors.textMuted },
+  label: { fontSize: 10, fontWeight: '700' as const, color: Colors.textMuted, letterSpacing: 1.5, textTransform: 'uppercase' as const },
+  mono: { fontSize: 13, fontFamily: 'monospace' as const, color: Colors.accent },
+};
+
+export const Radius = {
+  sm: 6,
+  md: 10,
+  lg: 14,
+  full: 999,
+};
