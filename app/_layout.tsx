@@ -3,6 +3,7 @@ import { DEV_BYPASS } from '@/lib/dev';
 import { Session } from '@supabase/supabase-js';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as Linking from 'expo-linking';
 import 'react-native-reanimated';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
@@ -22,7 +23,19 @@ export default function RootLayout() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
-    return () => subscription.unsubscribe();
+
+    // Handle email confirmation deep links
+    const linkSub = Linking.addEventListener('url', async ({ url }) => {
+      if (url.includes('auth/callback') || url.includes('access_token') || url.includes('code=')) {
+        const { data } = await supabase.auth.exchangeCodeForSession(url);
+        if (data.session) router.replace('/(tabs)');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      linkSub.remove();
+    };
   }, []);
 
   useEffect(() => {

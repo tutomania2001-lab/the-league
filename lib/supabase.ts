@@ -10,5 +10,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // Lock session to this device — prevents session token theft
+    flowType: 'pkce',
+  },
+  global: {
+    headers: {
+      // Identify requests from the mobile app
+      'x-app-name': 'the-league-mobile',
+    },
   },
 });
