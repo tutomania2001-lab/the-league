@@ -9,6 +9,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
@@ -72,6 +73,7 @@ export default function RootLayout() {
   }
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <ThemeProvider value={AppTheme}>
       <View style={styles.root}>
         <RootBackground />
@@ -88,6 +90,7 @@ export default function RootLayout() {
         <StatusBar style="light" />
       </View>
     </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 
