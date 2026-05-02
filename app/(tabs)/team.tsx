@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { GlowText } from '@/components/ui/GlowText';
 import { Input } from '@/components/ui/Input';
+import { LeagueEmblem } from '@/components/ui/LeagueEmblem';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { useTeam } from '@/hooks/useTeam';
@@ -12,24 +12,172 @@ import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, Easing, FlatList, Image,
+  ActivityIndicator, Dimensions, FlatList, Image,
   KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
-// ── Info modal ─────────────────────────────────────────────
+const { width } = Dimensions.get('window');
+
+// ── Role config ────────────────────────────────────────────
+const ROLES: Record<string, { label: string; color: string; bg: string }> = {
+  leader:    { label: 'LEADER',    color: Colors.gold,    bg: 'rgba(200,155,60,0.2)' },
+  member:    { label: 'MEMBER',    color: Colors.textMuted, bg: Colors.surfaceAlt },
+};
+
+function getRoleLabel(captainId: string, userId: string) {
+  return captainId === userId ? 'leader' : 'member';
+}
+
+// ── Team Banner ────────────────────────────────────────────
+function TeamBanner({ team, memberCount, wins, onInvite }: {
+  team: any; memberCount: number; wins: number; onInvite: () => void;
+}) {
+  const level = Math.floor(wins / 3) + 1;
+  const tag = team.name.slice(0, 4).toUpperCase();
+
+  return (
+    <View style={styles.banner}>
+      {/* Gold gradient background */}
+      <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
+        <Defs>
+          <LinearGradient id="bannerGrad" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor="#1a1200" stopOpacity="1" />
+            <Stop offset="0.5" stopColor="#0d0d1f" stopOpacity="1" />
+            <Stop offset="1" stopColor="#0a0a14" stopOpacity="1" />
+          </LinearGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill="url(#bannerGrad)" />
+      </Svg>
+
+      {/* Gold top border */}
+      <View style={styles.bannerBorder} />
+
+      <View style={styles.bannerContent}>
+        {/* Emblem */}
+        <View style={styles.emblemWrap}>
+          <LeagueEmblem size={72} color={Colors.gold} />
+        </View>
+
+        {/* Info */}
+        <View style={{ flex: 1 }}>
+          <View style={styles.nameRow}>
+            <Text style={styles.clanName}>{team.name}</Text>
+            <View style={styles.tagChip}>
+              <Text style={styles.tagText}>#{tag}</Text>
+            </View>
+          </View>
+          <View style={styles.levelRow}>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelText}>Lv.{level}</Text>
+            </View>
+            <Text style={styles.bannerSub}>{memberCount}/10 members</Text>
+          </View>
+          {/* Stats row */}
+          <View style={styles.bannerStats}>
+            <View style={styles.bannerStat}>
+              <Text style={styles.bannerStatVal}>{wins}</Text>
+              <Text style={styles.bannerStatLabel}>Wins</Text>
+            </View>
+            <View style={styles.bannerStatDiv} />
+            <View style={styles.bannerStat}>
+              <Text style={styles.bannerStatVal}>{memberCount}</Text>
+              <Text style={styles.bannerStatLabel}>Members</Text>
+            </View>
+            <View style={styles.bannerStatDiv} />
+            <View style={styles.bannerStat}>
+              <Text style={styles.bannerStatVal}>{team.tournaments_played ?? 0}</Text>
+              <Text style={styles.bannerStatLabel}>Played</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Invite button */}
+      <TouchableOpacity style={styles.inviteBtn} onPress={onInvite}>
+        <Text style={styles.inviteBtnText}>+ Invite</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ── Room Code modal ────────────────────────────────────────
 function RoomCodeInfo({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.infoBackdrop} activeOpacity={1} onPress={onClose} />
+      <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={onClose} />
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>🎮 How to join the match</Text>
         {['1. Open Wild Rift on your device','2. Tap Play → Custom Game','3. Tap Join Game','4. Paste the Room Code shown here','5. Enter the password if shown','6. Ready up and wait for match start']
           .map((s, i) => <Text key={i} style={styles.infoStep}>{s}</Text>)}
         <TouchableOpacity style={styles.infoDismiss} onPress={onClose}>
-          <Text style={{ color: Colors.accent, fontWeight: '700', fontSize: 13 }}>Got it</Text>
+          <Text style={{ color: Colors.gold, fontWeight: '700', fontSize: 13 }}>Got it</Text>
         </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+}
+
+// ── Lineup picker ──────────────────────────────────────────
+function LineupPicker({ visible, members, memberProfiles, onConfirm, onClose, fee }: {
+  visible: boolean; members: any[]; memberProfiles: Record<string, any>;
+  onConfirm: (ids: string[]) => void; onClose: () => void; fee: number;
+}) {
+  const [selected, setSelected] = useState<string[]>([]);
+  function toggle(id: string) {
+    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : prev.length < 5 ? [...prev, id] : prev);
+  }
+  return (
+    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={onClose} />
+      </View>
+      <View style={styles.lineupSheet}>
+        <View style={styles.lineupHeader}>
+          <Text style={styles.lineupTitle}>⚔️ Select Starting 5</Text>
+          <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+            <Text style={{ color: Colors.textMuted, fontSize: 16 }}>✕</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={[Typography.body, { paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm, fontSize: 12 }]}>
+          Choose 5 players for this tournament. Each pays £{fee}.
+        </Text>
+        <ScrollView contentContainerStyle={{ padding: Spacing.sm, gap: Spacing.xs }}>
+          {members.map(m => {
+            const p = memberProfiles[m.user_id];
+            const name = p?.riot_id ?? p?.username ?? 'Player';
+            const isSelected = selected.includes(m.user_id);
+            return (
+              <TouchableOpacity key={m.user_id} onPress={() => toggle(m.user_id)}
+                style={[styles.lineupRow, isSelected && styles.lineupRowSelected]}>
+                {p?.avatar_url
+                  ? <Image source={{ uri: p.avatar_url }} style={styles.lineupAvatar} />
+                  : <View style={[styles.lineupAvatar, { backgroundColor: Colors.accentDim, alignItems:'center', justifyContent:'center' }]}>
+                      <Text style={{ color: Colors.accent, fontWeight: '800' }}>{name[0]}</Text>
+                    </View>
+                }
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.lineupName, isSelected && { color: Colors.gold }]}>{name}</Text>
+                  <StatusDot status={p?.status ?? 'offline'} size={7} showLabel />
+                </View>
+                <View style={[styles.lineupCheck, isSelected && styles.lineupCheckDone]}>
+                  {isSelected && <Text style={{ color: '#000', fontSize: 10, fontWeight: '900' }}>✓</Text>}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+        <View style={styles.lineupFooter}>
+          <View>
+            <Text style={{ color: selected.length === 5 ? Colors.gold : Colors.textMuted, fontWeight: '700', fontSize: 14 }}>
+              {selected.length}/5 selected
+            </Text>
+            {selected.length === 5 && <Text style={{ color: Colors.accent, fontSize: 12 }}>Total: £{fee * 5}</Text>}
+          </View>
+          <Button label="Confirm Lineup →" onPress={() => onConfirm(selected)} disabled={selected.length !== 5} style={{ minWidth: 140 }} />
+        </View>
       </View>
     </Modal>
   );
@@ -43,9 +191,7 @@ function TeamChat({ teamId, myId, memberProfiles }: { teamId: string; myId: stri
   const listRef = useRef<FlatList>(null);
   const justSent = useRef(false);
 
-  useEffect(() => {
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
-  }, [messages.length]);
+  useEffect(() => { setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100); }, [messages.length]);
 
   async function handleSend() {
     if (!text.trim()) return;
@@ -53,13 +199,12 @@ function TeamChat({ teamId, myId, memberProfiles }: { teamId: string; myId: stri
     const content = text.trim();
     setText('');
     setSending(true);
-    // Double-clear after microtask to catch any trailing newline from onChangeText
     setTimeout(() => setText(''), 0);
     await send(content);
     setSending(false);
   }
 
-  if (loading) return <ActivityIndicator color={Colors.accent} style={{ flex: 1 }} />;
+  if (loading) return <ActivityIndicator color={Colors.gold} style={{ flex: 1 }} />;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -67,31 +212,33 @@ function TeamChat({ teamId, myId, memberProfiles }: { teamId: string; myId: stri
         ref={listRef}
         data={messages}
         keyExtractor={m => m.id}
-        contentContainerStyle={{ padding: Spacing.sm, gap: 6, flexGrow: 1 }}
+        contentContainerStyle={{ padding: Spacing.sm, gap: 8, flexGrow: 1 }}
         onLayout={() => listRef.current?.scrollToEnd()}
         ListEmptyComponent={
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xxl }}>
             <Text style={{ fontSize: 32, marginBottom: 8 }}>💬</Text>
-            <Text style={[Typography.subheading, { textAlign: 'center' }]}>Team chat</Text>
-            <Text style={[Typography.body, { textAlign: 'center', marginTop: 4 }]}>Say something to your team!</Text>
+            <Text style={[Typography.subheading, { textAlign: 'center', color: Colors.gold }]}>Clan Chat</Text>
+            <Text style={[Typography.body, { textAlign: 'center', marginTop: 4 }]}>Say something to your clan!</Text>
           </View>
         }
         renderItem={({ item }) => {
           const isMe = item.user_id === myId;
-          const name = item.profile?.riot_id ?? item.profile?.username ?? memberProfiles[item.user_id] ?? '?';
-          const avatar = item.profile?.avatar_url;
+          const p = memberProfiles[item.user_id];
+          const name = p?.riot_id ?? p?.username ?? '?';
+          const avatar = p?.avatar_url;
           return (
             <View style={[styles.chatRow, isMe && styles.chatRowMe]}>
               {!isMe && (
-                avatar ? <Image source={{ uri: avatar }} style={styles.chatAvatar} />
-                  : <View style={[styles.chatAvatar, { backgroundColor: Colors.accentDim, alignItems: 'center', justifyContent: 'center' }]}>
-                      <Text style={{ color: Colors.accent, fontSize: 12, fontWeight: '800' }}>{name[0]}</Text>
+                avatar
+                  ? <Image source={{ uri: avatar }} style={styles.chatAvatar} />
+                  : <View style={[styles.chatAvatar, { backgroundColor: 'rgba(200,155,60,0.2)', alignItems:'center', justifyContent:'center' }]}>
+                      <Text style={{ color: Colors.gold, fontSize: 12, fontWeight: '800' }}>{name[0]}</Text>
                     </View>
               )}
               <View style={{ flex: 1 }}>
                 {!isMe && <Text style={styles.chatName}>{name}</Text>}
                 <View style={[styles.chatBubble, isMe ? styles.chatBubbleMe : styles.chatBubbleThem]}>
-                  <Text style={[styles.chatText, isMe && { color: Colors.background }]}>{item.content}</Text>
+                  <Text style={[styles.chatText, isMe && { color: '#0a0800' }]}>{item.content}</Text>
                 </View>
                 <Text style={[styles.chatTime, isMe && { textAlign: 'right' }]}>
                   {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -101,18 +248,17 @@ function TeamChat({ teamId, myId, memberProfiles }: { teamId: string; myId: stri
           );
         }}
       />
-      <View style={styles.chatInput}>
+      <View style={styles.chatInputRow}>
         <TextInput
           style={styles.chatTextInput}
           value={text}
           onChangeText={v => {
-            // Block trailing newline that fires after Enter sends
             const cleaned = v.replace(/\n/g, '');
             if (justSent.current) { justSent.current = false; setText(cleaned); return; }
-            if (v.endsWith('\n') && v.trim() === text.trim()) { return; }
+            if (v.endsWith('\n') && v.trim() === text.trim()) return;
             setText(v);
           }}
-          placeholder="Message team..."
+          placeholder="Clan chat..."
           placeholderTextColor={Colors.textDim}
           multiline maxLength={500}
           onSubmitEditing={handleSend}
@@ -121,80 +267,14 @@ function TeamChat({ teamId, myId, memberProfiles }: { teamId: string; myId: stri
           onKeyPress={({ nativeEvent }) => { if (nativeEvent.key === 'Enter' && !(nativeEvent as any).shiftKey) handleSend(); }}
         />
         <TouchableOpacity style={[styles.chatSendBtn, !text.trim() && { opacity: 0.4 }]} onPress={handleSend} disabled={!text.trim() || sending}>
-          {sending ? <ActivityIndicator color={Colors.background} size="small" /> : <Text style={{ color: Colors.background, fontSize: 16, fontWeight: '900' }}>➤</Text>}
+          {sending ? <ActivityIndicator color="#0a0800" size="small" /> : <Text style={{ color: '#0a0800', fontSize: 16, fontWeight: '900' }}>➤</Text>}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-// ── Lineup picker modal ────────────────────────────────────
-function LineupPicker({ visible, members, memberProfiles, onConfirm, onClose, fee }: {
-  visible: boolean; members: any[]; memberProfiles: Record<string, any>;
-  onConfirm: (ids: string[]) => void; onClose: () => void; fee: number;
-}) {
-  const [selected, setSelected] = useState<string[]>([]);
-
-  function toggle(id: string) {
-    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : prev.length < 5 ? [...prev, id] : prev);
-  }
-
-  return (
-    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.lineupBackdrop}>
-        <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={onClose} />
-      </View>
-      <View style={styles.lineupSheet}>
-        <View style={styles.lineupHeader}>
-          <Text style={styles.lineupTitle}>⚔️ Select 5 Players</Text>
-          <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
-            <Text style={{ color: Colors.textMuted, fontSize: 16 }}>✕</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={[Typography.body, { paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm }]}>
-          Choose which 5 players enter this tournament. Each pays £{fee}.
-        </Text>
-        <ScrollView contentContainerStyle={{ padding: Spacing.sm, gap: Spacing.xs }}>
-          {members.map(m => {
-            const isSelected = selected.includes(m.user_id);
-            const name = memberProfiles[m.user_id] ?? 'Player';
-            return (
-              <TouchableOpacity
-                key={m.user_id}
-                onPress={() => toggle(m.user_id)}
-                style={[styles.lineupRow, isSelected && styles.lineupRowSelected]}
-              >
-                <View style={[styles.lineupCheck, isSelected && styles.lineupCheckDone]}>
-                  {isSelected && <Text style={{ color: Colors.background, fontSize: 10, fontWeight: '900' }}>✓</Text>}
-                </View>
-                <Text style={[styles.lineupName, isSelected && { color: Colors.accent }]}>{name}</Text>
-                {isSelected && <Text style={styles.lineupFee}>£{fee}</Text>}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-        <View style={styles.lineupFooter}>
-          <View>
-            <Text style={[Typography.subheading, { color: selected.length === 5 ? Colors.accent : Colors.textMuted }]}>
-              {selected.length}/5 selected
-            </Text>
-            {selected.length === 5 && (
-              <Text style={[Typography.body, { color: Colors.gold }]}>Total: £{fee * 5}</Text>
-            )}
-          </View>
-          <Button
-            label="Confirm Lineup →"
-            onPress={() => onConfirm(selected)}
-            disabled={selected.length !== 5}
-            style={{ minWidth: 140 }}
-          />
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-// ── Main screen ────────────────────────────────────────────
+// ── Main ───────────────────────────────────────────────────
 export default function TeamScreen() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>();
@@ -202,38 +282,25 @@ export default function TeamScreen() {
   const { tournaments } = useTournamentList();
   const openTournaments = tournaments.filter(t => t.status === 'open');
   const [memberProfiles, setMemberProfiles] = useState<Record<string, any>>({});
-  const [activeTab, setActiveTab] = useState<'chat' | 'roster' | 'stats' | 'tournaments'>('chat');
-
-  // Creation flow — just a name now, room code only needed for tournaments
-  const [roomCode, setRoomCode] = useState('');
-  const [roomPassword, setRoomPassword] = useState('');
+  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'chat' | 'play'>('overview');
   const [teamName, setTeamName] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Room code editing
   const [editingCode, setEditingCode] = useState(false);
   const [newCode, setNewCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
-
-  // Lineup picker
   const [lineupTournamentId, setLineupTournamentId] = useState<string | null>(null);
   const [lineupFee, setLineupFee] = useState(0);
   const [joiningTournament, setJoiningTournament] = useState(false);
-
-  // Info
   const [showInfo, setShowInfo] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
-  }, []);
+  useEffect(() => { supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id)); }, []);
 
   useEffect(() => {
     if (!members.length) return;
     supabase.from('users').select('id, riot_id, username, avatar_url, status').in('id', members.map(m => m.user_id))
-      .then(({ data }) => {
-        if (data) setMemberProfiles(Object.fromEntries(data.map(u => [u.id, u])));
-      });
+      .then(({ data }) => { if (data) setMemberProfiles(Object.fromEntries(data.map(u => [u.id, u]))); });
   }, [members]);
 
   async function handleCreate() {
@@ -248,246 +315,270 @@ export default function TeamScreen() {
   async function handleEnterTournament(ids: string[]) {
     if (!team || !lineupTournamentId) return;
     setJoiningTournament(true);
-
-    // Register team in tournament
-    const { error: regError } = await supabase.from('tournament_teams')
-      .insert({ tournament_id: lineupTournamentId, team_id: team.id });
-    if (regError && !regError.message.includes('duplicate')) {
-      setJoiningTournament(false); setLineupTournamentId(null); return;
+    const { error: regError } = await supabase.from('tournament_teams').insert({ tournament_id: lineupTournamentId, team_id: team.id });
+    if (!regError || regError.message.includes('duplicate')) {
+      await supabase.from('tournament_lineups').insert(ids.map(uid => ({ tournament_id: lineupTournamentId, team_id: team.id, user_id: uid })));
     }
-
-    // Save lineup
-    await supabase.from('tournament_lineups').insert(
-      ids.map(uid => ({ tournament_id: lineupTournamentId, team_id: team.id, user_id: uid }))
-    );
-
     setJoiningTournament(false);
     setLineupTournamentId(null);
-    setActiveTab('tournaments');
     router.push(`/tournament/${lineupTournamentId}`);
   }
 
-  if (loading) return <SafeAreaView style={styles.safe}><ActivityIndicator color={Colors.accent} style={{ flex: 1 }} /></SafeAreaView>;
+  if (loading) return <SafeAreaView style={styles.safe}><ActivityIndicator color={Colors.gold} style={{ flex: 1 }} /></SafeAreaView>;
 
-  // ── No team — creation ──────────────────────────────────
+  // ── No team ──────────────────────────────────────────────
   if (!team) return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <GlowText style={Typography.title}>⚔️ My Team</GlowText>
+          <GlowText style={[Typography.title, { color: Colors.gold }]}>⚔️ My Clan</GlowText>
           <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
             <Text style={{ color: Colors.textMuted, fontSize: 13 }}>Cancel</Text>
           </TouchableOpacity>
         </View>
 
-        <Card style={{ gap: Spacing.md }}>
-          <Text style={[Typography.subheading, { color: Colors.text }]}>Create a Team</Text>
-          <Text style={[Typography.body, { lineHeight: 20 }]}>
-            Assemble up to 10 players. Free to create — you only pay when you enter a tournament.
+        <View style={styles.createCard}>
+          <LeagueEmblem size={64} color={Colors.gold} />
+          <Text style={styles.createTitle}>Create a Clan</Text>
+          <Text style={[Typography.body, { textAlign: 'center', lineHeight: 20 }]}>
+            Assemble up to 10 players. Free to create — you only pay when entering tournaments.
           </Text>
-          <Input label="Team Name *" placeholder="e.g. Dragon Fist" value={teamName} onChangeText={setTeamName} autoCorrect={false} />
+          <Input label="Clan Name *" placeholder="e.g. Dragon Fist" value={teamName} onChangeText={setTeamName} autoCorrect={false} style={{ width: '100%' }} />
           {error && <Text style={{ color: Colors.error, fontSize: 12 }}>{error}</Text>}
-          <Button label="Create Team" onPress={handleCreate} loading={creating} />
-        </Card>
+          <Button label="Create Clan" onPress={handleCreate} loading={creating} style={styles.createBtn} />
+        </View>
 
-        <Card style={{ gap: Spacing.sm }}>
-          <Text style={Typography.label}>Already in a team?</Text>
-          <Button label="Join with Room Code" variant="secondary" onPress={() => router.push('/team/invite')} />
-        </Card>
+        <TouchableOpacity style={styles.joinCard} onPress={() => router.push('/team/invite')}>
+          <Text style={{ fontSize: 24 }}>🔗</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[Typography.subheading, { color: Colors.gold }]}>Join a Clan</Text>
+            <Text style={[Typography.body, { fontSize: 11 }]}>Enter a room code to join an existing clan</Text>
+          </View>
+          <Text style={{ color: Colors.gold, fontSize: 18 }}>›</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 
   const isCaptain = team.captain_id === userId;
+  const wins = team.wins ?? 0;
 
-  // ── Team Hub ────────────────────────────────────────────
+  // ── Clan Hub ─────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Team header */}
-      <View style={styles.hubHeader}>
-        <View style={{ flex: 1 }}>
-          <GlowText style={styles.hubName}>{team.name}</GlowText>
-          <Text style={[Typography.body, { fontSize: 11, marginTop: 2 }]}>{members.length}/10 members{isCaptain ? ' · Captain' : ''}</Text>
-        </View>
-        {team.room_code && (
-          <TouchableOpacity style={styles.codeChip} onPress={async () => { await Clipboard.setStringAsync(team.room_code!); }}>
-            <Text style={styles.codeChipText}>🎮 {team.room_code}</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity onPress={() => setShowInfo(true)} style={styles.infoBtn}>
-          <Text style={styles.infoBtnText}>ℹ</Text>
-        </TouchableOpacity>
-      </View>
+      <TeamBanner team={team} memberCount={members.length} wins={wins} onInvite={() => router.push('/team/invite')} />
 
-      {/* Inner tabs */}
-      <View style={styles.innerTabs}>
-        {([['chat','💬','Chat'],['roster','⚔️','Roster'],['stats','📊','Stats'],['tournaments','🏆','Play']] as const).map(([t, emoji, label]) => (
-          <TouchableOpacity key={t} style={[styles.innerTab, activeTab === t && styles.innerTabActive]} onPress={() => setActiveTab(t)}>
-            <Text style={styles.innerTabEmoji}>{emoji}</Text>
-            <Text style={[styles.innerTabLabel, activeTab === t && { color: Colors.accent }]}>{label}</Text>
+      {/* Tab bar */}
+      <View style={styles.tabBar}>
+        {([['overview','🏰','Overview'],['members','👥','Members'],['chat','💬','Chat'],['play','⚔️','Play']] as const).map(([t, emoji, label]) => (
+          <TouchableOpacity key={t} style={[styles.tab, activeTab === t && styles.tabActive]} onPress={() => setActiveTab(t)}>
+            <Text style={[styles.tabLabel, activeTab === t && styles.tabLabelActive]}>{emoji} {label}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* Tab content */}
       <View style={{ flex: 1 }}>
+
+        {/* OVERVIEW */}
+        {activeTab === 'overview' && (
+          <ScrollView contentContainerStyle={styles.tabContent}>
+            {/* Room code card */}
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>🎮 Wild Rift Room</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {isCaptain && (
+                    <TouchableOpacity onPress={() => { setEditingCode(!editingCode); setNewCode(team.room_code ?? ''); setNewPassword(team.room_password ?? ''); }}>
+                      <Text style={{ color: Colors.gold, fontSize: 12 }}>{editingCode ? 'Cancel' : '✏️ Edit'}</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity onPress={() => setShowInfo(true)}>
+                    <Text style={{ color: Colors.textMuted, fontSize: 12 }}>ℹ️</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {!editingCode ? (
+                team.room_code ? (
+                  <TouchableOpacity style={styles.roomCodeBlock} onPress={async () => { await Clipboard.setStringAsync(team.room_code!); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
+                    <Text style={styles.roomCodeText}>{team.room_code}</Text>
+                    <View style={[styles.copyChip, copied && { backgroundColor: 'rgba(0,255,136,0.15)', borderColor: Colors.success + '55' }]}>
+                      <Text style={{ color: copied ? Colors.success : Colors.gold, fontSize: 11, fontWeight: '700' }}>{copied ? '✓ Copied' : '📋 Copy'}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ) : isCaptain ? (
+                  <TouchableOpacity style={styles.noCodeBtn} onPress={() => setEditingCode(true)}>
+                    <Text style={{ color: Colors.gold, fontSize: 12 }}>+ Set room code for tournaments</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={[Typography.body, { color: Colors.error, fontSize: 12 }]}>⚠️ Leader hasn't set a room code</Text>
+                )
+              ) : (
+                <View style={{ gap: Spacing.sm }}>
+                  <Input label="Room Code (5 digits)" value={newCode} onChangeText={v => setNewCode(v.replace(/[^0-9]/g, '').slice(0, 5))} keyboardType="numeric" maxLength={5} />
+                  <Input label="Password (optional)" value={newPassword} onChangeText={setNewPassword} autoCapitalize="none" />
+                  <Button label="Save" disabled={newCode.length !== 5} onPress={async () => {
+                    if (!/^\d{5}$/.test(newCode)) return;
+                    await supabase.from('teams').update({ room_code: newCode, room_password: newPassword.trim() || null }).eq('id', team.id);
+                    setEditingCode(false); refreshTeam();
+                  }} />
+                </View>
+              )}
+            </View>
+
+            {/* Stats */}
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>📊 Clan Stats</Text>
+              <View style={styles.statsRow}>
+                {[
+                  { label: 'Wins', val: wins, icon: '🏆' },
+                  { label: 'Played', val: team.tournaments_played ?? 0, icon: '⚔️' },
+                  { label: 'Earnings', val: `£${((team as any).total_earnings ?? 0).toFixed(0)}`, icon: '💰' },
+                ].map(s => (
+                  <View key={s.label} style={styles.statBox}>
+                    <Text style={{ fontSize: 22 }}>{s.icon}</Text>
+                    <Text style={styles.statVal}>{s.val}</Text>
+                    <Text style={styles.statLabel}>{s.label}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Quick actions */}
+            <View style={styles.quickActions}>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => setActiveTab('play')}>
+                <Text style={{ fontSize: 24 }}>⚔️</Text>
+                <Text style={styles.quickLabel}>Enter{'\n'}Tournament</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => setActiveTab('chat')}>
+                <Text style={{ fontSize: 24 }}>💬</Text>
+                <Text style={styles.quickLabel}>Clan{'\n'}Chat</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/team/invite')}>
+                <Text style={{ fontSize: 24 }}>👥</Text>
+                <Text style={styles.quickLabel}>Invite{'\n'}Players</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        )}
+
+        {/* MEMBERS */}
+        {activeTab === 'members' && (
+          <ScrollView contentContainerStyle={styles.tabContent}>
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>👥 Members — {members.length}/10</Text>
+              {members.map(m => {
+                const p = memberProfiles[m.user_id];
+                const role = getRoleLabel(team.captain_id, m.user_id);
+                const roleCfg = ROLES[role];
+                return (
+                  <View key={m.user_id} style={styles.memberRow}>
+                    {p?.avatar_url
+                      ? <Image source={{ uri: p.avatar_url }} style={styles.memberAvatar} />
+                      : <View style={[styles.memberAvatar, { backgroundColor: 'rgba(200,155,60,0.15)', alignItems:'center', justifyContent:'center' }]}>
+                          <Text style={{ color: Colors.gold, fontSize: 16, fontWeight: '800' }}>{(p?.riot_id ?? p?.username ?? '?')[0]}</Text>
+                        </View>
+                    }
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <Text style={styles.memberName}>{p?.riot_id ?? p?.username ?? 'Player'}</Text>
+                      <StatusDot status={p?.status ?? 'offline'} size={8} showLabel />
+                    </View>
+                    <View style={[styles.roleBadge, { backgroundColor: roleCfg.bg, borderColor: roleCfg.color + '55' }]}>
+                      <Text style={[styles.roleText, { color: roleCfg.color }]}>{roleCfg.label}</Text>
+                    </View>
+                    {isCaptain && m.user_id !== userId && (
+                      <TouchableOpacity style={styles.kickBtn} onPress={async () => { await supabase.from('team_members').delete().eq('team_id', team.id).eq('user_id', m.user_id); refreshTeam(); }}>
+                        <Text style={{ color: Colors.error, fontSize: 11 }}>Kick</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+              {Array.from({ length: Math.max(0, 10 - members.length) }).map((_, i) => (
+                <View key={`e-${i}`} style={[styles.memberRow, { opacity: 0.35 }]}>
+                  <View style={[styles.memberAvatar, { borderStyle: 'dashed', backgroundColor: 'transparent' }]} />
+                  <Text style={[Typography.body, { fontSize: 12 }]}>Open slot</Text>
+                </View>
+              ))}
+            </View>
+            <Button label="📨 Invite Players" variant="secondary" onPress={() => router.push('/team/invite')} style={{ borderColor: Colors.gold + '88', marginTop: Spacing.sm }} />
+            <Button label="Leave Clan" variant="ghost" onPress={leaveTeam} style={{ borderColor: Colors.error + '44', marginTop: Spacing.xs }} />
+          </ScrollView>
+        )}
 
         {/* CHAT */}
         {activeTab === 'chat' && userId && (
-          <TeamChat teamId={team.id} myId={userId} memberProfiles={Object.fromEntries(Object.entries(memberProfiles).map(([k, v]) => [k, v?.riot_id ?? v?.username ?? '?']))} />
+          <TeamChat
+            teamId={team.id}
+            myId={userId}
+            memberProfiles={memberProfiles}
+          />
         )}
 
-        {/* ROSTER */}
-        {activeTab === 'roster' && (
-          <ScrollView contentContainerStyle={{ padding: Spacing.md, gap: Spacing.sm, paddingBottom: Spacing.xxl }}>
-            <Text style={Typography.label}>Roster ({members.length}/10)</Text>
-            {members.map(m => {
-              const p = memberProfiles[m.user_id];
-              return (
-                <Card key={m.user_id} style={styles.memberRow}>
-                  {p?.avatar_url
-                    ? <Image source={{ uri: p.avatar_url }} style={styles.memberAvatar} />
-                    : <View style={[styles.memberAvatar, { backgroundColor: Colors.accentDim, alignItems: 'center', justifyContent: 'center' }]}>
-                        <Text style={{ color: Colors.accent, fontSize: 14, fontWeight: '800' }}>{(p?.riot_id ?? p?.username ?? '?')[0]}</Text>
-                      </View>
-                  }
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={[Typography.subheading, { fontSize: 13 }]}>{p?.riot_id ?? p?.username ?? 'Player'}</Text>
-                    <StatusDot status={p?.status ?? 'offline'} size={8} showLabel />
-                  </View>
-                  {m.user_id === team.captain_id && <Text style={[Typography.label, { color: Colors.gold }]}>CAPTAIN</Text>}
-                  {isCaptain && m.user_id !== userId && (
-                    <TouchableOpacity onPress={async () => {
-                      await supabase.from('team_members').delete().eq('team_id', team.id).eq('user_id', m.user_id);
-                      refreshTeam();
-                    }}>
-                      <Text style={{ color: Colors.error, fontSize: 11 }}>Kick</Text>
-                    </TouchableOpacity>
-                  )}
-                </Card>
-              );
-            })}
-            {Array.from({ length: Math.max(0, 10 - members.length) }).map((_, i) => (
-              <Card key={`empty-${i}`} style={[styles.memberRow, { borderStyle: 'dashed', opacity: 0.4 }]}>
-                <Text style={{ fontSize: 20 }}>➕</Text>
-                <Text style={Typography.body}>Invite a player...</Text>
-              </Card>
-            ))}
-            <Button label="📨 Invite Players" variant="secondary" onPress={() => router.push('/team/invite')} />
-            {/* Room code edit for captain */}
-            {isCaptain && (
-              <Card style={{ gap: Spacing.sm, marginTop: Spacing.sm }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={Typography.label}>Wild Rift Room Code</Text>
-                  <TouchableOpacity onPress={() => { setEditingCode(!editingCode); setNewCode(team.room_code ?? ''); setNewPassword(team.room_password ?? ''); }}>
-                    <Text style={{ color: Colors.gold, fontSize: 11, fontWeight: '700' }}>{editingCode ? 'Cancel' : '✏️ Edit'}</Text>
-                  </TouchableOpacity>
+        {/* PLAY */}
+        {activeTab === 'play' && (
+          <ScrollView contentContainerStyle={styles.tabContent}>
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>⚔️ Enter Tournament</Text>
+              <Text style={[Typography.body, { fontSize: 12, marginBottom: Spacing.sm }]}>
+                Select 5 of your {members.length} clan members to compete. Each player pays the entry fee.
+              </Text>
+              {!team.room_code && (
+                <View style={styles.warningBox}>
+                  <Text style={{ color: Colors.warning, fontSize: 12, fontWeight: '600' }}>⚠️ Set a room code in Overview before entering</Text>
                 </View>
-                {!editingCode ? (
-                  <TouchableOpacity style={styles.codeBlock} onPress={async () => { await Clipboard.setStringAsync(team.room_code ?? ''); }}>
-                    <GlowText style={styles.codeText}>{team.room_code ?? '—'}</GlowText>
-                    <Text style={styles.copyText}>📋 Copy</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View style={{ gap: Spacing.sm }}>
-                    <Input label="New Code (5 digits)" value={newCode} onChangeText={v => setNewCode(v.replace(/[^0-9]/g, '').slice(0, 5))} keyboardType="numeric" maxLength={5} autoCorrect={false} />
-                    <Input label="Password (optional)" value={newPassword} onChangeText={setNewPassword} autoCapitalize="none" />
-                    <Button label="Save" disabled={newCode.length !== 5} onPress={async () => {
-                      if (!/^\d{5}$/.test(newCode)) return;
-                      await supabase.from('teams').update({ room_code: newCode.toUpperCase(), room_password: newPassword.trim() || null }).eq('id', team.id);
-                      setEditingCode(false);
-                      refreshTeam();
-                    }} />
-                  </View>
-                )}
-              </Card>
-            )}
-            <Button label="Leave Team" variant="ghost" onPress={leaveTeam} style={{ borderColor: Colors.error + '44', marginTop: Spacing.sm }} />
-          </ScrollView>
-        )}
-
-        {/* STATS */}
-        {activeTab === 'stats' && (
-          <ScrollView contentContainerStyle={{ padding: Spacing.md, gap: Spacing.md }}>
-            <GlowText style={Typography.heading}>📊 Team Stats</GlowText>
-            <View style={styles.statsGrid}>
-              {[
-                { label: 'Wins', value: (team as any).wins ?? 0, icon: '🏆', color: Colors.gold },
-                { label: 'Tournaments', value: (team as any).tournaments_played ?? 0, icon: '⚔️', color: Colors.accent },
-                { label: 'Earnings', value: `£${((team as any).total_earnings ?? 0).toFixed(0)}`, icon: '💰', color: Colors.success },
-                { label: 'Members', value: `${members.length}/10`, icon: '👥', color: Colors.text },
-              ].map(s => (
-                <Card key={s.label} style={styles.statCard}>
-                  <Text style={{ fontSize: 28 }}>{s.icon}</Text>
-                  <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
-                  <Text style={Typography.label}>{s.label}</Text>
-                </Card>
-              ))}
+              )}
             </View>
-            <Card>
-              <Text style={Typography.label}>Win Rate</Text>
-              <GlowText style={[Typography.heading, { marginTop: 4 }]}>
-                {(team as any).tournaments_played > 0
-                  ? `${Math.round(((team as any).wins / (team as any).tournaments_played) * 100)}%`
-                  : '—'}
-              </GlowText>
-            </Card>
-          </ScrollView>
-        )}
 
-        {/* TOURNAMENTS */}
-        {activeTab === 'tournaments' && (
-          <ScrollView contentContainerStyle={{ padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl }}>
-            <GlowText style={Typography.heading}>🏆 Enter a Tournament</GlowText>
-            <Text style={[Typography.body, { lineHeight: 20 }]}>
-              Your team has {members.length} players. Select 5 to enter — each pays the entry fee from their wallet.
-            </Text>
-            {!team.room_code && (
-              <Card style={{ borderColor: Colors.error + '55' }}>
-                <Text style={{ color: Colors.error, fontSize: 12, fontWeight: '700' }}>⚠️ Set a room code first in the Roster tab before entering tournaments.</Text>
-              </Card>
-            )}
             {openTournaments.length === 0 ? (
-              <Card style={{ alignItems: 'center', gap: Spacing.sm }}>
-                <Text style={{ fontSize: 32 }}>🏆</Text>
-                <Text style={[Typography.subheading, { textAlign: 'center' }]}>No open tournaments</Text>
-                <Text style={[Typography.body, { textAlign: 'center' }]}>Check back soon</Text>
-              </Card>
+              <View style={styles.sectionCard}>
+                <Text style={[Typography.subheading, { textAlign: 'center', color: Colors.gold }]}>No open tournaments</Text>
+                <Text style={[Typography.body, { textAlign: 'center', marginTop: 4 }]}>Check back soon for upcoming events</Text>
+              </View>
             ) : (
-              openTournaments.map(t => (
-                <Card key={t.id} style={{ gap: Spacing.sm }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[Typography.subheading, { color: Colors.text }]}>{t.name}</Text>
-                      <Text style={[Typography.body, { fontSize: 11, marginTop: 2 }]}>£{t.entry_fee_per_player}/player · Prize pool £{(t.entry_fee_per_player * 5 * t.max_teams * 0.9).toFixed(0)}</Text>
+              openTournaments.map(t => {
+                const prize = (t.entry_fee_per_player * 5 * t.max_teams * 0.9).toFixed(0);
+                return (
+                  <View key={t.id} style={styles.tourneyCard}>
+                    <View style={styles.tourneyGold} />
+                    <View style={styles.tourneyBody}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.tourneyName}>{t.name}</Text>
+                          <Text style={styles.tourneySub}>£{t.entry_fee_per_player}/player · 8 teams</Text>
+                        </View>
+                        <View style={styles.prizeTag}>
+                          <Text style={styles.prizeText}>🏆 £{prize}</Text>
+                        </View>
+                      </View>
+                      <Button
+                        label={team.room_code ? '⚔️ Select 5 Players' : 'Set room code first →'}
+                        onPress={() => {
+                          if (!team.room_code) { setActiveTab('overview'); return; }
+                          setLineupFee(t.entry_fee_per_player);
+                          setLineupTournamentId(t.id);
+                        }}
+                        style={[styles.enterBtn, !team.room_code && { backgroundColor: Colors.surfaceAlt, borderColor: Colors.accentBorder, borderWidth: 1 }]}
+                        loading={joiningTournament && lineupTournamentId === t.id}
+                      />
                     </View>
-                    <GlowText style={{ color: Colors.gold, fontWeight: '900' }}>£{t.entry_fee_per_player * 5}</GlowText>
                   </View>
-                  <Button
-                    label={team.room_code ? 'Select 5 Players →' : '⚠️ Add room code in Roster first'}
-                    onPress={() => { if (!team.room_code) { setActiveTab('roster'); return; } setLineupFee(t.entry_fee_per_player); setLineupTournamentId(t.id); }}
-                    variant={team.room_code ? 'primary' : 'secondary'}
-                    loading={joiningTournament && lineupTournamentId === t.id}
-                  />
-                </Card>
-              ))
+                );
+              })
             )}
           </ScrollView>
         )}
       </View>
 
-      {/* Lineup picker modal */}
       {lineupTournamentId && (
         <LineupPicker
           visible={!!lineupTournamentId}
           members={members}
-          memberProfiles={Object.fromEntries(Object.entries(memberProfiles).map(([k, v]) => [k, v?.riot_id ?? v?.username ?? '?']))}
+          memberProfiles={memberProfiles}
           fee={lineupFee}
           onConfirm={handleEnterTournament}
           onClose={() => setLineupTournamentId(null)}
         />
       )}
-
       <RoomCodeInfo visible={showInfo} onClose={() => setShowInfo(false)} />
     </SafeAreaView>
   );
@@ -495,70 +586,114 @@ export default function TeamScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
-  scroll: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
-  stepHeader: { gap: 2 },
-  stepNum: { fontSize: 10, fontWeight: '700', color: Colors.accent, letterSpacing: 1, textTransform: 'uppercase' },
-  codePreview: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surfaceAlt, borderRadius: 8, paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderWidth: 1, borderColor: Colors.accentBorder },
+  scroll: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing.xxl, alignItems: 'center' },
 
-  // Hub
-  hubHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.accentBorder, backgroundColor: 'rgba(8,14,24,0.8)' },
-  hubName: { fontSize: 20, fontWeight: '900' },
-  codeChip: { backgroundColor: Colors.accentDim, borderRadius: 8, borderWidth: 1, borderColor: Colors.accentBorder, paddingHorizontal: 8, paddingVertical: 4 },
-  codeChipText: { color: Colors.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  infoBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.accentDim, borderWidth: 1, borderColor: Colors.accentBorder, alignItems: 'center', justifyContent: 'center' },
-  infoBtnText: { color: Colors.accent, fontSize: 12, fontWeight: '800' },
+  // Create screen
+  createCard: { alignItems: 'center', gap: Spacing.md, backgroundColor: 'rgba(10,8,3,0.85)', borderRadius: 16, borderWidth: 1, borderColor: Colors.gold + '44', padding: Spacing.xl, width: '100%' },
+  createTitle: { fontSize: 22, fontWeight: '900', color: Colors.gold, letterSpacing: 1 },
+  createBtn: { backgroundColor: Colors.gold, width: '100%' },
+  joinCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: 'rgba(10,8,3,0.7)', borderRadius: 12, borderWidth: 1, borderColor: Colors.gold + '33', padding: Spacing.md, width: '100%' },
 
-  innerTabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.accentBorder, backgroundColor: 'rgba(8,14,24,0.6)' },
-  innerTab: { flex: 1, alignItems: 'center', paddingVertical: 6, gap: 2 },
-  innerTabActive: { borderBottomWidth: 2, borderBottomColor: Colors.accent },
-  innerTabEmoji: { fontSize: 16 },
-  innerTabLabel: { fontSize: 9, fontWeight: '600', color: Colors.textMuted, letterSpacing: 0.5 },
+  // Banner
+  banner: { position: 'relative', paddingTop: Spacing.md, paddingBottom: Spacing.sm, paddingHorizontal: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.gold + '44', overflow: 'hidden' },
+  bannerBorder: { position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: Colors.gold, opacity: 0.6 },
+  bannerContent: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  emblemWrap: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  clanName: { fontSize: 20, fontWeight: '900', color: '#fff', letterSpacing: 0.5 },
+  tagChip: { backgroundColor: 'rgba(200,155,60,0.2)', borderRadius: 4, borderWidth: 1, borderColor: Colors.gold + '55', paddingHorizontal: 6, paddingVertical: 2 },
+  tagText: { fontSize: 10, fontWeight: '800', color: Colors.gold, letterSpacing: 1 },
+  levelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  levelBadge: { backgroundColor: Colors.gold, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  levelText: { fontSize: 10, fontWeight: '900', color: '#0a0800' },
+  bannerSub: { fontSize: 11, color: Colors.textMuted },
+  bannerStats: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+  bannerStat: { alignItems: 'center', paddingHorizontal: 10 },
+  bannerStatVal: { fontSize: 16, fontWeight: '900', color: Colors.gold },
+  bannerStatLabel: { fontSize: 9, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  bannerStatDiv: { width: 1, height: 24, backgroundColor: Colors.gold + '33' },
+  inviteBtn: { position: 'absolute', top: Spacing.md, right: Spacing.md, backgroundColor: 'rgba(200,155,60,0.15)', borderRadius: 8, borderWidth: 1, borderColor: Colors.gold + '66', paddingHorizontal: 10, paddingVertical: 5 },
+  inviteBtnText: { color: Colors.gold, fontSize: 12, fontWeight: '700' },
+
+  // Tab bar
+  tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.gold + '33', backgroundColor: 'rgba(8,6,0,0.8)' },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center' },
+  tabActive: { borderBottomWidth: 2, borderBottomColor: Colors.gold },
+  tabLabel: { fontSize: 11, fontWeight: '600', color: Colors.textMuted },
+  tabLabelActive: { color: Colors.gold },
+
+  // Tab content
+  tabContent: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
+  sectionCard: { backgroundColor: 'rgba(10,8,3,0.75)', borderRadius: 12, borderWidth: 1, borderColor: Colors.gold + '33', padding: Spacing.md, gap: Spacing.sm },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sectionTitle: { fontSize: 13, fontWeight: '800', color: Colors.gold, letterSpacing: 0.5, textTransform: 'uppercase' },
+
+  // Room code
+  roomCodeBlock: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(200,155,60,0.08)', borderRadius: 8, borderWidth: 1, borderColor: Colors.gold + '44', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  roomCodeText: { fontSize: 26, fontWeight: '900', color: Colors.gold, letterSpacing: 6, textShadowColor: Colors.gold, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 },
+  copyChip: { backgroundColor: 'rgba(200,155,60,0.15)', borderRadius: 6, borderWidth: 1, borderColor: Colors.gold + '55', paddingHorizontal: 8, paddingVertical: 4 },
+  noCodeBtn: { padding: Spacing.sm, borderRadius: 8, borderWidth: 1, borderColor: Colors.gold + '44', borderStyle: 'dashed', alignItems: 'center' },
+
+  // Stats
+  statsRow: { flexDirection: 'row', justifyContent: 'space-around' },
+  statBox: { alignItems: 'center', gap: 4 },
+  statVal: { fontSize: 22, fontWeight: '900', color: Colors.gold },
+  statLabel: { fontSize: 10, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  // Quick actions
+  quickActions: { flexDirection: 'row', gap: Spacing.sm },
+  quickBtn: { flex: 1, alignItems: 'center', gap: 6, backgroundColor: 'rgba(10,8,3,0.75)', borderRadius: 12, borderWidth: 1, borderColor: Colors.gold + '33', paddingVertical: Spacing.md },
+  quickLabel: { fontSize: 10, fontWeight: '700', color: Colors.textMuted, textAlign: 'center', lineHeight: 14 },
+
+  // Members
+  memberRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.gold + '15' },
+  memberAvatar: { width: 40, height: 40, borderRadius: 8, borderWidth: 1, borderColor: Colors.gold + '33' },
+  memberName: { fontSize: 13, fontWeight: '700', color: Colors.text },
+  roleBadge: { borderRadius: 4, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
+  roleText: { fontSize: 9, fontWeight: '800', letterSpacing: 1 },
+  kickBtn: { padding: 4 },
+  warningBox: { backgroundColor: 'rgba(255,170,0,0.1)', borderRadius: 8, borderWidth: 1, borderColor: Colors.warning + '44', padding: Spacing.sm },
+
+  // Tournament card
+  tourneyCard: { borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: Colors.gold + '44' },
+  tourneyGold: { height: 3, backgroundColor: Colors.gold },
+  tourneyBody: { backgroundColor: 'rgba(10,8,3,0.85)', padding: Spacing.md, gap: Spacing.sm },
+  tourneyName: { fontSize: 15, fontWeight: '800', color: Colors.text },
+  tourneySub: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
+  prizeTag: { backgroundColor: 'rgba(200,155,60,0.15)', borderRadius: 6, borderWidth: 1, borderColor: Colors.gold + '55', paddingHorizontal: 8, paddingVertical: 4 },
+  prizeText: { color: Colors.gold, fontSize: 12, fontWeight: '800' },
+  enterBtn: { backgroundColor: Colors.gold },
 
   // Chat
   chatRow: { flexDirection: 'row', gap: 6, alignItems: 'flex-end' },
   chatRowMe: { flexDirection: 'row-reverse' },
-  chatAvatar: { width: 28, height: 28, borderRadius: 6, borderWidth: 1, borderColor: Colors.accentBorder },
-  chatName: { fontSize: 10, color: Colors.textMuted, marginBottom: 2, marginLeft: 4 },
-  chatBubble: { maxWidth: '80%', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
-  chatBubbleMe: { backgroundColor: Colors.accent, borderBottomRightRadius: 3 },
-  chatBubbleThem: { backgroundColor: Colors.surfaceAlt, borderWidth: 1, borderColor: Colors.accentBorder, borderBottomLeftRadius: 3 },
+  chatAvatar: { width: 30, height: 30, borderRadius: 6, borderWidth: 1, borderColor: Colors.gold + '44' },
+  chatName: { fontSize: 10, color: Colors.gold, marginBottom: 2, marginLeft: 4, fontWeight: '600' },
+  chatBubble: { maxWidth: '80%', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12 },
+  chatBubbleMe: { backgroundColor: Colors.gold, borderBottomRightRadius: 3 },
+  chatBubbleThem: { backgroundColor: 'rgba(20,16,4,0.9)', borderWidth: 1, borderColor: Colors.gold + '33', borderBottomLeftRadius: 3 },
   chatText: { fontSize: 13, color: Colors.text, lineHeight: 18 },
   chatTime: { fontSize: 9, color: Colors.textDim, marginTop: 2, marginHorizontal: 4 },
-  chatInput: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm, padding: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.accentBorder, backgroundColor: 'rgba(8,14,24,0.95)' },
-  chatTextInput: { flex: 1, minHeight: 40, maxHeight: 100, backgroundColor: Colors.surfaceAlt, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accentBorder, paddingHorizontal: Spacing.sm, paddingVertical: 8, color: Colors.text, fontSize: 13 },
-  chatSendBtn: { width: 40, height: 40, borderRadius: Radius.md, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
+  chatInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm, padding: Spacing.sm, paddingHorizontal: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.gold + '33', backgroundColor: 'rgba(8,6,0,0.95)' },
+  chatTextInput: { flex: 1, minHeight: 40, maxHeight: 100, backgroundColor: 'rgba(20,16,4,0.9)', borderRadius: 8, borderWidth: 1, borderColor: Colors.gold + '44', paddingHorizontal: Spacing.sm, paddingVertical: 8, color: Colors.text, fontSize: 13 },
+  chatSendBtn: { width: 40, height: 40, borderRadius: 8, backgroundColor: Colors.gold, alignItems: 'center', justifyContent: 'center' },
 
-  // Roster
-  memberRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.sm },
-  memberAvatar: { width: 36, height: 36, borderRadius: 8, borderWidth: 1, borderColor: Colors.accentBorder },
-
-  // Stats
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  statCard: { width: '47%', alignItems: 'center', gap: 4, padding: Spacing.md },
-  statValue: { fontSize: 24, fontWeight: '900' },
-
-  // Room code
-  codeBlock: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(0,200,255,0.05)', borderRadius: 10, borderWidth: 1, borderColor: Colors.accentBorder, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
-  codeText: { fontSize: 22, fontWeight: '900', letterSpacing: 5 },
-  copyText: { color: Colors.accent, fontSize: 11, fontWeight: '700' },
-
-  // Lineup picker
-  lineupBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 99 },
-  lineupSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(10,16,26,0.99)', borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 1, borderTopColor: Colors.accentBorder, maxHeight: '80%', zIndex: 100 },
-  lineupHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.accentBorder },
-  lineupTitle: { fontSize: 16, fontWeight: '800', color: Colors.text },
-  lineupRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, borderRadius: 10, borderWidth: 1, borderColor: Colors.accentBorder, backgroundColor: Colors.surface },
-  lineupRowSelected: { borderColor: Colors.accent, backgroundColor: 'rgba(0,200,255,0.08)' },
-  lineupCheck: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: Colors.accentBorder, alignItems: 'center', justifyContent: 'center' },
-  lineupCheckDone: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  lineupName: { flex: 1, fontSize: 14, fontWeight: '600', color: Colors.text },
-  lineupFee: { fontSize: 12, color: Colors.gold, fontWeight: '700' },
-  lineupFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.accentBorder },
+  // Lineup
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 99 },
+  lineupSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(10,8,3,0.99)', borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 2, borderTopColor: Colors.gold + '66', maxHeight: '82%', zIndex: 100 },
+  lineupHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.gold + '33' },
+  lineupTitle: { fontSize: 16, fontWeight: '800', color: Colors.gold },
+  lineupRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, borderRadius: 10, borderWidth: 1, borderColor: Colors.gold + '22', backgroundColor: 'rgba(20,16,4,0.8)' },
+  lineupRowSelected: { borderColor: Colors.gold, backgroundColor: 'rgba(200,155,60,0.12)' },
+  lineupAvatar: { width: 38, height: 38, borderRadius: 8, borderWidth: 1, borderColor: Colors.gold + '44' },
+  lineupName: { fontSize: 14, fontWeight: '600', color: Colors.text },
+  lineupCheck: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: Colors.gold + '55', alignItems: 'center', justifyContent: 'center' },
+  lineupCheckDone: { backgroundColor: Colors.gold, borderColor: Colors.gold },
+  lineupFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.gold + '33' },
 
   // Info modal
-  infoBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
-  infoCard: { position: 'absolute', left: '5%', right: '5%', top: '25%', backgroundColor: 'rgba(10,16,28,0.98)', borderRadius: 16, borderWidth: 1, borderColor: Colors.accentBorder, padding: Spacing.lg, gap: Spacing.sm },
-  infoTitle: { fontSize: 16, fontWeight: '800', color: Colors.text, marginBottom: 4 },
+  infoCard: { position: 'absolute', left: '5%', right: '5%', top: '25%', backgroundColor: 'rgba(10,8,3,0.98)', borderRadius: 16, borderWidth: 1, borderColor: Colors.gold + '55', padding: Spacing.lg, gap: Spacing.sm, zIndex: 100 },
+  infoTitle: { fontSize: 16, fontWeight: '800', color: Colors.gold, marginBottom: 4 },
   infoStep: { fontSize: 13, color: Colors.textMuted, lineHeight: 22 },
-  infoDismiss: { marginTop: Spacing.sm, alignItems: 'center', paddingVertical: 10, borderRadius: 8, backgroundColor: Colors.accentDim, borderWidth: 1, borderColor: Colors.accentBorder },
+  infoDismiss: { marginTop: Spacing.sm, alignItems: 'center', paddingVertical: 10, borderRadius: 8, backgroundColor: 'rgba(200,155,60,0.1)', borderWidth: 1, borderColor: Colors.gold + '55' },
 });
