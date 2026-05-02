@@ -2,6 +2,7 @@ import { Colors } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
@@ -52,6 +53,7 @@ function buildNews(tournaments: any[], matches: any[]): NewsItem[] {
 
 export function NewsTicker() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const translateX = useRef(new Animated.Value(width)).current;
@@ -100,7 +102,7 @@ export function NewsTicker() {
 
   return (
     <TouchableOpacity
-      style={styles.ticker}
+      style={[styles.ticker, { marginTop: insets.top }]}
       activeOpacity={0.9}
       onPress={() => item.route && router.push(item.route as any)}
     >
