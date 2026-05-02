@@ -53,7 +53,7 @@ export default function LandingScreen() {
           {/* Logo */}
           <View style={styles.logoBlock}>
             <Image
-              source={require('../../assets/images/logo.png')}
+              source={require('../assets/images/logo.png')}
               style={{ width: 90, height: 90 }}
               resizeMode="contain"
               tintColor="#ffffff"
