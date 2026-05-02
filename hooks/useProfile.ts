@@ -20,13 +20,18 @@ export function useProfile(userId: string | undefined) {
         setLoading(false);
       });
 
-    const sub = supabase
-      .channel(`profile:${userId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${userId}` },
-        (payload) => setProfile(payload.new as UserRow)
-      ).subscribe();
-
-    return () => { sub.unsubscribe(); };
+    // Realtime subscription — requires Supabase Realtime enabled on users table
+    // Enable in: Supabase Dashboard → Database → Replication → users table
+    try {
+      const sub = supabase
+        .channel(`profile:${userId}`)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${userId}` },
+          (payload) => setProfile(payload.new as UserRow)
+        ).subscribe();
+      return () => { sub.unsubscribe(); };
+    } catch {
+      return undefined;
+    }
   }, [userId]);
 
   async function updateProfile(updates: Partial<Pick<UserRow, 'username' | 'riot_id' | 'avatar_url'>>) {

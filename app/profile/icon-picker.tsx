@@ -38,9 +38,9 @@ export default function IconPickerScreen() {
     fetch(`https://ddragon.leagueoflegends.com/cdn/${DD_VERSION}/data/en_US/profileicon.json`)
       .then(r => r.json())
       .then(json => {
-        const list: IconEntry[] = Object.values(json.data).map((icon: any) => ({
-          id: icon.id,
-          name: icon.id.toString(),
+        const list: IconEntry[] = Object.values(json.data as Record<string, any>).map((icon: any) => ({
+          id: Number(icon.id),
+          name: String(icon.id),
           uri: `${DD_BASE}/${icon.id}.png`,
         }));
         list.sort((a, b) => a.id - b.id);
@@ -48,7 +48,10 @@ export default function IconPickerScreen() {
         setFiltered(list);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(err => {
+        console.warn('Icon fetch failed:', err);
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
