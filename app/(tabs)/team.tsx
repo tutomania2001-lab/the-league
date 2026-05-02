@@ -420,6 +420,8 @@ export default function TeamScreen() {
   const [showNewPost, setShowNewPost] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [targetPostId, setTargetPostId] = useState<string | null>(null);
+  const feedListRef = useRef<FlatList>(null);
   const [postCaption, setPostCaption] = useState('');
   const [postMedia, setPostMedia] = useState<{ uri: string; type: 'image' | 'video' } | null>(null);
   const [posting, setPosting] = useState(false);
@@ -940,7 +942,18 @@ export default function TeamScreen() {
                       <Text style={[Typography.body, { textAlign: 'center', marginTop: 8 }]}>No notifications yet</Text>
                     </View>
                   ) : notifications.map(n => (
-                    <View key={n.id} style={[styles.notifRow, !n.read && styles.notifRowUnread]}>
+                    <TouchableOpacity
+                      key={n.id}
+                      style={[styles.notifRow, !n.read && styles.notifRowUnread]}
+                      onPress={() => {
+                        setShowNotifications(false);
+                        if (n.post_id) {
+                          setTargetPostId(n.post_id);
+                          setActiveTab('feed');
+                        }
+                      }}
+                      activeOpacity={0.8}
+                    >
                       {n.from_user?.avatar_url
                         ? <Image source={{ uri: n.from_user.avatar_url }} style={styles.notifAvatar} />
                         : <View style={[styles.notifAvatar, { backgroundColor: 'rgba(200,155,60,0.2)', alignItems: 'center', justifyContent: 'center' }]}>
@@ -951,8 +964,11 @@ export default function TeamScreen() {
                         <Text style={styles.notifContent}>{n.content}</Text>
                         <Text style={styles.notifTime}>{timeAgo(n.created_at)}</Text>
                       </View>
-                      {!n.read && <View style={styles.notifDot} />}
-                    </View>
+                      <View style={{ alignItems: 'center', gap: 2 }}>
+                        {!n.read && <View style={styles.notifDot} />}
+                        {n.post_id && <Text style={{ color: Colors.gold, fontSize: 16 }}>›</Text>}
+                      </View>
+                    </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
@@ -968,13 +984,27 @@ export default function TeamScreen() {
               </View>
             ) : (
               <FlatList
+                ref={feedListRef}
                 data={posts}
                 keyExtractor={p => p.id}
                 contentContainerStyle={{ gap: 2, paddingBottom: 80 }}
                 refreshing={false}
                 onRefresh={refreshFeed}
+                onLayout={() => {
+                  if (targetPostId && posts.length > 0) {
+                    const idx = posts.findIndex(p => p.id === targetPostId);
+                    if (idx >= 0) {
+                      feedListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0 });
+                      // Expand comments for that post
+                      fetchComments(targetPostId).then(comments => {
+                        setExpandedComments(prev => ({ ...prev, [targetPostId]: comments }));
+                      });
+                      setTargetPostId(null);
+                    }
+                  }
+                }}
                 renderItem={({ item: post }) => (
-                  <View style={styles.postCard}>
+                  <View style={[styles.postCard, post.id === targetPostId && { borderColor: Colors.gold, borderWidth: 1 }]}>
                     {/* Post header */}
                     <View style={styles.postHeader}>
                       {post.author?.avatar_url

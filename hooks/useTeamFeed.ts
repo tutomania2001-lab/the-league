@@ -155,16 +155,19 @@ export function useTeamFeed(teamId: string | undefined, myId: string | undefined
     ));
 
     // Notify post author (skip if commenting on own post)
-    const { data: post } = await supabase.from('team_posts').select('user_id, team_id').eq('id', postId).single();
+    const { data: post } = await supabase.from('team_posts').select('user_id, team_id, caption, media_type').eq('id', postId).single();
     if (post && post.user_id !== userId) {
       const commenterName = data?.author?.riot_id ?? data?.author?.username ?? 'Someone';
+      const postHint = post.caption
+        ? `"${post.caption.slice(0, 30)}${post.caption.length > 30 ? '…' : ''}"`
+        : post.media_type === 'image' ? '📸 your photo' : post.media_type === 'video' ? '🎬 your clip' : 'your post';
       await supabase.from('team_notifications').insert({
         user_id: post.user_id,
         from_user_id: userId,
         post_id: postId,
         team_id: post.team_id,
         type: 'comment',
-        content: `${commenterName} commented: "${content.trim().slice(0, 50)}${content.length > 50 ? '…' : ''}"`,
+        content: `${commenterName} commented on ${postHint}: "${content.trim().slice(0, 40)}${content.length > 40 ? '…' : ''}"`,
       });
     }
 
