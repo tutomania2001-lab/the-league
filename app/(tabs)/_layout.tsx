@@ -1,77 +1,104 @@
-import { Tabs, useRouter, usePathname } from 'expo-router';
-import { Text, View } from 'react-native';
+import HomeScreen from '@/app/(tabs)/index';
+import TournamentsScreen from '@/app/(tabs)/tournaments';
+import TeamScreen from '@/app/(tabs)/team';
+import WalletScreen from '@/app/(tabs)/wallet';
+import ProfileScreen from '@/app/(tabs)/profile';
 import { Colors } from '@/constants/theme';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useCallback } from 'react';
+import { useRef, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import PagerView from 'react-native-pager-view';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const TABS = ['/', '/tournaments', '/team', '/wallet', '/profile'];
-const TAB_NAMES = ['index', 'tournaments', 'team', 'wallet', 'profile'];
+const TABS = [
+  { name: 'index',       emoji: '🏠', label: 'Home' },
+  { name: 'tournaments', emoji: '🏆', label: 'Tournaments' },
+  { name: 'team',        emoji: '⚔️', label: 'My Team' },
+  { name: 'wallet',      emoji: '💰', label: 'Wallet' },
+  { name: 'profile',     emoji: '👤', label: 'Profile' },
+];
 
-function Icon({ emoji, focused }: { emoji: string; focused: boolean }) {
-  return <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>;
-}
-
-function SwipeTabsWrapper({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const pathname = usePathname();
-
-  const getCurrentIndex = useCallback(() => {
-    // Match current path to tab index
-    if (pathname === '/' || pathname === '/index' || pathname.endsWith('/(tabs)')) return 0;
-    const found = TABS.findIndex(t => t !== '/' && pathname.includes(t.slice(1)));
-    return found >= 0 ? found : 0;
-  }, [pathname]);
-
-  const swipe = Gesture.Pan()
-    .runOnJS(true)
-    .activeOffsetX([-25, 25])   // must move 25px horizontally to activate
-    .failOffsetY([-20, 20])     // cancel if moving more than 20px vertically (scrolling)
-    .onEnd((e) => {
-      const isSwipeLeft  = e.translationX < -60 || e.velocityX < -600;
-      const isSwipeRight = e.translationX > 60  || e.velocityX > 600;
-      const current = getCurrentIndex();
-
-      if (isSwipeLeft && current < TABS.length - 1) {
-        router.push(`/(tabs)/${TAB_NAMES[current + 1] === 'index' ? '' : TAB_NAMES[current + 1]}` as any);
-      } else if (isSwipeRight && current > 0) {
-        router.push(`/(tabs)/${TAB_NAMES[current - 1] === 'index' ? '' : TAB_NAMES[current - 1]}` as any);
-      }
-    });
-
-  return (
-    <GestureDetector gesture={swipe}>
-      <View style={{ flex: 1 }}>
-        {children}
-      </View>
-    </GestureDetector>
-  );
-}
+const SCREENS = [
+  <HomeScreen key="home" />,
+  <TournamentsScreen key="tournaments" />,
+  <TeamScreen key="team" />,
+  <WalletScreen key="wallet" />,
+  <ProfileScreen key="profile" />,
+];
 
 export default function TabLayout() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const pagerRef = useRef<PagerView>(null);
+  const insets = useSafeAreaInsets();
+
+  function goTo(index: number) {
+    pagerRef.current?.setPage(index);
+    setActiveIndex(index);
+  }
+
   return (
-    <SwipeTabsWrapper>
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: 'transparent' },
-          tabBarStyle: {
-            backgroundColor: 'rgba(13,21,32,0.92)',
-            borderTopColor: Colors.accentBorder,
-            borderTopWidth: 1,
-            height: 60,
-            paddingBottom: 8,
-          },
-          tabBarActiveTintColor: Colors.accent,
-          tabBarInactiveTintColor: Colors.textMuted,
-          tabBarLabelStyle: { fontSize: 9, fontWeight: '600', letterSpacing: 0.5 },
-        }}
+    <View style={styles.container}>
+      {/* Pager — handles swipe natively */}
+      <PagerView
+        ref={pagerRef}
+        style={styles.pager}
+        initialPage={0}
+        onPageSelected={e => setActiveIndex(e.nativeEvent.position)}
+        overdrag
+        overScrollMode="never"
       >
-        <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: ({ focused }) => <Icon emoji="🏠" focused={focused} /> }} />
-        <Tabs.Screen name="tournaments" options={{ title: 'Tournaments', tabBarIcon: ({ focused }) => <Icon emoji="🏆" focused={focused} /> }} />
-        <Tabs.Screen name="team" options={{ title: 'My Team', tabBarIcon: ({ focused }) => <Icon emoji="⚔️" focused={focused} /> }} />
-        <Tabs.Screen name="wallet" options={{ title: 'Wallet', tabBarIcon: ({ focused }) => <Icon emoji="💰" focused={focused} /> }} />
-        <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ focused }) => <Icon emoji="👤" focused={focused} /> }} />
-      </Tabs>
-    </SwipeTabsWrapper>
+        {SCREENS.map((screen, i) => (
+          <View key={i} style={styles.page} collapsable={false}>
+            {screen}
+          </View>
+        ))}
+      </PagerView>
+
+      {/* Bottom tab bar */}
+      <View style={[styles.tabBar, { paddingBottom: insets.bottom || 8 }]}>
+        {TABS.map((tab, i) => {
+          const focused = activeIndex === i;
+          return (
+            <TouchableOpacity
+              key={tab.name}
+              style={styles.tab}
+              onPress={() => goTo(i)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabIcon, { opacity: focused ? 1 : 0.45 }]}>
+                {tab.emoji}
+              </Text>
+              <Text style={[styles.tabLabel, { color: focused ? Colors.accent : Colors.textMuted }]}>
+                {tab.label}
+              </Text>
+              {focused && <View style={[styles.tabIndicator, { backgroundColor: Colors.accent }]} />}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: 'transparent' },
+  pager: { flex: 1 },
+  page: { flex: 1 },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(13,21,32,0.95)',
+    borderTopWidth: 1,
+    borderTopColor: Colors.accentBorder,
+    height: 60,
+    paddingTop: 4,
+  },
+  tab: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2,
+    position: 'relative',
+  },
+  tabIcon: { fontSize: 20 },
+  tabLabel: { fontSize: 9, fontWeight: '600', letterSpacing: 0.5 },
+  tabIndicator: {
+    position: 'absolute', top: 0, left: '25%', right: '25%',
+    height: 2, borderRadius: 1,
+  },
+});
