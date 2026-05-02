@@ -43,22 +43,24 @@ export function useLiveMatches() {
     supabase.from('matches').select('*').eq('status', 'live')
       .then(({ data }) => { if (data) setMatches(data); });
 
-    const sub = supabase.channel('live-matches-global')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' },
-        (payload) => {
-          const updated = payload.new as MatchRow;
-          setMatches(prev => {
-            if (updated.status === 'live') {
-              return prev.some(m => m.id === updated.id)
-                ? prev.map(m => m.id === updated.id ? updated : m)
-                : [...prev, updated];
-            }
-            return prev.filter(m => m.id !== updated.id);
-          });
-        }
-      ).subscribe();
+    // Use unique channel name to avoid duplicate subscription errors with PagerView
+    const channelName = `live-matches-${Math.random().toString(36).slice(2, 8)}`;
+    const ch = supabase.channel(channelName);
+    ch.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches' },
+      (payload) => {
+        const updated = payload.new as MatchRow;
+        setMatches(prev => {
+          if (updated.status === 'live') {
+            return prev.some(m => m.id === updated.id)
+              ? prev.map(m => m.id === updated.id ? updated : m)
+              : [...prev, updated];
+          }
+          return prev.filter(m => m.id !== updated.id);
+        });
+      }
+    ).subscribe();
 
-    return () => { sub.unsubscribe(); };
+    return () => { ch.unsubscribe(); };
   }, []);
 
   return { matches };
