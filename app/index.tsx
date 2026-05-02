@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/theme';
-import { LeagueEmblem } from '@/components/ui/LeagueEmblem';
+import { Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useRef } from 'react';
@@ -52,7 +52,12 @@ export default function LandingScreen() {
 
           {/* Logo */}
           <View style={styles.logoBlock}>
-            <LeagueEmblem size={90} color="#ffffff" />
+            <Image
+              source={require('../../assets/images/logo.png')}
+              style={{ width: 90, height: 90 }}
+              resizeMode="contain"
+              tintColor="#ffffff"
+            />
             <View style={styles.logoText}>
               <Text style={styles.title}>THE LEAGUE</Text>
               <Text style={styles.rift}>WILD RIFT TOURNAMENTS</Text>
