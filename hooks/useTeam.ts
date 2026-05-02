@@ -14,7 +14,7 @@ export function useTeam(userId: string | undefined) {
       .from('team_members')
       .select('team_id')
       .eq('user_id', uid)
-      .eq('status', 'active')
+      .in('status', ['active', 'pending'])
       .maybeSingle();
 
     if (!membership) {
