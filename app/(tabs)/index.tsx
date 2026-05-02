@@ -6,6 +6,7 @@ import { TournamentCard } from '@/components/tournament/TournamentCard';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { FEATURED_CHAMPIONS } from '@/constants/champions';
 import { useTournamentList } from '@/hooks/useTournament';
+import { useLiveMatches } from '@/hooks/useMatch';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -34,6 +35,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const [activeChamp, setActiveChamp] = useState(FEATURED_CHAMPIONS[0]);
   const { tournaments } = useTournamentList();
+  const { matches: liveMatches } = useLiveMatches();
   const activeTournaments = tournaments.filter(t => t.status !== 'completed').slice(0, 3);
 
   return (
@@ -84,6 +86,26 @@ export default function HomeScreen() {
             </Card>
           ))}
         </View>
+
+        {/* Live matches banner */}
+        {liveMatches.length > 0 && (
+          <View style={{ gap: Spacing.xs }}>
+            <Text style={Typography.label}>🔴 Live Now</Text>
+            {liveMatches.map(m => (
+              <TouchableOpacity key={m.id} onPress={() => router.push(`/match/${m.id}`)}>
+                <Card glow style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View>
+                    <Badge variant="live" />
+                    <Text style={[Typography.body, { marginTop: 4, color: Colors.text }]}>
+                      Match in progress
+                    </Text>
+                  </View>
+                  <GlowText style={{ fontSize: 28, fontWeight: '900' }}>{m.score_a} – {m.score_b}</GlowText>
+                </Card>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {activeTournaments.length > 0 && (
           <View style={{ gap: Spacing.sm }}>
