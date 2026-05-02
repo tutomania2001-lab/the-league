@@ -6,7 +6,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const VIDEO_URI = 'https://res.cloudinary.com/dfneopzdb/video/upload/q_auto:best,e_sharpen:100,w_1080,c_scale/v1777689772/All_ranked_promotion_animations_Iron_-_Challenger_with_sound_effects_-_LoL_Season_14_15_16_b89e5x.mp4';
+const VIDEO_URI = 'https://res.cloudinary.com/dfneopzdb/video/upload/q_100,e_sharpen:400,e_improve,w_1920,c_scale/v1777689772/All_ranked_promotion_animations_Iron_-_Challenger_with_sound_effects_-_LoL_Season_14_15_16_b89e5x.mp4';
 
 export default function LandingScreen() {
   const router = useRouter();
@@ -45,8 +45,8 @@ export default function LandingScreen() {
         allowsPictureInPicture={false}
       />
 
-      {/* Overlay for legibility */}
-      <View style={styles.overlay} />
+      {/* Subtle bottom gradient only — keeps buttons readable, no full overlay */}
+      <View style={styles.bottomGradient} />
 
       {/* UI */}
       <SafeAreaView style={styles.safe} pointerEvents="box-none">
@@ -96,9 +96,9 @@ const styles = StyleSheet.create({
 
   video: { ...StyleSheet.absoluteFillObject },
 
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.42)',
+  bottomGradient: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: '45%',
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
 
   safe: { ...StyleSheet.absoluteFillObject },
