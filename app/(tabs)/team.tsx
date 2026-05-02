@@ -513,7 +513,7 @@ export default function TeamScreen() {
                 style={styles.roomCodeBlock}
                 onPress={async () => { await Clipboard.setStringAsync(team.invite_code); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
               >
-                <Text style={styles.codeText}>{team.invite_code}</Text>
+                <Text style={styles.roomCodeText}>{team.invite_code}</Text>
                 <View style={[styles.copyChip, copied && { backgroundColor: 'rgba(0,255,136,0.15)', borderColor: Colors.success + '55' }]}>
                   <Text style={{ color: copied ? Colors.success : Colors.gold, fontSize: 11, fontWeight: '700' }}>
                     {copied ? '✓ Copied' : '📋 Copy'}
