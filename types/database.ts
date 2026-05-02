@@ -8,6 +8,9 @@ export type UserRow = {
   stripe_customer_id: string | null;
   kyc_verified: boolean;
   is_admin: boolean;
+  status: 'online' | 'in_game' | 'away' | 'offline';
+  current_game: string | null;
+  last_seen: string | null;
   created_at: string;
 };
 

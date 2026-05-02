@@ -30,7 +30,9 @@ export function useFriends(userId: string | undefined) {
 
     const otherIds = data.map(f => f.requester_id === uid ? f.addressee_id : f.requester_id);
     const { data: profiles } = await supabase
-      .from('users').select('*').in('id', otherIds.length ? otherIds : ['00000000-0000-0000-0000-000000000000']);
+      .from('users')
+      .select('id, email, username, riot_id, avatar_url, wallet_balance, kyc_verified, is_admin, status, current_game, last_seen, created_at, stripe_customer_id')
+      .in('id', otherIds.length ? otherIds : ['00000000-0000-0000-0000-000000000000']);
 
     const profileMap: Record<string, UserRow> = {};
     profiles?.forEach(p => { profileMap[p.id] = p; });

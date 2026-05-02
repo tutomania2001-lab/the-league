@@ -1,7 +1,8 @@
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { useFriends, useRecentPlayers } from '@/hooks/useFriends';
-import { supabase } from '@/lib/supabase';
-import { useEffect, useRef, useState } from 'react';
+import { StatusDot, UserStatus, STATUS_CONFIG } from '@/components/ui/StatusDot';
+import { MiniProfile, MiniProfileUser } from '@/components/ui/MiniProfile';
+import { useRef, useState } from 'react';
 import {
   Animated, Dimensions, Easing, Image, RefreshControl,
   ScrollView, StyleSheet, Text, TouchableOpacity, View,
@@ -9,7 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
-const PANEL_W = 260;
+const PANEL_W = 265;
 
 type Props = { userId: string | undefined };
 
@@ -18,8 +19,10 @@ export function FriendsPanel({ userId }: Props) {
   const { friends, incoming, loading, accept, decline, remove, sendRequest } = useFriends(userId);
   const { recentPlayers } = useRecentPlayers(userId);
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<'friends' | 'requests' | 'recent'>('friends');
+  const [tab, setTab] = useState<'friends' | 'recent' | 'requests'>('friends');
   const [refreshing, setRefreshing] = useState(false);
+  const [miniProfile, setMiniProfile] = useState<MiniProfileUser | null>(null);
+  const [miniIsFriend, setMiniIsFriend] = useState(false);
   const slideX = useRef(new Animated.Value(PANEL_W)).current;
   const backdropOp = useRef(new Animated.Value(0)).current;
 
@@ -29,15 +32,10 @@ export function FriendsPanel({ userId }: Props) {
     Animated.parallel([
       Animated.timing(slideX, {
         toValue: opening ? 0 : PANEL_W,
-        duration: 280,
-        useNativeDriver: true,
+        duration: 280, useNativeDriver: true,
         easing: opening ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       }),
-      Animated.timing(backdropOp, {
-        toValue: opening ? 1 : 0,
-        duration: 280,
-        useNativeDriver: true,
-      }),
+      Animated.timing(backdropOp, { toValue: opening ? 1 : 0, duration: 280, useNativeDriver: true }),
     ]).start();
   }
 
@@ -49,30 +47,100 @@ export function FriendsPanel({ userId }: Props) {
     ]).start();
   }
 
+  function openMiniProfile(user: MiniProfileUser, isFriend: boolean) {
+    setMiniIsFriend(isFriend);
+    setMiniProfile(user);
+  }
+
   const pendingCount = incoming.length;
-  const listData = tab === 'friends' ? friends : tab === 'requests' ? incoming : [];
+
+  // Sort friends: online first, then in_game, then away, then offline
+  const ORDER: Record<string, number> = { in_game: 0, online: 1, away: 2, offline: 3 };
+  const sortedFriends = [...friends].sort((a, b) =>
+    (ORDER[a.profile?.status ?? 'offline'] ?? 3) - (ORDER[b.profile?.status ?? 'offline'] ?? 3)
+  );
+
+  function renderFriendRow(f: any, isFriend: boolean, showActions = false) {
+    const profile = f.profile ?? f;
+    const status = (profile.status ?? 'offline') as UserStatus;
+    const statusCfg = STATUS_CONFIG[status];
+
+    return (
+      <TouchableOpacity
+        key={f.id}
+        style={styles.friendRow}
+        onPress={() => openMiniProfile({
+          id: profile.id, riot_id: profile.riot_id, username: profile.username,
+          avatar_url: profile.avatar_url, status: profile.status, current_game: profile.current_game,
+        }, isFriend)}
+        activeOpacity={0.75}
+      >
+        {/* Avatar with status dot overlay */}
+        <View>
+          {profile.avatar_url ? (
+            <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarLetter}>{(profile.riot_id ?? profile.username ?? 'S')[0].toUpperCase()}</Text>
+            </View>
+          )}
+          <View style={styles.statusOverlay}>
+            <StatusDot status={status} size={9} />
+          </View>
+        </View>
+
+        {/* Name + status */}
+        <View style={styles.friendInfo}>
+          <Text style={styles.friendName} numberOfLines={1}>{profile.riot_id ?? profile.username}</Text>
+          <Text style={[styles.friendStatus, { color: statusCfg.color }]}>
+            {status === 'in_game' && profile.current_game
+              ? `⚔ ${profile.current_game}`
+              : statusCfg.label}
+          </Text>
+        </View>
+
+        {/* Actions */}
+        {showActions ? (
+          <View style={styles.reqActions}>
+            <TouchableOpacity style={styles.acceptBtn} onPress={() => accept(f.id)}>
+              <Text style={{ color: Colors.success, fontWeight: '900', fontSize: 13 }}>✓</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.declineBtn} onPress={() => decline(f.id)}>
+              <Text style={{ color: Colors.error, fontWeight: '900', fontSize: 12 }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        ) : !isFriend ? (
+          <TouchableOpacity style={styles.addBtn} onPress={() => profile.riot_id && sendRequest(profile.riot_id)}>
+            <Text style={styles.addBtnText}>+ Add</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.statusPip, { backgroundColor: statusCfg.color + '22', borderColor: statusCfg.color + '55' }]}>
+            <Text style={{ fontSize: 9, color: statusCfg.color }}>{statusCfg.icon}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  }
 
   return (
     <>
-      {/* Backdrop — tap to close */}
-      <Animated.View
-        pointerEvents={open ? 'auto' : 'none'}
-        style={[styles.backdrop, { opacity: backdropOp }]}
-      >
+      {/* Backdrop */}
+      <Animated.View pointerEvents={open ? 'auto' : 'none'} style={[styles.backdrop, { opacity: backdropOp }]}>
         <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={close} />
       </Animated.View>
 
-      {/* Sliding panel */}
+      {/* Panel */}
       <Animated.View
-        style={[
-          styles.panel,
-          { top: insets.top, bottom: insets.bottom, transform: [{ translateX: slideX }] },
-        ]}
+        style={[styles.panel, { top: insets.top, bottom: insets.bottom, transform: [{ translateX: slideX }] }]}
         pointerEvents={open ? 'auto' : 'none'}
       >
-        {/* Panel header */}
+        {/* Header */}
         <View style={styles.panelHeader}>
           <Text style={styles.panelTitle}>Friends</Text>
+          <View style={styles.onlineCount}>
+            <StatusDot status="online" size={7} />
+            <Text style={styles.onlineText}>{friends.filter(f => (f.profile?.status ?? 'offline') !== 'offline').length} online</Text>
+          </View>
           <TouchableOpacity onPress={close} style={styles.closeBtn}>
             <Text style={styles.closeBtnText}>✕</Text>
           </TouchableOpacity>
@@ -80,199 +148,139 @@ export function FriendsPanel({ userId }: Props) {
 
         {/* Tabs */}
         <View style={styles.tabs}>
-          <TouchableOpacity style={[styles.tab, tab === 'friends' && styles.tabActive]} onPress={() => setTab('friends')}>
-            <Text style={[styles.tabText, tab === 'friends' && styles.tabTextActive]}>All ({friends.length})</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.tab, tab === 'recent' && styles.tabActive]} onPress={() => setTab('recent')}>
-            <Text style={[styles.tabText, tab === 'recent' && styles.tabTextActive]}>Recent</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.tab, tab === 'requests' && styles.tabActive]} onPress={() => setTab('requests')}>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={[styles.tabText, tab === 'requests' && styles.tabTextActive]}>Req</Text>
-              {pendingCount > 0 && (
+          {([['friends', `All (${friends.length})`], ['recent', 'Recent'], ['requests', 'Requests']] as const).map(([t, label]) => (
+            <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => setTab(t)}>
+              <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{label}</Text>
+              {t === 'requests' && pendingCount > 0 && (
                 <View style={styles.tabBadge}><Text style={styles.tabBadgeText}>{pendingCount}</Text></View>
               )}
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* List */}
-        <ScrollView
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={async () => { setRefreshing(true); setRefreshing(false); }}
-              tintColor={Colors.accent}
-            />
-          }
-        >
-          {/* Recent tab */}
-          {tab === 'recent' ? (
+        <ScrollView contentContainerStyle={styles.list} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); setRefreshing(false); }} tintColor={Colors.accent} />}>
+
+          {tab === 'friends' && (
+            sortedFriends.length === 0 ? (
+              <View style={styles.empty}>
+                <Text style={{ fontSize: 28, marginBottom: 6 }}>🎮</Text>
+                <Text style={[Typography.body, { textAlign: 'center', fontSize: 12 }]}>No friends yet</Text>
+              </View>
+            ) : sortedFriends.map(f => renderFriendRow(f, true))
+          )}
+
+          {tab === 'recent' && (
             recentPlayers.length === 0 ? (
               <View style={styles.empty}>
                 <Text style={{ fontSize: 28, marginBottom: 6 }}>⚔️</Text>
                 <Text style={[Typography.body, { textAlign: 'center', fontSize: 12 }]}>No recent matches yet</Text>
-                <Text style={[Typography.body, { textAlign: 'center', fontSize: 11, marginTop: 4, color: Colors.textDim }]}>
-                  Players you face in tournaments appear here
-                </Text>
+                <Text style={[Typography.body, { textAlign: 'center', fontSize: 11, marginTop: 4, color: Colors.textDim }]}>Players you face in tournaments appear here</Text>
               </View>
-            ) : (
-              recentPlayers.map(p => (
-                <View key={p.id} style={styles.friendRow}>
-                  {p.avatar_url ? (
-                    <Image source={{ uri: p.avatar_url }} style={styles.avatar} />
-                  ) : (
-                    <View style={styles.avatarFallback}>
-                      <Text style={styles.avatarLetter}>{(p.riot_id ?? p.username ?? 'S')[0].toUpperCase()}</Text>
-                    </View>
-                  )}
-                  <View style={styles.friendInfo}>
-                    <Text style={styles.friendName} numberOfLines={1}>{p.riot_id ?? p.username}</Text>
-                    <Text style={styles.friendStatus}>⚔️ Recent opponent</Text>
-                  </View>
-                  {!friends.some(f => f.profile?.id === p.id) && (
-                    <TouchableOpacity style={styles.addFriendBtn} onPress={() => p.riot_id && sendRequest(p.riot_id)}>
-                      <Text style={styles.addFriendText}>+ Add</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))
-            )
-          ) : listData.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={{ fontSize: 28, marginBottom: 6 }}>
-                {tab === 'friends' ? '🎮' : '📭'}
-              </Text>
-              <Text style={[Typography.body, { textAlign: 'center', fontSize: 12 }]}>
-                {tab === 'friends' ? 'No friends yet' : 'No pending requests'}
-              </Text>
-            </View>
-          ) : (
-            listData.map(f => (
-              <View key={f.id} style={styles.friendRow}>
-                {f.profile?.avatar_url ? (
-                  <Image source={{ uri: f.profile.avatar_url }} style={styles.avatar} />
-                ) : (
-                  <View style={styles.avatarFallback}>
-                    <Text style={styles.avatarLetter}>
-                      {(f.profile?.riot_id ?? f.profile?.username ?? 'S')[0].toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.friendInfo}>
-                  <Text style={styles.friendName} numberOfLines={1}>
-                    {f.profile?.riot_id ?? f.profile?.username ?? 'Player'}
-                  </Text>
-                  <Text style={styles.friendStatus}>
-                    {tab === 'requests' ? '⏳ Pending' : '● Friend'}
-                  </Text>
-                </View>
-                {tab === 'requests' ? (
-                  <View style={styles.reqActions}>
-                    <TouchableOpacity style={styles.acceptBtn} onPress={() => accept(f.id)}>
-                      <Text style={{ color: Colors.success, fontWeight: '900', fontSize: 13 }}>✓</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.declineBtn} onPress={() => decline(f.id)}>
-                      <Text style={{ color: Colors.error, fontWeight: '900', fontSize: 12 }}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity onPress={() => remove(f.id)} style={styles.moreBtn}>
-                    <Text style={{ color: Colors.textDim, fontSize: 16 }}>···</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+            ) : recentPlayers.map(p => renderFriendRow(
+              { id: p.id, profile: p },
+              friends.some(f => f.profile?.id === p.id),
             ))
           )}
+
+          {tab === 'requests' && (
+            incoming.length === 0 ? (
+              <View style={styles.empty}>
+                <Text style={{ fontSize: 28, marginBottom: 6 }}>📭</Text>
+                <Text style={[Typography.body, { textAlign: 'center', fontSize: 12 }]}>No pending requests</Text>
+              </View>
+            ) : incoming.map(f => renderFriendRow(f, false, true))
+          )}
+
         </ScrollView>
       </Animated.View>
 
-      {/* Floating tab on the right edge */}
-      <TouchableOpacity
-        style={[styles.floatTab, { top: insets.top + 120 }]}
-        onPress={toggle}
-        activeOpacity={0.85}
-      >
+      {/* Floating tab */}
+      <TouchableOpacity style={[styles.floatTab, { top: insets.top + 120 }]} onPress={toggle} activeOpacity={0.85}>
         <Text style={styles.floatIcon}>👥</Text>
         {pendingCount > 0 && (
-          <View style={styles.floatBadge}>
-            <Text style={styles.floatBadgeText}>{pendingCount}</Text>
-          </View>
+          <View style={styles.floatBadge}><Text style={styles.floatBadgeText}>{pendingCount}</Text></View>
         )}
       </TouchableOpacity>
+
+      {/* Mini profile popup */}
+      <MiniProfile
+        user={miniProfile}
+        onClose={() => setMiniProfile(null)}
+        isFriend={miniIsFriend}
+        onAddFriend={() => miniProfile?.riot_id && sendRequest(miniProfile.riot_id)}
+        onRemoveFriend={() => {
+          const f = friends.find(f => f.profile?.id === miniProfile?.id);
+          if (f) remove(f.id);
+        }}
+      />
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    zIndex: 99,
-  },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 99 },
 
   panel: {
-    position: 'absolute',
-    right: 0,
-    width: PANEL_W,
-    zIndex: 100,
-    backgroundColor: 'rgba(10,16,26,0.97)',
-    borderLeftWidth: 1,
-    borderLeftColor: Colors.accentBorder,
+    position: 'absolute', right: 0, width: PANEL_W, zIndex: 100,
+    backgroundColor: 'rgba(8,14,24,0.98)',
+    borderLeftWidth: 1, borderLeftColor: Colors.accentBorder,
   },
 
   panelHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 4,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.accentBorder,
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 4,
+    borderBottomWidth: 1, borderBottomColor: Colors.accentBorder,
   },
-  panelTitle: { fontSize: 15, fontWeight: '800', color: Colors.text, letterSpacing: 1 },
+  panelTitle: { fontSize: 15, fontWeight: '800', color: Colors.text, letterSpacing: 1, flex: 1 },
+  onlineCount: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  onlineText: { fontSize: 10, color: Colors.textMuted },
   closeBtn: { padding: 4 },
   closeBtnText: { color: Colors.textMuted, fontSize: 14 },
 
-  tabs: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.accentBorder,
-  },
+  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.accentBorder },
   tab: { flex: 1, paddingVertical: Spacing.sm, alignItems: 'center', position: 'relative' },
   tabActive: { borderBottomWidth: 2, borderBottomColor: Colors.accent },
-  tabText: { fontSize: 11, fontWeight: '600', color: Colors.textMuted },
+  tabText: { fontSize: 10, fontWeight: '600', color: Colors.textMuted },
   tabTextActive: { color: Colors.accent },
   tabBadge: {
-    position: 'absolute', top: -4, right: -4,
+    position: 'absolute', top: 4, right: 4,
     backgroundColor: Colors.accent, borderRadius: 8,
     minWidth: 14, height: 14, paddingHorizontal: 2,
     alignItems: 'center', justifyContent: 'center',
   },
   tabBadgeText: { color: Colors.background, fontSize: 8, fontWeight: '900' },
 
-  list: { padding: Spacing.sm, gap: Spacing.xs, paddingBottom: Spacing.xxl },
-  empty: { alignItems: 'center', paddingTop: Spacing.xxl },
+  list: { padding: Spacing.xs, paddingBottom: 120 },
+  empty: { alignItems: 'center', paddingTop: Spacing.xxl, paddingHorizontal: Spacing.md },
 
   friendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.xs + 2,
-    paddingHorizontal: Spacing.xs,
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    paddingVertical: 7, paddingHorizontal: Spacing.sm,
     borderRadius: Radius.sm,
   },
-  avatar: { width: 36, height: 36, borderRadius: 6, borderWidth: 1, borderColor: Colors.accentBorder },
+
+  avatar: { width: 38, height: 38, borderRadius: 7, borderWidth: 1, borderColor: Colors.accentBorder },
   avatarFallback: {
-    width: 36, height: 36, borderRadius: 6,
+    width: 38, height: 38, borderRadius: 7,
     backgroundColor: Colors.accentDim, borderWidth: 1, borderColor: Colors.accentBorder,
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarLetter: { fontSize: 14, fontWeight: '800', color: Colors.accent },
+  avatarLetter: { fontSize: 15, fontWeight: '800', color: Colors.accent },
+  statusOverlay: {
+    position: 'absolute', bottom: -2, right: -2,
+    backgroundColor: 'rgba(8,14,24,0.9)', borderRadius: 6, padding: 2,
+  },
+
   friendInfo: { flex: 1 },
   friendName: { fontSize: 12, fontWeight: '700', color: Colors.text },
-  friendStatus: { fontSize: 10, color: Colors.textMuted, marginTop: 1 },
+  friendStatus: { fontSize: 10, fontWeight: '600', marginTop: 1 },
+
+  statusPip: {
+    width: 22, height: 22, borderRadius: 6,
+    borderWidth: 1, alignItems: 'center', justifyContent: 'center',
+  },
+
   reqActions: { flexDirection: 'row', gap: 4 },
   acceptBtn: {
     width: 28, height: 28, borderRadius: 6,
@@ -284,38 +292,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,68,68,0.1)', borderWidth: 1, borderColor: Colors.error + '44',
     alignItems: 'center', justifyContent: 'center',
   },
-  moreBtn: { padding: 4 },
-  addFriendBtn: {
+
+  addBtn: {
     paddingHorizontal: 8, paddingVertical: 4,
     borderRadius: 6, borderWidth: 1, borderColor: Colors.accent + '66',
     backgroundColor: Colors.accentDim,
   },
-  addFriendText: { color: Colors.accent, fontSize: 10, fontWeight: '700' },
+  addBtnText: { color: Colors.accent, fontSize: 10, fontWeight: '700' },
 
-  // Floating tab
   floatTab: {
-    position: 'absolute',
-    right: 0,
-    zIndex: 101,
-    backgroundColor: 'rgba(10,16,26,0.95)',
-    borderTopLeftRadius: 10,
-    borderBottomLeftRadius: 10,
-    borderWidth: 1,
-    borderRightWidth: 0,
-    borderColor: Colors.accentBorder,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    gap: 2,
+    position: 'absolute', right: 0, zIndex: 101,
+    backgroundColor: 'rgba(8,14,24,0.95)',
+    borderTopLeftRadius: 10, borderBottomLeftRadius: 10,
+    borderWidth: 1, borderRightWidth: 0, borderColor: Colors.accentBorder,
+    paddingVertical: 10, paddingHorizontal: 8,
+    alignItems: 'center', gap: 2,
   },
   floatIcon: { fontSize: 18 },
   floatBadge: {
-    position: 'absolute',
-    top: -4, right: -4,
-    backgroundColor: Colors.accent,
-    borderRadius: 8,
-    minWidth: 16, height: 16,
-    paddingHorizontal: 3,
+    position: 'absolute', top: -4, right: -4,
+    backgroundColor: Colors.accent, borderRadius: 8,
+    minWidth: 16, height: 16, paddingHorizontal: 3,
     alignItems: 'center', justifyContent: 'center',
   },
   floatBadgeText: { color: Colors.background, fontSize: 9, fontWeight: '900' },
