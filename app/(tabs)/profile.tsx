@@ -7,6 +7,7 @@ import { PulseGlow } from '@/components/ui/PulseGlow';
 import { RankBadge } from '@/components/ui/RankBadge';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useProfile } from '@/hooks/useProfile';
+import { useFriends } from '@/hooks/useFriends';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
@@ -17,6 +18,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>();
   const { profile, loading, updateProfile, refreshProfile } = useProfile(userId);
+  const { friends, incoming } = useFriends(userId);
   const [editingRiotId, setEditingRiotId] = useState(false);
   const [riotId, setRiotId] = useState('');
   const [saving, setSaving] = useState(false);
@@ -128,6 +130,25 @@ export default function ProfileScreen() {
           ))}
         </View>
 
+        {/* Friends */}
+        <TouchableOpacity onPress={() => router.push('/profile/friends')} activeOpacity={0.8}>
+          <Card style={styles.friendsRow}>
+            <Text style={{ fontSize: 20 }}>👥</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[Typography.subheading, { fontSize: 14 }]}>Friends</Text>
+              <Text style={[Typography.body, { fontSize: 11, marginTop: 2 }]}>
+                {friends.length} friend{friends.length !== 1 ? 's' : ''}
+              </Text>
+            </View>
+            {incoming.length > 0 && (
+              <View style={styles.requestBadge}>
+                <Text style={styles.requestBadgeText}>{incoming.length}</Text>
+              </View>
+            )}
+            <Text style={{ color: Colors.textMuted, fontSize: 18 }}>›</Text>
+          </Card>
+        </TouchableOpacity>
+
         {/* Riot ID */}
         <Card>
           <View style={styles.row}>
@@ -215,4 +236,11 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, alignItems: 'center', gap: 4, padding: Spacing.sm },
   statValue: { fontSize: 20, fontWeight: '800' },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  friendsRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  requestBadge: {
+    backgroundColor: Colors.accent, borderRadius: 10,
+    minWidth: 20, height: 20, paddingHorizontal: 5,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  requestBadgeText: { color: Colors.background, fontSize: 11, fontWeight: '800' },
 });
