@@ -41,20 +41,17 @@ export function useTeam(userId: string | undefined) {
     fetchTeam(userId);
   }, [userId]);
 
-  // Re-fetch whenever team membership changes (member joins, gets approved, leaves)
+  // Re-fetch whenever team membership changes
   useEffect(() => {
-    if (!team?.id) return;
-    const sub = supabase
-      .channel(`team-members:${team.id}`)
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'team_members',
-        filter: `team_id=eq.${team.id}`,
-      }, () => {
-        if (userId) fetchTeam(userId);
-      })
-      .subscribe();
-    return () => { sub.unsubscribe(); };
-  }, [team?.id]);
+    if (!team?.id || !userId) return;
+    const channelName = `team-members-${team.id}-${Math.random().toString(36).slice(2, 6)}`;
+    const ch = supabase.channel(channelName);
+    ch.on('postgres_changes', {
+      event: '*', schema: 'public', table: 'team_members',
+      filter: `team_id=eq.${team.id}`,
+    }, () => fetchTeam(userId)).subscribe();
+    return () => { ch.unsubscribe(); };
+  }, [team?.id, userId]);
 
   async function createTeam(name: string, roomCode?: string, roomPassword?: string) {
     if (!userId) return { error: 'Not authenticated' };
