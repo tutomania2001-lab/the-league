@@ -87,7 +87,7 @@ function RoomCodeCard({ code, password }: { code: string; password?: string }) {
 export default function TeamScreen() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>();
-  const { team, members, loading, createTeam, leaveTeam } = useTeam(userId);
+  const { team, members, loading, createTeam, leaveTeam, refreshTeam } = useTeam(userId);
   const [memberProfiles, setMemberProfiles] = useState<Record<string, string>>({});
 
   // Step 1: room code, Step 2: team name
@@ -113,13 +113,14 @@ export default function TeamScreen() {
   async function handleCreate() {
     if (!teamName.trim()) { setError('Team name is required'); return; }
     setCreating(true);
-    // Pass room code directly into the insert — no separate update needed
     const { error } = await createTeam(
       teamName.trim(),
       roomCode.trim(),
       roomPassword.trim() || undefined,
     );
     if (error) { setError(error); setCreating(false); return; }
+    // Re-fetch so the team state includes room_code from DB
+    await refreshTeam();
     setCreating(false);
   }
 
@@ -264,12 +265,15 @@ export default function TeamScreen() {
               disabled={roomCode.length !== 5}
               onPress={async () => {
                 if (!/^\d{5}$/.test(roomCode)) return;
-                await supabase.from('teams').update({
+                const { error } = await supabase.from('teams').update({
                   room_code: roomCode.trim().toUpperCase(),
                   room_password: roomPassword.trim() || null,
                 }).eq('id', team.id);
-                setRoomCode('');
-                setRoomPassword('');
+                if (!error) {
+                  setRoomCode('');
+                  setRoomPassword('');
+                  await refreshTeam(); // Reload team to show new code
+                }
               }}
             />
           </Card>

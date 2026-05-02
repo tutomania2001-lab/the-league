@@ -64,5 +64,9 @@ export function useTeam(userId: string | undefined) {
     setMembers([]);
   }
 
-  return { team, members, loading, createTeam, joinTeam, leaveTeam };
+  async function refreshTeam() {
+    if (userId) await fetchTeam(userId);
+  }
+
+  return { team, members, loading, createTeam, joinTeam, leaveTeam, refreshTeam };
 }
