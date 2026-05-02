@@ -40,9 +40,16 @@ function RoomCodeInfo({ visible, onClose }: { visible: boolean; onClose: () => v
 }
 
 // ── Room Code Display Card ─────────────────────────────────
-function RoomCodeCard({ code, password }: { code: string; password?: string }) {
+function RoomCodeCard({
+  code, password, isCaptain, teamId, onUpdated,
+}: { code: string; password?: string; isCaptain?: boolean; teamId?: string; onUpdated?: () => void }) {
   const [copied, setCopied] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [newCode, setNewCode] = useState(code);
+  const [newPassword, setNewPassword] = useState(password ?? '');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   async function copyCode() {
     await Clipboard.setStringAsync(code);
@@ -50,33 +57,82 @@ function RoomCodeCard({ code, password }: { code: string; password?: string }) {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function handleSave() {
+    if (!/^\d{5}$/.test(newCode)) { setSaveError('Must be exactly 5 digits'); return; }
+    setSaving(true);
+    setSaveError(null);
+    const { error } = await supabase.from('teams').update({
+      room_code: newCode.toUpperCase(),
+      room_password: newPassword.trim() || null,
+    }).eq('id', teamId!);
+    setSaving(false);
+    if (error) { setSaveError(error.message); return; }
+    setEditing(false);
+    onUpdated?.();
+  }
+
   return (
     <>
       <Card glow style={styles.roomCard}>
         <View style={styles.roomHeader}>
           <Text style={Typography.label}>🎮 Wild Rift Room Code</Text>
-          <TouchableOpacity onPress={() => setShowInfo(true)} style={styles.infoBtn}>
-            <Text style={styles.infoBtnText}>ℹ</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {isCaptain && !editing && (
+              <TouchableOpacity onPress={() => { setEditing(true); setNewCode(code); setNewPassword(password ?? ''); }} style={styles.editCodeBtn}>
+                <Text style={styles.editCodeText}>✏️ Edit</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => setShowInfo(true)} style={styles.infoBtn}>
+              <Text style={styles.infoBtnText}>ℹ</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <TouchableOpacity onPress={copyCode} activeOpacity={0.8} style={styles.codeBlock}>
-          <GlowText style={styles.codeText}>{code}</GlowText>
-          <View style={[styles.copyBadge, copied && styles.copyBadgeDone]}>
-            <Text style={styles.copyBadgeText}>{copied ? '✓ Copied!' : '📋 Copy'}</Text>
+        {editing ? (
+          <View style={{ gap: Spacing.sm }}>
+            <Input
+              label="New Room Code (5 digits)"
+              placeholder="e.g. 48271"
+              value={newCode}
+              onChangeText={v => setNewCode(v.replace(/[^0-9]/g, '').slice(0, 5))}
+              keyboardType="numeric"
+              maxLength={5}
+              autoCorrect={false}
+            />
+            <Input
+              label="Password (optional)"
+              placeholder="Leave blank if none"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              autoCapitalize="none"
+            />
+            {saveError && <Text style={{ color: Colors.error, fontSize: 11 }}>{saveError}</Text>}
+            <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+              <Button label="Save" onPress={handleSave} loading={saving} disabled={newCode.length !== 5} style={{ flex: 1 }} />
+              <Button label="Cancel" variant="ghost" onPress={() => { setEditing(false); setSaveError(null); }} style={{ flex: 1 }} />
+            </View>
           </View>
-        </TouchableOpacity>
+        ) : (
+          <>
+            <TouchableOpacity onPress={copyCode} activeOpacity={0.8} style={styles.codeBlock}>
+              <GlowText style={styles.codeText}>{code}</GlowText>
+              <View style={[styles.copyBadge, copied && styles.copyBadgeDone]}>
+                <Text style={styles.copyBadgeText}>{copied ? '✓ Copied!' : '📋 Copy'}</Text>
+              </View>
+            </TouchableOpacity>
 
-        {password && (
-          <View style={styles.passwordRow}>
-            <Text style={[Typography.label, { flex: 1 }]}>Password</Text>
-            <Text style={[Typography.mono, { letterSpacing: 2 }]}>{password}</Text>
-          </View>
+            {password && (
+              <View style={styles.passwordRow}>
+                <Text style={[Typography.label, { flex: 1 }]}>Password</Text>
+                <Text style={[Typography.mono, { letterSpacing: 2 }]}>{password}</Text>
+              </View>
+            )}
+
+            <Text style={[Typography.body, { fontSize: 11, opacity: 0.6 }]}>
+              Tap the code to copy · Paste in Wild Rift → Custom Game → Join
+            </Text>
+          </>
         )}
-
-        <Text style={[Typography.body, { fontSize: 11, opacity: 0.6 }]}>
-          Tap the code to copy · Paste in Wild Rift → Custom Game → Join
-        </Text>
       </Card>
       <RoomCodeInfo visible={showInfo} onClose={() => setShowInfo(false)} />
     </>
@@ -230,7 +286,13 @@ export default function TeamScreen() {
 
         {/* Room code — required to enter tournaments */}
         {team.room_code ? (
-          <RoomCodeCard code={team.room_code} password={team.room_password} />
+          <RoomCodeCard
+            code={team.room_code}
+            password={team.room_password ?? undefined}
+            isCaptain={isCaptain}
+            teamId={team.id}
+            onUpdated={refreshTeam}
+          />
         ) : isCaptain ? (
           <Card style={{ gap: Spacing.sm, borderColor: Colors.error + '55' }}>
             <Text style={{ color: Colors.error, fontWeight: '700', fontSize: 13 }}>
@@ -337,6 +399,12 @@ const styles = StyleSheet.create({
   // Room code card
   roomCard: { gap: Spacing.sm },
   roomHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  editCodeBtn: {
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 6, borderWidth: 1, borderColor: Colors.gold + '66',
+    backgroundColor: 'rgba(200,155,60,0.1)',
+  },
+  editCodeText: { color: Colors.gold, fontSize: 11, fontWeight: '700' },
   infoBtn: {
     width: 22, height: 22, borderRadius: 11,
     backgroundColor: Colors.accentDim, borderWidth: 1, borderColor: Colors.accentBorder,
