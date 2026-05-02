@@ -1,13 +1,15 @@
 import { AnimatedSplash } from '@/components/ui/AnimatedSplash';
 import { Colors } from '@/constants/theme';
-import YoutubePlayer from 'react-native-youtube-iframe';
-import { useRef, useState } from 'react';
-import { Animated, Dimensions, StyleSheet, View, ViewStyle } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, StyleSheet, View, ViewStyle } from 'react-native';
 
-const { width, height } = Dimensions.get('window');
+// Single looping background video used throughout the entire app.
+// Falls back to AnimatedSplash if the video fails to load.
+// Replace this URL with your preferred LoL/Wild Rift cinematic MP4.
+export const APP_VIDEO_URI = 'https://assets.mixkit.co/videos/3696/3696-720.mp4';
 
 type Props = {
-  videoId: string;
   fallbackImageUri: string;
   children: React.ReactNode;
   style?: ViewStyle;
@@ -15,30 +17,40 @@ type Props = {
 };
 
 export function VideoBackground({
-  videoId,
   fallbackImageUri,
   children,
   style,
-  overlayOpacity = 0.55,
+  overlayOpacity = 0.6,
 }: Props) {
   const [videoReady, setVideoReady] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const videoOpacity = useRef(new Animated.Value(0)).current;
 
-  function onReady() {
-    setVideoReady(true);
-    Animated.timing(videoOpacity, {
-      toValue: 1,
-      duration: 1000,
-      useNativeDriver: true,
-    }).start();
-  }
+  const player = useVideoPlayer(APP_VIDEO_URI, p => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
 
-  function onError() {
-    setVideoError(true);
-  }
+  useEffect(() => {
+    const sub = player.addListener('statusChange', ({ status, error }) => {
+      if (status === 'readyToPlay') {
+        setVideoReady(true);
+        Animated.timing(videoOpacity, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }).start();
+      }
+      if (error) setVideoError(true);
+    });
+    // Fallback after 8s if video never loads
+    const timeout = setTimeout(() => {
+      if (!videoReady) setVideoError(true);
+    }, 8000);
+    return () => { sub.remove(); clearTimeout(timeout); };
+  }, [player]);
 
-  // If video fails just show animated splash
   if (videoError) {
     return (
       <AnimatedSplash uri={fallbackImageUri} style={style} overlayOpacity={overlayOpacity}>
@@ -49,81 +61,51 @@ export function VideoBackground({
 
   return (
     <View style={[styles.container, style]}>
-      {/* Animated splash always visible underneath */}
-      <AnimatedSplash
-        uri={fallbackImageUri}
-        style={StyleSheet.absoluteFillObject}
-        overlayOpacity={videoReady ? 0 : overlayOpacity}
-      >
-        <View />
-      </AnimatedSplash>
+      {/* Fallback splash visible while video loads */}
+      {!videoReady && (
+        <AnimatedSplash
+          uri={fallbackImageUri}
+          style={StyleSheet.absoluteFillObject}
+          overlayOpacity={overlayOpacity}
+        >
+          <View />
+        </AnimatedSplash>
+      )}
 
-      {/* YouTube video fades in once ready */}
-      <Animated.View style={[styles.videoWrap, { opacity: videoOpacity }]}>
-        <YoutubePlayer
-          height={height * 1.2}
-          width={width * 1.8}
-          videoId={videoId}
-          play
-          mute
-          loop
-          webViewStyle={{ opacity: 0.99, backgroundColor: 'transparent' }}
-          webViewProps={{
-            allowsInlineMediaPlayback: true,
-            mediaPlaybackRequiresUserAction: false,
-            userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-          }}
-          initialPlayerParams={{
-            controls: false,
-            showClosedCaptions: false,
-            modestbranding: true,
-            rel: false,
-            fs: false,
-            iv_load_policy: 3,
-          }}
-          onReady={onReady}
-          onError={onError}
+      {/* Video fades in */}
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: videoOpacity }]}>
+        <VideoView
+          player={player}
+          style={StyleSheet.absoluteFillObject}
+          contentFit="cover"
+          nativeControls={false}
+          allowsFullscreen={false}
+          allowsPictureInPicture={false}
         />
       </Animated.View>
 
-      {/* Dark overlay for text legibility */}
+      {/* Overlay */}
       <View style={[styles.overlay, { backgroundColor: `rgba(7,11,20,${overlayOpacity})` }]} />
 
-      {/* Hextech corner brackets */}
-      <View style={[styles.corner, styles.topLeft]} />
-      <View style={[styles.corner, styles.topRight]} />
-      <View style={[styles.corner, styles.bottomLeft]} />
-      <View style={[styles.corner, styles.bottomRight]} />
+      {/* Hextech corners */}
+      <View style={[styles.corner, styles.tl]} />
+      <View style={[styles.corner, styles.tr]} />
+      <View style={[styles.corner, styles.bl]} />
+      <View style={[styles.corner, styles.br]} />
 
-      {/* Content on top */}
       <View style={styles.content}>{children}</View>
     </View>
   );
 }
 
-const cornerSize = 18;
-const cornerWidth = 2;
-
+const C = 18; const CW = 2;
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background, overflow: 'hidden' },
-  videoWrap: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    top: -height * 0.1,
-    left: -width * 0.4,
-  },
-  overlay: { ...StyleSheet.absoluteFillObject },
+  overlay: StyleSheet.absoluteFillObject,
   content: { flex: 1 },
-  corner: {
-    position: 'absolute',
-    width: cornerSize,
-    height: cornerSize,
-    borderColor: Colors.accent,
-    opacity: 0.6,
-  },
-  topLeft:     { top: 14, left: 14, borderTopWidth: cornerWidth, borderLeftWidth: cornerWidth },
-  topRight:    { top: 14, right: 14, borderTopWidth: cornerWidth, borderRightWidth: cornerWidth },
-  bottomLeft:  { bottom: 14, left: 14, borderBottomWidth: cornerWidth, borderLeftWidth: cornerWidth },
-  bottomRight: { bottom: 14, right: 14, borderBottomWidth: cornerWidth, borderRightWidth: cornerWidth },
+  corner: { position: 'absolute', width: C, height: C, borderColor: Colors.accent, opacity: 0.6 },
+  tl: { top: 14, left: 14, borderTopWidth: CW, borderLeftWidth: CW },
+  tr: { top: 14, right: 14, borderTopWidth: CW, borderRightWidth: CW },
+  bl: { bottom: 14, left: 14, borderBottomWidth: CW, borderLeftWidth: CW },
+  br: { bottom: 14, right: 14, borderBottomWidth: CW, borderRightWidth: CW },
 });

@@ -5,7 +5,7 @@ import { PulseGlow } from '@/components/ui/PulseGlow';
 import { VideoBackground } from '@/components/ui/VideoBackground';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { FEATURED_CHAMPIONS } from '@/constants/champions';
-import { ChampionVideoIds, VideoFallbacks } from '@/constants/videos';
+import { VideoFallbacks } from '@/constants/videos';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated, Dimensions, FlatList, Image,
@@ -44,7 +44,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       {/* Video hero */}
-      <VideoBackground videoId={ChampionVideoIds.home} fallbackImageUri={activeChamp.splash} style={styles.hero} overlayOpacity={0.45}>
+      <VideoBackground fallbackImageUri={activeChamp.splash} style={styles.hero} overlayOpacity={0.45}>
         <SafeAreaView>
           <View style={styles.heroContent}>
             <Text style={styles.heroLabel}>WILD RIFT TOURNAMENT</Text>
