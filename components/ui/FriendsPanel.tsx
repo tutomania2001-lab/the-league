@@ -5,7 +5,7 @@ import { useTeamInvites } from '@/hooks/useTeamInvites';
 import { useTeam } from '@/hooks/useTeam';
 import { StatusDot, UserStatus, STATUS_CONFIG } from '@/components/ui/StatusDot';
 import { MiniProfile, MiniProfileUser } from '@/components/ui/MiniProfile';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated, Dimensions, Easing, Image, RefreshControl,
   ScrollView, StyleSheet, Text, TouchableOpacity, View,
@@ -14,10 +14,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const PANEL_W = 265;
 
+import { supabase } from '@/lib/supabase';
+
 type Props = { userId: string | undefined };
 
-export function FriendsPanel({ userId }: Props) {
+export function FriendsPanel({ userId: userIdProp }: Props) {
   const insets = useSafeAreaInsets();
+  const [resolvedUserId, setResolvedUserId] = useState<string | undefined>(userIdProp);
+
+  // Resolve userId ourselves if not provided (dev bypass / web)
+  useEffect(() => {
+    if (userIdProp) { setResolvedUserId(userIdProp); return; }
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.id) setResolvedUserId(data.user.id);
+    });
+  }, [userIdProp]);
+
+  const userId = resolvedUserId;
   const { friends, incoming, loading, accept, decline, remove, sendRequest } = useFriends(userId);
   const { recentPlayers } = useRecentPlayers(userId);
   const { unreadByUser, totalUnread } = useUnreadCounts(userId);
