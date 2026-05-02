@@ -6,6 +6,7 @@ import { useTeam } from '@/hooks/useTeam';
 import { StatusDot, UserStatus, STATUS_CONFIG } from '@/components/ui/StatusDot';
 import { MiniProfile, MiniProfileUser } from '@/components/ui/MiniProfile';
 import { getStatusFromLastSeen } from '@/hooks/usePresence';
+import { withClanTag } from '@/lib/clanTag';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Animated, Dimensions, Easing, Image,
@@ -132,7 +133,7 @@ export function FriendsPanel({ userId: userIdProp }: Props) {
 
         {/* Name + status */}
         <View style={styles.friendInfo}>
-          <Text style={styles.friendName} numberOfLines={1}>{profile.riot_id ?? profile.username}</Text>
+          <Text style={styles.friendName} numberOfLines={1}>{withClanTag(profile.riot_id ?? profile.username, (profile as any).clan_tag)}</Text>
           <Text style={[styles.friendStatus, { color: statusCfg.color }]}>
             {status === 'in_game' && profile.current_game
               ? `⚔ ${profile.current_game}`

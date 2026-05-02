@@ -322,6 +322,60 @@ function TeamChat({ teamId, myId, memberProfiles }: { teamId: string; myId: stri
   );
 }
 
+function ClanTagEditor({ team, onSaved }: { team: any; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [tag, setTag] = useState((team.clan_tag ?? '').toUpperCase());
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <View style={styles.sectionCard}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>🏷️ Clan Tag</Text>
+        <TouchableOpacity onPress={() => { setEditing(!editing); setTag((team.clan_tag ?? '').toUpperCase()); }}>
+          <Text style={{ color: Colors.gold, fontSize: 12 }}>{editing ? 'Cancel' : '✏️ Edit'}</Text>
+        </TouchableOpacity>
+      </View>
+      {!editing ? (
+        <View style={styles.roomCodeBlock}>
+          <Text style={[styles.roomCodeText, { letterSpacing: 3, fontSize: 20 }]}>
+            {team.clan_tag ? `[${team.clan_tag.toUpperCase()}]` : 'Not set'}
+          </Text>
+          <Text style={[Typography.body, { fontSize: 11 }]}>Shows before all members' names</Text>
+        </View>
+      ) : (
+        <View style={{ gap: Spacing.sm }}>
+          <Input
+            label="Tag (max 4 letters)"
+            placeholder="e.g. GANG"
+            value={tag}
+            onChangeText={v => setTag(v.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 4))}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={4}
+          />
+          {tag.length > 0 && (
+            <Text style={[Typography.body, { fontSize: 12 }]}>
+              Preview: <Text style={{ color: Colors.gold, fontWeight: '800' }}>[{tag}]</Text> YourName#TAG
+            </Text>
+          )}
+          <Button
+            label={saving ? 'Saving...' : 'Save Tag'}
+            onPress={async () => {
+              setSaving(true);
+              await supabase.from('teams').update({ clan_tag: tag || null }).eq('id', team.id);
+              setSaving(false);
+              setEditing(false);
+              onSaved();
+            }}
+            loading={saving}
+            disabled={tag.length === 0}
+          />
+        </View>
+      )}
+    </View>
+  );
+}
+
 function timeAgo(date: string): string {
   const diff = Date.now() - new Date(date).getTime();
   const m = Math.floor(diff / 60000);
@@ -596,6 +650,20 @@ export default function TeamScreen() {
                 </View>
               )}
             </View>
+
+            {/* Clan Tag — captain sets, everyone displays */}
+            {isCaptain && (
+              <ClanTagEditor team={team} onSaved={refreshTeam} />
+            )}
+            {!isCaptain && (team as any).clan_tag && (
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionTitle}>🏷️ Clan Tag</Text>
+                <View style={styles.roomCodeBlock}>
+                  <Text style={[styles.roomCodeText, { letterSpacing: 3, fontSize: 20 }]}>[{(team as any).clan_tag.toUpperCase()}]</Text>
+                  <Text style={[Typography.body, { fontSize: 11 }]}>Displayed before your name</Text>
+                </View>
+              </View>
+            )}
 
             {/* Clan Invite Code — visible to all members */}
             <View style={styles.sectionCard}>

@@ -34,8 +34,17 @@ export function useFriends(userId: string | undefined) {
       .select('*')
       .in('id', otherIds.length ? otherIds : ['00000000-0000-0000-0000-000000000000']);
 
-    const profileMap: Record<string, UserRow> = {};
-    profiles?.forEach(p => { profileMap[p.id] = p; });
+    // Fetch clan tags for each friend
+    const { data: teamMemberships } = await supabase
+      .from('team_members')
+      .select('user_id, team:teams(clan_tag)')
+      .in('user_id', otherIds.length ? otherIds : ['00000000-0000-0000-0000-000000000000'])
+      .in('status', ['active']);
+    const tagMap: Record<string, string> = {};
+    teamMemberships?.forEach((m: any) => { if (m.team?.clan_tag) tagMap[m.user_id] = m.team.clan_tag; });
+
+    const profileMap: Record<string, UserRow & { clan_tag?: string }> = {};
+    profiles?.forEach(p => { profileMap[p.id] = { ...p, clan_tag: tagMap[p.id] }; });
 
     const withProfiles = data.map(f => ({
       ...f,
