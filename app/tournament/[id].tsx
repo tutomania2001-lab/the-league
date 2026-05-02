@@ -7,16 +7,20 @@ import { GlowText } from '@/components/ui/GlowText';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useTournament } from '@/hooks/useTournament';
 import { useTeam } from '@/hooks/useTeam';
+import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
 import { TeamRow, TournamentStatus } from '@/types/database';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const badgeVariant: Record<TournamentStatus, 'open' | 'active' | 'completed'> = {
   open: 'open', active: 'active', completed: 'completed',
 };
+
+const HOLDING_PERCENT = 0.10; // 10% non-refundable holding deposit
+const REFUND_PERCENT  = 0.90; // 90% refunded to players
 
 export default function TournamentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,14 +28,68 @@ export default function TournamentDetailScreen() {
   const { tournament, matches, registeredTeamIds, loading } = useTournament(id);
   const [userId, setUserId] = useState<string>();
   const { team } = useTeam(userId);
+  const { profile } = useProfile(userId);
   const [teams, setTeams] = useState<Record<string, TeamRow>>({});
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
   }, []);
+
+  const isCreator = tournament?.created_by === userId;
+  const canCancel = (profile?.is_admin || isCreator) && tournament?.status !== 'completed' && tournament?.status !== 'cancelled';
+
+  async function handleCancel() {
+    if (!id || !tournament) return;
+
+    Alert.alert(
+      'Cancel Tournament',
+      `This will refund 90% of entry fees to all players. The 10% holding deposit is non-refundable.\n\nTotal to refund: £${(tournament.prize_pool * REFUND_PERCENT).toFixed(2)}\n\nContinue?`,
+      [
+        { text: 'Keep Tournament', style: 'cancel' },
+        {
+          text: 'Cancel & Refund',
+          style: 'destructive',
+          onPress: async () => {
+            setCancelling(true);
+
+            // Find all entry_fee transactions for this tournament
+            const { data: entryTxns } = await supabase
+              .from('transactions')
+              .select('*')
+              .eq('tournament_id', id)
+              .eq('type', 'entry_fee')
+              .eq('status', 'completed');
+
+            // Refund 90% to each payer
+            if (entryTxns?.length) {
+              for (const txn of entryTxns) {
+                const refundAmount = Number((txn.amount * REFUND_PERCENT).toFixed(2));
+                await supabase.rpc('increment_wallet', { user_id: txn.user_id, amount: refundAmount });
+                await supabase.from('transactions').insert({
+                  user_id: txn.user_id,
+                  type: 'topup',
+                  amount: refundAmount,
+                  status: 'completed',
+                  tournament_id: id,
+                });
+              }
+            }
+
+            // Mark tournament as cancelled
+            await supabase.from('tournaments').update({ status: 'cancelled' }).eq('id', id);
+
+            setCancelling(false);
+            Alert.alert('Tournament Cancelled', 'All players have been refunded 90% of their entry fees.');
+            router.replace('/(tabs)/tournaments');
+          },
+        },
+      ]
+    );
+  }
 
   useEffect(() => {
     if (!matches.length && !registeredTeamIds.length) return;
@@ -176,6 +234,39 @@ export default function TournamentDetailScreen() {
             ))}
           </View>
         )}
+
+        {/* Cancel tournament — creator/admin only */}
+        {canCancel && (
+          <Card style={{ borderColor: Colors.error + '55', gap: Spacing.sm }}>
+            <Text style={[Typography.label, { color: Colors.error }]}>⚠️ Cancel Tournament</Text>
+            <Text style={[Typography.body, { fontSize: 12 }]}>
+              Players will be refunded <Text style={{ color: Colors.success, fontWeight: '700' }}>90%</Text> of their entry fees.
+              The <Text style={{ color: Colors.error, fontWeight: '700' }}>10%</Text> holding deposit is non-refundable.
+            </Text>
+            {tournament.prize_pool > 0 && (
+              <View style={styles.refundRow}>
+                <View style={styles.refundBox}>
+                  <Text style={[Typography.label, { color: Colors.success }]}>Refunded</Text>
+                  <Text style={[Typography.subheading, { color: Colors.success }]}>
+                    £{(tournament.prize_pool * REFUND_PERCENT).toFixed(2)}
+                  </Text>
+                </View>
+                <View style={styles.refundBox}>
+                  <Text style={[Typography.label, { color: Colors.error }]}>Held (10%)</Text>
+                  <Text style={[Typography.subheading, { color: Colors.error }]}>
+                    £{(tournament.prize_pool * HOLDING_PERCENT).toFixed(2)}
+                  </Text>
+                </View>
+              </View>
+            )}
+            <Button
+              label={cancelling ? 'Cancelling...' : '🗑 Cancel Tournament'}
+              onPress={handleCancel}
+              loading={cancelling}
+              style={{ backgroundColor: 'rgba(255,68,68,0.15)', borderWidth: 1, borderColor: Colors.error + '66' }}
+            />
+          </Card>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -189,4 +280,6 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, gap: 4, padding: Spacing.sm },
   teamList: { gap: Spacing.xs },
   teamRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.sm },
+  refundRow: { flexDirection: 'row', gap: Spacing.sm },
+  refundBox: { flex: 1, backgroundColor: Colors.surfaceAlt, borderRadius: 8, padding: Spacing.sm, alignItems: 'center', gap: 2 },
 });

@@ -30,7 +30,7 @@ export type TeamMemberRow = {
   joined_at: string;
 };
 
-export type TournamentStatus = 'open' | 'active' | 'completed';
+export type TournamentStatus = 'open' | 'active' | 'completed' | 'cancelled';
 
 export type TournamentRow = {
   id: string;

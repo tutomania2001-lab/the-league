@@ -380,17 +380,17 @@ export default function TeamScreen() {
       const fee = tournament?.entry_fee_per_player ?? lineupFee;
 
       if (captainPaysAll) {
-        // Captain pays full £fee×5
         await supabase.rpc('decrement_wallet', { user_id: userId, amount: fee * 5 });
         await supabase.from('transactions').insert({
-          user_id: userId, type: 'entry_fee', amount: fee * 5, status: 'completed',
+          user_id: userId, type: 'entry_fee', amount: fee * 5,
+          status: 'completed', tournament_id: lineupTournamentId,
         });
       } else {
-        // Each of the 5 selected players pays individually
         for (const uid of ids) {
           await supabase.rpc('decrement_wallet', { user_id: uid, amount: fee });
           await supabase.from('transactions').insert({
-            user_id: uid, type: 'entry_fee', amount: fee, status: 'completed',
+            user_id: uid, type: 'entry_fee', amount: fee,
+            status: 'completed', tournament_id: lineupTournamentId,
           });
         }
       }
