@@ -1,293 +1,297 @@
-import { Colors, Spacing, Typography } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
+import { Splashes } from '@/constants/champions';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import {
-  Animated, Dimensions, Easing, StyleSheet,
-  Text, TouchableOpacity, View,
+  Animated, Dimensions, Easing, Image,
+  StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
-// Floating gold sparkle particle
-function Sparkle({ x, delay }: { x: number; delay: number }) {
+// Floating ember / spark particle
+function Ember({ x, size, delay, color }: { x: number; size: number; delay: number; color: string }) {
   const y = useRef(new Animated.Value(0)).current;
   const op = useRef(new Animated.Value(0)).current;
-  const sc = useRef(new Animated.Value(0.5)).current;
+  const drift = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const run = () => {
-      y.setValue(0); op.setValue(0); sc.setValue(0.5);
+      y.setValue(0); op.setValue(0); drift.setValue(0);
+      const dur = 3500 + Math.random() * 3000;
       Animated.sequence([
-        Animated.delay(delay),
+        Animated.delay(delay + Math.random() * 2000),
         Animated.parallel([
-          Animated.timing(y, { toValue: -180, duration: 3000, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
+          Animated.timing(y, { toValue: -(height * 0.55), duration: dur, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
           Animated.sequence([
-            Animated.timing(op, { toValue: 1, duration: 600, useNativeDriver: true }),
-            Animated.timing(op, { toValue: 0, duration: 2400, useNativeDriver: true }),
+            Animated.timing(op, { toValue: 0.9, duration: 400, useNativeDriver: true }),
+            Animated.timing(op, { toValue: 0, duration: dur - 400, useNativeDriver: true }),
           ]),
-          Animated.sequence([
-            Animated.timing(sc, { toValue: 1.2, duration: 800, useNativeDriver: true }),
-            Animated.timing(sc, { toValue: 0.3, duration: 2200, useNativeDriver: true }),
-          ]),
+          Animated.timing(drift, { toValue: (Math.random() - 0.5) * 60, duration: dur, useNativeDriver: true }),
         ]),
-        Animated.delay(Math.random() * 2000),
       ]).start(run);
     };
     run();
   }, []);
 
   return (
-    <Animated.Text style={{
-      position: 'absolute', left: x, bottom: 20,
-      fontSize: 14, opacity: op,
-      transform: [{ translateY: y }, { scale: sc }],
-    }}>✦</Animated.Text>
+    <Animated.View style={{
+      position: 'absolute', bottom: height * 0.28,
+      left: x, width: size, height: size, borderRadius: size,
+      backgroundColor: color, opacity: op,
+      transform: [{ translateY: y }, { translateX: drift }],
+      shadowColor: color, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: size * 2,
+    }} />
   );
 }
 
-// Rotating outer ring
-function RotatingRing({ size, duration, color, reverse }: { size: number; duration: number; color: string; reverse?: boolean }) {
+// Pulsing glow circle behind trophy
+function GlowOrb() {
+  const scale = useRef(new Animated.Value(0.8)).current;
+  const op = useRef(new Animated.Value(0.25)).current;
+
+  useEffect(() => {
+    Animated.loop(Animated.parallel([
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1.2, duration: 2500, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+        Animated.timing(scale, { toValue: 0.8, duration: 2500, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+      ]),
+      Animated.sequence([
+        Animated.timing(op, { toValue: 0.5, duration: 2500, useNativeDriver: true }),
+        Animated.timing(op, { toValue: 0.2, duration: 2500, useNativeDriver: true }),
+      ]),
+    ])).start();
+  }, []);
+
+  return (
+    <Animated.View style={[styles.glowOrb, { opacity: op, transform: [{ scale }] }]} />
+  );
+}
+
+// Slow rotating hexagon ring
+function HexRing({ size, duration, color, width: bw = 1, reverse }: any) {
   const rot = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.loop(
       Animated.timing(rot, { toValue: 1, duration, useNativeDriver: true, easing: Easing.linear })
     ).start();
   }, []);
-
   const rotate = rot.interpolate({ inputRange: [0, 1], outputRange: reverse ? ['360deg', '0deg'] : ['0deg', '360deg'] });
-
   return (
-    <Animated.View style={[styles.ring, { width: size, height: size, borderColor: color, transform: [{ rotate }] }]} />
+    <Animated.View style={{
+      position: 'absolute', width: size, height: size, borderRadius: 8,
+      borderWidth: bw, borderColor: color, transform: [{ rotate }],
+    }} />
   );
 }
 
-// Pulsing glow behind trophy
-function TrophyGlow() {
-  const scale = useRef(new Animated.Value(1)).current;
-  const op = useRef(new Animated.Value(0.3)).current;
-
-  useEffect(() => {
-    Animated.loop(Animated.parallel([
-      Animated.sequence([
-        Animated.timing(scale, { toValue: 1.3, duration: 2000, useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 1, duration: 2000, useNativeDriver: true }),
-      ]),
-      Animated.sequence([
-        Animated.timing(op, { toValue: 0.6, duration: 2000, useNativeDriver: true }),
-        Animated.timing(op, { toValue: 0.2, duration: 2000, useNativeDriver: true }),
-      ]),
-    ])).start();
-  }, []);
-
-  return (
-    <Animated.View style={[styles.trophyGlow, { opacity: op, transform: [{ scale }] }]} />
-  );
-}
-
-// Trophy bounce on mount
-function TrophyIcon() {
-  const scale = useRef(new Animated.Value(0)).current;
+// Trophy rises into frame
+function Trophy() {
+  const translateY = useRef(new Animated.Value(60)).current;
+  const op = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.sequence([
-      Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 60, friction: 6 }),
+      Animated.delay(300),
+      Animated.parallel([
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 40, friction: 8 }),
+        Animated.timing(op, { toValue: 1, duration: 800, useNativeDriver: true }),
+      ]),
     ]).start(() => {
       Animated.loop(Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.06, duration: 1800, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
-        Animated.timing(pulse, { toValue: 1, duration: 1800, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+        Animated.timing(pulse, { toValue: 1.04, duration: 2200, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
+        Animated.timing(pulse, { toValue: 1, duration: 2200, useNativeDriver: true, easing: Easing.inOut(Easing.sin) }),
       ])).start();
     });
   }, []);
 
   return (
-    <Animated.View style={{ transform: [{ scale: Animated.multiply(scale, pulse) }] }}>
+    <Animated.View style={{ opacity: op, transform: [{ translateY }, { scale: pulse }] }}>
       <Text style={styles.trophyEmoji}>🏆</Text>
     </Animated.View>
   );
 }
 
-export default function SplashScreen() {
+export default function LandingScreen() {
   const router = useRouter();
 
-  // Staggered fade-in for text + buttons
-  const titleOp = useRef(new Animated.Value(0)).current;
-  const subtitleOp = useRef(new Animated.Value(0)).current;
-  const buttonsOp = useRef(new Animated.Value(0)).current;
-  const titleY = useRef(new Animated.Value(20)).current;
+  const logoOp = useRef(new Animated.Value(0)).current;
+  const logoY = useRef(new Animated.Value(-30)).current;
+  const btnsOp = useRef(new Animated.Value(0)).current;
+  const btnsY = useRef(new Animated.Value(40)).current;
+  const divOp = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.sequence([
-      Animated.delay(600),
+      Animated.delay(200),
       Animated.parallel([
-        Animated.timing(titleOp, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(titleY, { toValue: 0, duration: 700, useNativeDriver: true }),
+        Animated.timing(logoOp, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(logoY, { toValue: 0, duration: 900, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
       ]),
-      Animated.timing(subtitleOp, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(buttonsOp, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(divOp, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.parallel([
+        Animated.timing(btnsOp, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(btnsY, { toValue: 0, duration: 700, useNativeDriver: true, easing: Easing.out(Easing.cubic) }),
+      ]),
     ]).start();
   }, []);
 
-  const sparklePositions = [
-    { x: width * 0.3, delay: 0 },
-    { x: width * 0.4, delay: 500 },
-    { x: width * 0.5, delay: 1000 },
-    { x: width * 0.6, delay: 300 },
-    { x: width * 0.55, delay: 800 },
-    { x: width * 0.35, delay: 1500 },
-    { x: width * 0.45, delay: 200 },
-    { x: width * 0.62, delay: 700 },
+  const embers = [
+    { x: width * 0.25, size: 3, delay: 0,    color: Colors.gold },
+    { x: width * 0.35, size: 2, delay: 600,  color: Colors.accent },
+    { x: width * 0.45, size: 4, delay: 200,  color: Colors.gold },
+    { x: width * 0.55, size: 2, delay: 1000, color: Colors.accent },
+    { x: width * 0.65, size: 3, delay: 400,  color: Colors.gold },
+    { x: width * 0.30, size: 2, delay: 800,  color: Colors.gold },
+    { x: width * 0.60, size: 3, delay: 1400, color: Colors.accent },
+    { x: width * 0.50, size: 2, delay: 1800, color: Colors.gold },
+    { x: width * 0.40, size: 4, delay: 300,  color: Colors.gold },
+    { x: width * 0.70, size: 2, delay: 900,  color: Colors.accent },
   ];
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
+    <View style={styles.root}>
+      {/* Champion splash — full bleed background */}
+      <Image
+        source={{ uri: Splashes.KaiSa }}
+        style={styles.bgImage}
+        resizeMode="cover"
+      />
+      {/* Heavy vignette overlay */}
+      <View style={styles.vignette} />
+      {/* Bottom gradient fade */}
+      <View style={styles.bottomFade} />
 
-        {/* Top brand */}
-        <Animated.View style={[styles.brandRow, { opacity: titleOp, transform: [{ translateY: titleY }] }]}>
-          <Text style={styles.wildRiftLabel}>WILD RIFT</Text>
-          <Text style={styles.brandTitle}>◈ THE LEAGUE</Text>
-          <Text style={styles.brandTagline}>COMPETE · WIN · DOMINATE</Text>
+      <SafeAreaView style={styles.safe}>
+        {/* Logo block — top */}
+        <Animated.View style={[styles.logoBlock, { opacity: logoOp, transform: [{ translateY: logoY }] }]}>
+          <Text style={styles.rift}>WILD RIFT</Text>
+          <Text style={styles.title}>◈ THE LEAGUE</Text>
+          <View style={styles.titleUnderline} />
         </Animated.View>
 
         {/* Trophy centrepiece */}
-        <View style={styles.trophySection}>
-          <TrophyGlow />
-          <RotatingRing size={200} duration={8000} color={Colors.gold + '66'} />
-          <RotatingRing size={260} duration={14000} color={Colors.accent + '44'} reverse />
-          <RotatingRing size={160} duration={5000} color={Colors.gold + '99'} />
-          <View style={styles.trophyCenter}>
-            <TrophyIcon />
+        <View style={styles.trophyWrap}>
+          <GlowOrb />
+          <HexRing size={220} duration={12000} color={Colors.gold + '55'} width={1} />
+          <HexRing size={170} duration={7000} color={Colors.accent + '66'} width={1.5} reverse />
+          <HexRing size={140} duration={4500} color={Colors.gold + '88'} width={0.5} />
+          <View style={styles.trophyInner}>
+            <Trophy />
           </View>
-          {sparklePositions.map((s, i) => (
-            <Sparkle key={i} x={s.x - width * 0.25} delay={s.delay} />
-          ))}
+          {embers.map((e, i) => <Ember key={i} {...e} />)}
         </View>
 
-        {/* Prize tagline */}
-        <Animated.View style={{ opacity: subtitleOp, alignItems: 'center', gap: 6 }}>
-          <Text style={styles.prizeText}>Real Prize Pools</Text>
-          <Text style={styles.prizeDesc}>5v5 Wild Rift tournaments with cash prizes</Text>
-        </Animated.View>
+        {/* Bottom CTA section */}
+        <Animated.View style={[styles.bottomSection, { opacity: btnsOp, transform: [{ translateY: btnsY }] }]}>
 
-        {/* CTA buttons */}
-        <Animated.View style={[styles.buttons, { opacity: buttonsOp }]}>
-          <TouchableOpacity
-            style={styles.btnPrimary}
-            onPress={() => router.push('/auth/sign-up')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.btnPrimaryText}>Create Account</Text>
+          <Animated.View style={[styles.dividerRow, { opacity: divOp }]}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>ENTER THE ARENA</Text>
+            <View style={styles.dividerLine} />
+          </Animated.View>
+
+          <TouchableOpacity style={styles.btnPrimary} onPress={() => router.push('/auth/sign-up')} activeOpacity={0.8}>
+            <Text style={styles.btnPrimaryText}>CREATE ACCOUNT</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.btnSecondary}
-            onPress={() => router.push('/auth/log-in')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.btnSecondaryText}>Log In</Text>
+          <TouchableOpacity style={styles.btnSecondary} onPress={() => router.push('/auth/log-in')} activeOpacity={0.8}>
+            <Text style={styles.btnSecondaryText}>LOG IN</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => {
+            const { DEV_BYPASS } = require('@/lib/dev');
+            DEV_BYPASS.enabled = true;
+            router.replace('/(tabs)');
+          }}>
+            <Text style={styles.devText}>dev preview</Text>
+          </TouchableOpacity>
+
         </Animated.View>
-
-        {/* Dev bypass */}
-        <TouchableOpacity onPress={() => {
-          const { DEV_BYPASS } = require('@/lib/dev');
-          DEV_BYPASS.enabled = true;
-          router.replace('/(tabs)');
-        }}>
-          <Text style={styles.devText}>🎮 Dev Preview</Text>
-        </TouchableOpacity>
-
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: 'transparent' },
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
+  root: { flex: 1, backgroundColor: '#000' },
+  bgImage: {
+    ...StyleSheet.absoluteFillObject,
+    width, height,
+    opacity: 0.55,
   },
+  vignette: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+    // Radial-style dark edges via layered views
+  },
+  bottomFade: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: height * 0.55,
+    backgroundColor: '#000',
+    opacity: 0.82,
+  },
+  safe: { flex: 1, justifyContent: 'space-between', alignItems: 'center' },
 
-  // Brand
-  brandRow: { alignItems: 'center', gap: 4, marginTop: Spacing.md },
-  wildRiftLabel: {
-    fontSize: 11, fontWeight: '800', letterSpacing: 5,
+  // Logo
+  logoBlock: { alignItems: 'center', gap: 6, paddingTop: 12 },
+  rift: {
+    fontSize: 11, fontWeight: '800', letterSpacing: 6,
     color: Colors.gold, textTransform: 'uppercase',
   },
-  brandTitle: {
-    fontSize: 34, fontWeight: '900', letterSpacing: 3,
-    color: Colors.accent,
-    textShadowColor: Colors.accent, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 16,
+  title: {
+    fontSize: 38, fontWeight: '900', letterSpacing: 2,
+    color: '#fff',
+    textShadowColor: Colors.accent, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 20,
   },
-  brandTagline: {
-    fontSize: 10, fontWeight: '700', letterSpacing: 4,
-    color: Colors.textMuted, textTransform: 'uppercase',
+  titleUnderline: {
+    width: 60, height: 2, backgroundColor: Colors.gold,
+    shadowColor: Colors.gold, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 6,
   },
 
   // Trophy
-  trophySection: {
-    width: 280, height: 280,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  trophyGlow: {
-    position: 'absolute',
-    width: 180, height: 180, borderRadius: 90,
+  trophyWrap: { width: 260, height: 260, alignItems: 'center', justifyContent: 'center' },
+  glowOrb: {
+    position: 'absolute', width: 160, height: 160, borderRadius: 80,
     backgroundColor: Colors.gold,
-    shadowColor: Colors.gold,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1, shadowRadius: 40,
+    shadowColor: Colors.gold, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 60,
   },
-  ring: {
-    position: 'absolute',
-    borderRadius: 999, borderWidth: 1,
-    borderStyle: 'dashed',
-  },
-  trophyCenter: {
-    position: 'absolute',
-    alignItems: 'center', justifyContent: 'center',
-  },
+  trophyInner: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   trophyEmoji: {
-    fontSize: 96,
-    textShadowColor: Colors.gold,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 30,
+    fontSize: 100,
+    textShadowColor: Colors.gold, textShadowOffset: { width: 0, height: 8 }, textShadowRadius: 24,
   },
 
-  // Prize text
-  prizeText: {
-    fontSize: 22, fontWeight: '900', color: Colors.gold,
-    textShadowColor: Colors.gold, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8,
-  },
-  prizeDesc: { fontSize: 13, color: Colors.textMuted, textAlign: 'center' },
+  // Bottom
+  bottomSection: { width: '100%', paddingHorizontal: 28, paddingBottom: 12, gap: 12, alignItems: 'center' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%' },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.gold + '44' },
+  dividerText: { fontSize: 10, fontWeight: '800', letterSpacing: 3, color: Colors.gold + 'aa' },
 
-  // Buttons
-  buttons: { width: '100%', gap: Spacing.sm },
   btnPrimary: {
-    backgroundColor: Colors.accent,
-    borderRadius: 14, paddingVertical: 16,
+    width: '100%', paddingVertical: 17,
+    backgroundColor: Colors.gold,
     alignItems: 'center',
-    shadowColor: Colors.accent,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5, shadowRadius: 12,
+    borderRadius: 2,
+    shadowColor: Colors.gold, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 16,
   },
   btnPrimaryText: {
-    fontSize: 16, fontWeight: '900', color: Colors.background, letterSpacing: 0.5,
-  },
-  btnSecondary: {
-    borderRadius: 14, paddingVertical: 15,
-    alignItems: 'center', borderWidth: 1.5,
-    borderColor: Colors.accent + '88',
-    backgroundColor: 'rgba(0,200,255,0.06)',
-  },
-  btnSecondaryText: {
-    fontSize: 16, fontWeight: '700', color: Colors.accent,
+    fontSize: 14, fontWeight: '900', letterSpacing: 3,
+    color: '#0a0800',
   },
 
-  devText: { fontSize: 11, color: Colors.textDim, marginBottom: Spacing.sm },
+  btnSecondary: {
+    width: '100%', paddingVertical: 16,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    borderRadius: 2,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
+  },
+  btnSecondaryText: {
+    fontSize: 14, fontWeight: '700', letterSpacing: 3,
+    color: 'rgba(255,255,255,0.8)',
+  },
+
+  devText: { fontSize: 10, color: 'rgba(255,255,255,0.15)', letterSpacing: 1, marginTop: 4 },
 });
