@@ -113,15 +113,13 @@ export default function TeamScreen() {
   async function handleCreate() {
     if (!teamName.trim()) { setError('Team name is required'); return; }
     setCreating(true);
-    const { error, team: newTeam } = await createTeam(teamName.trim());
+    // Pass room code directly into the insert — no separate update needed
+    const { error } = await createTeam(
+      teamName.trim(),
+      roomCode.trim(),
+      roomPassword.trim() || undefined,
+    );
     if (error) { setError(error); setCreating(false); return; }
-    // Save room code to team
-    if (newTeam && roomCode.trim()) {
-      await supabase.from('teams').update({
-        room_code: roomCode.trim().toUpperCase(),
-        room_password: roomPassword.trim() || null,
-      }).eq('id', newTeam.id);
-    }
     setCreating(false);
   }
 

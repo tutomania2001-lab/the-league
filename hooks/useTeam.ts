@@ -25,10 +25,18 @@ export function useTeam(userId: string | undefined) {
     fetchTeam(userId);
   }, [userId]);
 
-  async function createTeam(name: string) {
+  async function createTeam(name: string, roomCode?: string, roomPassword?: string) {
     if (!userId) return { error: 'Not authenticated' };
     const { data, error } = await supabase
-      .from('teams').insert({ name, captain_id: userId }).select().single();
+      .from('teams')
+      .insert({
+        name,
+        captain_id: userId,
+        ...(roomCode ? { room_code: roomCode.toUpperCase() } : {}),
+        ...(roomPassword ? { room_password: roomPassword } : {}),
+      })
+      .select()
+      .single();
     if (error) return { error: error.message };
     await supabase.from('team_members').insert({ team_id: data.id, user_id: userId });
     setTeam(data);
