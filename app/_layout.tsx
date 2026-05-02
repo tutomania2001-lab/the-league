@@ -33,7 +33,12 @@ export default function RootLayout() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session?.user?.id) setUserId(session.user.id);
       setLoading(false);
+    });
+    // Also try to get userId for dev bypass mode
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.id) setUserId(data.user.id);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
@@ -78,8 +83,8 @@ export default function RootLayout() {
             animation: 'fade',
           }}
         />
-        {/* Persistent friends panel — only shown when authenticated */}
-        {session && <FriendsPanel userId={userId} />}
+        {/* Persistent friends panel — shown when authenticated or dev bypass */}
+        {(session || DEV_BYPASS.enabled) && <FriendsPanel userId={userId} />}
         <StatusBar style="light" />
       </View>
     </ThemeProvider>
