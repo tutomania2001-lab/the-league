@@ -67,5 +67,11 @@ export function useProfile(userId: string | undefined) {
     return { error: error?.message ?? null };
   }
 
-  return { profile, loading, error, updateProfile };
+  async function refreshProfile() {
+    if (!userId) return;
+    const { data } = await supabase.from('users').select('*').eq('id', userId).single();
+    if (data) broadcast(userId, data);
+  }
+
+  return { profile, loading, error, updateProfile, refreshProfile };
 }

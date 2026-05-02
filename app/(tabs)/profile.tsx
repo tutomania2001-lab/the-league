@@ -9,18 +9,25 @@ import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState, useCallback } from 'react';
+import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>();
-  const { profile, loading, updateProfile } = useProfile(userId);
+  const { profile, loading, updateProfile, refreshProfile } = useProfile(userId);
   const [editingRiotId, setEditingRiotId] = useState(false);
   const [riotId, setRiotId] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refreshProfile();
+    setRefreshing(false);
+  }, [refreshProfile]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
@@ -49,7 +56,17 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.accent}
+            colors={[Colors.accent]}
+          />
+        }
+      >
 
         {/* Header */}
         <View style={styles.header}>
