@@ -6,9 +6,8 @@ import { supabase } from '@/lib/supabase';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { TextInput } from 'react-native';
 
 export default function InviteScreen() {
   const router = useRouter();
@@ -18,12 +17,11 @@ export default function InviteScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
   }, []);
-
-  const [pendingApproval, setPendingApproval] = useState(false);
 
   async function handleJoin() {
     if (!code.trim()) { setError('Enter a clan invite code'); return; }
@@ -49,6 +47,7 @@ export default function InviteScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll}>
+
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
             <Text style={{ color: Colors.gold, fontSize: 15, fontWeight: '600' }}>‹ Back</Text>
@@ -56,12 +55,12 @@ export default function InviteScreen() {
           <GlowText style={[Typography.heading, { color: Colors.gold }]}>👥 Invite to Clan</GlowText>
         </View>
 
-        {/* Show current clan invite code */}
+        {/* Show current clan invite code if in a team */}
         {team?.invite_code && (
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Your Clan Invite Code</Text>
             <Text style={[Typography.body, { fontSize: 12, marginBottom: Spacing.sm }]}>
-              Share this code with players you want to invite to your clan.
+              Share this with players you want to invite to your clan.
             </Text>
             <View style={styles.codeRow}>
               <Text style={styles.codeText}>{team.invite_code}</Text>
@@ -74,8 +73,8 @@ export default function InviteScreen() {
           </View>
         )}
 
-        {/* Only show join section if not already in a team */}
-        {!team && (pendingApproval ? (
+        {/* Join section — only when not in a team */}
+        {!team && pendingApproval && (
           <View style={[styles.card, { borderColor: Colors.warning + '66', alignItems: 'center', gap: Spacing.md }]}>
             <Text style={{ fontSize: 40 }}>⏳</Text>
             <Text style={[Typography.subheading, { textAlign: 'center', color: Colors.warning }]}>Request Sent!</Text>
@@ -84,7 +83,9 @@ export default function InviteScreen() {
             </Text>
             <Button label="Back to Home" variant="secondary" onPress={() => router.replace('/(tabs)')} style={{ width: '100%' }} />
           </View>
-        ) : (
+        )}
+
+        {!team && !pendingApproval && (
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Join a Clan</Text>
             <Text style={[Typography.body, { fontSize: 12, marginBottom: Spacing.sm }]}>
@@ -109,7 +110,7 @@ export default function InviteScreen() {
               style={styles.joinBtn}
             />
           </View>
-        ))}
+        )}
 
       </ScrollView>
     </SafeAreaView>
@@ -126,7 +127,7 @@ const styles = StyleSheet.create({
   },
   cardLabel: { fontSize: 11, fontWeight: '800', color: Colors.gold, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 2 },
   codeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(200,155,60,0.08)', borderRadius: 8, borderWidth: 1, borderColor: Colors.gold + '44', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
-  codeText: { fontSize: 22, fontWeight: '900', color: Colors.gold, letterSpacing: 4 },
+  codeText: { fontSize: 22, fontWeight: '900', color: Colors.gold, letterSpacing: 4, textShadowColor: Colors.gold, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 },
   copyBtn: { backgroundColor: 'rgba(200,155,60,0.15)', borderRadius: 6, borderWidth: 1, borderColor: Colors.gold + '55', paddingHorizontal: 10, paddingVertical: 5 },
   copyBtnDone: { backgroundColor: 'rgba(0,255,136,0.12)', borderColor: Colors.success + '55' },
   input: {

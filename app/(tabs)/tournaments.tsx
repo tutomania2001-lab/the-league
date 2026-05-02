@@ -1,4 +1,5 @@
 import { TournamentCard } from '@/components/tournament/TournamentCard';
+import { LeaderboardView } from '@/components/tournament/LeaderboardView';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -71,7 +72,7 @@ export default function TournamentsScreen() {
   const [userId, setUserId] = useState<string>();
   const { profile } = useProfile(userId);
   const isAdmin = profile?.is_admin ?? false;
-  const [activeTab, setActiveTab] = useState<'tournaments' | 'battles'>('tournaments');
+  const [activeTab, setActiveTab] = useState<'tournaments' | 'battles' | 'leaderboard'>('tournaments');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
@@ -127,11 +128,24 @@ export default function TournamentsScreen() {
             ⚔️ Team Battles {teamBattles.length > 0 ? `(${teamBattles.length})` : ''}
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.subTab, activeTab === 'leaderboard' && styles.subTabActive]}
+          onPress={() => setActiveTab('leaderboard')}
+        >
+          <Text style={[styles.subTabText, activeTab === 'leaderboard' && styles.subTabTextActive]}>
+            🏆 Leaderboard
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {loading ? (
+      {/* Leaderboard tab */}
+      {activeTab === 'leaderboard' && (
+        <LeaderboardView />
+      )}
+
+      {activeTab !== 'leaderboard' && loading ? (
         <ActivityIndicator color={Colors.accent} style={{ flex: 1 }} />
-      ) : (
+      ) : activeTab !== 'leaderboard' ? (
         <ScrollView
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
@@ -191,7 +205,7 @@ export default function TournamentsScreen() {
             )
           )}
         </ScrollView>
-      )}
+      ) : null}
     </SafeAreaView>
   );
 }

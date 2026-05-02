@@ -3,6 +3,7 @@ import { GlowText } from '@/components/ui/GlowText';
 import { Input } from '@/components/ui/Input';
 import { LeagueEmblem } from '@/components/ui/LeagueEmblem';
 import { StatusDot } from '@/components/ui/StatusDot';
+import { LeaderboardView } from '@/components/tournament/LeaderboardView';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { useTeam } from '@/hooks/useTeam';
 import { useTeamChat } from '@/hooks/useTeamChat';
@@ -672,6 +673,12 @@ export default function TeamScreen() {
                   ))}
                 </View>
               )}
+            </View>
+
+            {/* Clan Leaderboard — compact top 5 */}
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>🏆 Clan Rankings</Text>
+              <LeaderboardView compact teamId={team.id} />
             </View>
 
             {/* Quick actions */}
