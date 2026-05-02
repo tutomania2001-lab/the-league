@@ -52,7 +52,7 @@ export default function LandingScreen() {
 
           {/* Logo — emblem left, text right */}
           <View style={styles.logoBlock}>
-            <LeagueEmblem size={72} color="#ffffff" />
+            <LeagueEmblem size={86} color="#ffffff" />
             <View style={styles.logoText}>
               <Text style={styles.title}>THE LEAGUE</Text>
               <Text style={styles.rift}>WILD RIFT TOURNAMENTS</Text>
@@ -109,9 +109,9 @@ const styles = StyleSheet.create({
   },
 
   logoBlock: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
   },
-  logoText: { flexDirection: 'column', gap: 4 },
+  logoText: { flexDirection: 'column', gap: 5, justifyContent: 'center' },
   title: {
     fontSize: 26, fontWeight: '900', letterSpacing: 3, color: '#fff',
     textShadowColor: 'rgba(255,255,255,0.4)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12,
