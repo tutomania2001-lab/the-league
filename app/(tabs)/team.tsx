@@ -21,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useTeamFeed } from '@/hooks/useTeamFeed';
+import { useTeamFeed, PostComment } from '@/hooks/useTeamFeed';
 
 const { width } = Dimensions.get('window');
 
@@ -359,7 +359,10 @@ export default function TeamScreen() {
   const [editingCode, setEditingCode] = useState(false);
   const [newCode, setNewCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const { posts, loading: feedLoading, toggleLike, createPost, deletePost, uploadMedia, refresh: refreshFeed } = useTeamFeed(team?.id, userId);
+  const { posts, loading: feedLoading, toggleLike, createPost, deletePost, uploadMedia, refresh: refreshFeed, fetchComments, addComment, deleteComment } = useTeamFeed(team?.id, userId);
+  const [expandedComments, setExpandedComments] = useState<Record<string, PostComment[]>>({});
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+  const [commentLoading, setCommentLoading] = useState<Record<string, boolean>>({});
   const [showNewPost, setShowNewPost] = useState(false);
   const [postCaption, setPostCaption] = useState('');
   const [postMedia, setPostMedia] = useState<{ uri: string; type: 'image' | 'video' } | null>(null);
@@ -873,19 +876,89 @@ export default function TeamScreen() {
                       <FeedVideo uri={post.media_url} />
                     )}
 
-                    {/* Actions + caption */}
+                    {/* Actions */}
                     <View style={styles.postFooter}>
                       <TouchableOpacity style={styles.likeBtn} onPress={() => toggleLike(post.id)}>
-                        <Text style={[styles.likeIcon, post.liked && { color: Colors.error }]}>
-                          {post.liked ? '❤️' : '🤍'}
-                        </Text>
+                        <Text style={[styles.likeIcon, post.liked && { color: Colors.error }]}>{post.liked ? '❤️' : '🤍'}</Text>
                         <Text style={[styles.likeCount, post.liked && { color: Colors.error }]}>{post.likes_count}</Text>
                       </TouchableOpacity>
+                      <TouchableOpacity style={[styles.likeBtn, { marginLeft: Spacing.md }]} onPress={async () => {
+                        if (expandedComments[post.id]) {
+                          setExpandedComments(prev => { const n = { ...prev }; delete n[post.id]; return n; });
+                        } else {
+                          const comments = await fetchComments(post.id);
+                          setExpandedComments(prev => ({ ...prev, [post.id]: comments }));
+                        }
+                      }}>
+                        <Text style={styles.likeIcon}>💬</Text>
+                        <Text style={styles.likeCount}>{expandedComments[post.id]?.length ?? 'View'}</Text>
+                      </TouchableOpacity>
                     </View>
+
+                    {/* Caption */}
                     {post.caption && (
                       <View style={styles.captionRow}>
                         <Text style={styles.captionAuthor}>{post.author?.riot_id ?? post.author?.username} </Text>
                         <Text style={styles.captionText}>{post.caption}</Text>
+                      </View>
+                    )}
+
+                    {/* Comments section */}
+                    {expandedComments[post.id] && (
+                      <View style={styles.commentsSection}>
+                        {expandedComments[post.id].map(c => (
+                          <View key={c.id} style={styles.commentRow}>
+                            <Text style={styles.commentAuthor}>{c.author?.riot_id ?? c.author?.username ?? 'Member'} </Text>
+                            <Text style={styles.commentText}>{c.content}</Text>
+                            {c.user_id === userId && (
+                              <TouchableOpacity onPress={async () => {
+                                await deleteComment(c.id);
+                                setExpandedComments(prev => ({ ...prev, [post.id]: prev[post.id].filter(x => x.id !== c.id) }));
+                              }}>
+                                <Text style={{ color: Colors.error, fontSize: 10, marginLeft: 4 }}>✕</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        ))}
+                        {/* Comment input */}
+                        <View style={styles.commentInputRow}>
+                          <TextInput
+                            style={styles.commentInput}
+                            value={commentInputs[post.id] ?? ''}
+                            onChangeText={v => setCommentInputs(prev => ({ ...prev, [post.id]: v }))}
+                            placeholder="Add a comment..."
+                            placeholderTextColor={Colors.textDim}
+                            returnKeyType="send"
+                            onSubmitEditing={async () => {
+                              const txt = commentInputs[post.id]?.trim();
+                              if (!txt || !userId) return;
+                              setCommentLoading(prev => ({ ...prev, [post.id]: true }));
+                              const { comment } = await addComment(post.id, userId, txt);
+                              if (comment) {
+                                setExpandedComments(prev => ({ ...prev, [post.id]: [...(prev[post.id] ?? []), comment] }));
+                                setCommentInputs(prev => ({ ...prev, [post.id]: '' }));
+                              }
+                              setCommentLoading(prev => ({ ...prev, [post.id]: false }));
+                            }}
+                          />
+                          <TouchableOpacity
+                            style={[styles.commentSend, commentLoading[post.id] && { opacity: 0.5 }]}
+                            disabled={commentLoading[post.id]}
+                            onPress={async () => {
+                              const txt = commentInputs[post.id]?.trim();
+                              if (!txt || !userId) return;
+                              setCommentLoading(prev => ({ ...prev, [post.id]: true }));
+                              const { comment } = await addComment(post.id, userId, txt);
+                              if (comment) {
+                                setExpandedComments(prev => ({ ...prev, [post.id]: [...(prev[post.id] ?? []), comment] }));
+                                setCommentInputs(prev => ({ ...prev, [post.id]: '' }));
+                              }
+                              setCommentLoading(prev => ({ ...prev, [post.id]: false }));
+                            }}
+                          >
+                            <Text style={{ color: Colors.gold, fontSize: 14, fontWeight: '900' }}>➤</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     )}
                   </View>
@@ -1113,9 +1186,16 @@ const styles = StyleSheet.create({
   likeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   likeIcon: { fontSize: 22 },
   likeCount: { fontSize: 13, fontWeight: '700', color: Colors.textMuted },
-  captionRow: { flexDirection: 'row', paddingHorizontal: Spacing.sm, paddingBottom: Spacing.sm, flexWrap: 'wrap' },
+  captionRow: { flexDirection: 'row', paddingHorizontal: Spacing.sm, paddingBottom: Spacing.xs, flexWrap: 'wrap' },
   captionAuthor: { fontSize: 12, fontWeight: '800', color: Colors.gold },
   captionText: { fontSize: 12, color: Colors.text, flex: 1 },
+  commentsSection: { borderTopWidth: 1, borderTopColor: Colors.gold + '22', paddingHorizontal: Spacing.sm, paddingTop: Spacing.xs, gap: 6 },
+  commentRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
+  commentAuthor: { fontSize: 11, fontWeight: '800', color: Colors.gold },
+  commentText: { fontSize: 11, color: Colors.text, flex: 1 },
+  commentInputRow: { flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 4 },
+  commentInput: { flex: 1, height: 32, backgroundColor: 'rgba(20,14,0,0.8)', borderRadius: 16, borderWidth: 1, borderColor: Colors.gold + '33', paddingHorizontal: 10, color: Colors.text, fontSize: 12 },
+  commentSend: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(200,155,60,0.2)', alignItems: 'center', justifyContent: 'center' },
   // New post modal
   newPostBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 99 },
   newPostSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(10,8,3,0.99)', borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 2, borderTopColor: Colors.gold + '55', paddingBottom: 32, zIndex: 100 },

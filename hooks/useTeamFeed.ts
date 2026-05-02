@@ -1,4 +1,6 @@
 import { supabase } from '@/lib/supabase';
+import * as FileSystem from 'expo-file-system';
+import { decode } from 'base64-arraybuffer';
 import { useEffect, useState } from 'react';
 
 export type TeamPost = {
@@ -9,9 +11,19 @@ export type TeamPost = {
   media_type: 'image' | 'video' | null;
   caption: string | null;
   likes_count: number;
+  comments_count?: number;
   created_at: string;
   author?: { riot_id: string | null; username: string; avatar_url: string | null };
   liked?: boolean;
+};
+
+export type PostComment = {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  author?: { riot_id: string | null; username: string; avatar_url: string | null };
 };
 
 export function useTeamFeed(teamId: string | undefined, myId: string | undefined) {
@@ -29,10 +41,8 @@ export function useTeamFeed(teamId: string | undefined, myId: string | undefined
 
     if (!data) { setLoading(false); return; }
 
-    // Check which posts current user liked
     const { data: likes } = await supabase
-      .from('team_post_likes')
-      .select('post_id')
+      .from('team_post_likes').select('post_id')
       .eq('user_id', myId ?? '00000000-0000-0000-0000-000000000000');
 
     const likedSet = new Set((likes ?? []).map((l: any) => l.post_id));
@@ -47,7 +57,6 @@ export function useTeamFeed(teamId: string | undefined, myId: string | undefined
 
   async function toggleLike(postId: string) {
     if (!myId) return;
-    // Optimistic update
     setPosts(prev => prev.map(p => p.id === postId
       ? { ...p, liked: !p.liked, likes_count: p.liked ? p.likes_count - 1 : p.likes_count + 1 }
       : p
@@ -59,15 +68,9 @@ export function useTeamFeed(teamId: string | undefined, myId: string | undefined
     const { data: insertedPost, error } = await supabase.from('team_posts')
       .insert({ team_id: teamId, user_id: userId, media_url: mediaUrl, media_type: mediaType, caption: caption.trim() || null })
       .select().single();
-
     if (error) return { error: error.message };
-
-    // Fetch author separately to avoid join issues
-    const { data: author } = await supabase
-      .from('users').select('riot_id, username, avatar_url').eq('id', userId).single();
-
-    const newPost: TeamPost = { ...insertedPost, author: author ?? undefined, liked: false };
-    setPosts(prev => [newPost, ...prev]);
+    const { data: author } = await supabase.from('users').select('riot_id, username, avatar_url').eq('id', userId).single();
+    setPosts(prev => [{ ...insertedPost, author: author ?? undefined, liked: false }, ...prev]);
     return { error: null };
   }
 
@@ -80,17 +83,44 @@ export function useTeamFeed(teamId: string | undefined, myId: string | undefined
     try {
       const ext = type === 'video' ? 'mp4' : 'jpg';
       const path = `${userId}/${Date.now()}.${ext}`;
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const { error } = await supabase.storage.from('team-media').upload(path, blob, {
-        contentType: type === 'video' ? 'video/mp4' : 'image/jpeg',
-        upsert: false,
-      });
-      if (error) return null;
+      const contentType = type === 'video' ? 'video/mp4' : 'image/jpeg';
+
+      // Read file as base64 then decode to ArrayBuffer — works reliably in RN
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      const arrayBuffer = decode(base64);
+
+      const { error } = await supabase.storage.from('team-media').upload(path, arrayBuffer, { contentType, upsert: false });
+      if (error) { console.log('Upload error:', error.message); return null; }
+
       const { data } = supabase.storage.from('team-media').getPublicUrl(path);
       return data.publicUrl;
-    } catch { return null; }
+    } catch (e: any) {
+      console.log('Upload exception:', e?.message);
+      return null;
+    }
   }
 
-  return { posts, loading, toggleLike, createPost, deletePost, uploadMedia, refresh: fetchPosts };
+  // Comments
+  async function fetchComments(postId: string): Promise<PostComment[]> {
+    const { data } = await supabase
+      .from('team_post_comments')
+      .select('*, author:users(riot_id, username, avatar_url)')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true });
+    return (data ?? []) as PostComment[];
+  }
+
+  async function addComment(postId: string, userId: string, content: string): Promise<{ error: string | null; comment?: PostComment }> {
+    const { data, error } = await supabase.from('team_post_comments')
+      .insert({ post_id: postId, user_id: userId, content: content.trim() })
+      .select('*, author:users(riot_id, username, avatar_url)').single();
+    if (error) return { error: error.message };
+    return { error: null, comment: data as PostComment };
+  }
+
+  async function deleteComment(commentId: string) {
+    await supabase.from('team_post_comments').delete().eq('id', commentId);
+  }
+
+  return { posts, loading, toggleLike, createPost, deletePost, uploadMedia, fetchComments, addComment, deleteComment, refresh: fetchPosts };
 }
