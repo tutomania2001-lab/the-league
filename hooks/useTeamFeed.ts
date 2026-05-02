@@ -43,12 +43,6 @@ export function useTeamFeed(teamId: string | undefined, myId: string | undefined
   useEffect(() => {
     if (!teamId || !myId) { setLoading(false); return; }
     fetchPosts();
-
-    const ch = supabase.channel(`feed:${teamId}-${Math.random().toString(36).slice(2, 6)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_posts', filter: `team_id=eq.${teamId}` },
-        () => fetchPosts())
-      .subscribe();
-    return () => { ch.unsubscribe(); };
   }, [teamId, myId]);
 
   async function toggleLike(postId: string) {
@@ -62,11 +56,19 @@ export function useTeamFeed(teamId: string | undefined, myId: string | undefined
   }
 
   async function createPost(teamId: string, userId: string, mediaUrl: string | null, mediaType: 'image' | 'video' | null, caption: string) {
-    const { data, error } = await supabase.from('team_posts')
+    const { data: insertedPost, error } = await supabase.from('team_posts')
       .insert({ team_id: teamId, user_id: userId, media_url: mediaUrl, media_type: mediaType, caption: caption.trim() || null })
-      .select('*, author:users(riot_id, username, avatar_url)').single();
-    if (!error && data) setPosts(prev => [{ ...data, liked: false }, ...prev]);
-    return { error: error?.message ?? null };
+      .select().single();
+
+    if (error) return { error: error.message };
+
+    // Fetch author separately to avoid join issues
+    const { data: author } = await supabase
+      .from('users').select('riot_id, username, avatar_url').eq('id', userId).single();
+
+    const newPost: TeamPost = { ...insertedPost, author: author ?? undefined, liked: false };
+    setPosts(prev => [newPost, ...prev]);
+    return { error: null };
   }
 
   async function deletePost(postId: string) {
