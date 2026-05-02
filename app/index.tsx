@@ -1,6 +1,6 @@
 import { Colors } from '@/constants/theme';
+import { LeagueEmblem } from '@/components/ui/LeagueEmblem';
 import { useRouter } from 'expo-router';
-import { useEvent } from 'expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -52,9 +52,9 @@ export default function LandingScreen() {
 
           {/* Logo */}
           <View style={styles.logoBlock}>
-            <Text style={styles.rift}>WILD RIFT</Text>
-            <Text style={styles.title}>◈ THE LEAGUE</Text>
-            <View style={styles.titleBar} />
+            <LeagueEmblem size={140} color="#ffffff" />
+            <Text style={styles.title}>THE LEAGUE</Text>
+            <Text style={styles.rift}>WILD RIFT TOURNAMENTS</Text>
           </View>
 
           {/* CTAs */}
@@ -106,15 +106,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
   },
 
-  logoBlock: { alignItems: 'center', gap: 5 },
-  rift: { fontSize: 11, fontWeight: '800', letterSpacing: 6, color: Colors.gold },
+  logoBlock: { alignItems: 'center', gap: 6 },
   title: {
-    fontSize: 36, fontWeight: '900', letterSpacing: 2, color: '#fff',
-    textShadowColor: Colors.accent, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 18,
+    fontSize: 28, fontWeight: '900', letterSpacing: 4, color: '#fff',
+    textShadowColor: 'rgba(255,255,255,0.4)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12,
   },
-  titleBar: {
-    width: 55, height: 2, backgroundColor: Colors.gold,
-    shadowColor: Colors.gold, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 6,
+  rift: {
+    fontSize: 9, fontWeight: '700', letterSpacing: 4, color: 'rgba(255,255,255,0.55)',
+    textTransform: 'uppercase',
   },
 
   bottomSection: { width: '100%', gap: 12, alignItems: 'center' },
