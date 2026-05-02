@@ -3,16 +3,11 @@ import TournamentsScreen from '@/app/(tabs)/tournaments';
 import TeamScreen from '@/app/(tabs)/team';
 import WalletScreen from '@/app/(tabs)/wallet';
 import ProfileScreen from '@/app/(tabs)/profile';
+import SwipePager from '@/components/ui/SwipePager';
 import { Colors } from '@/constants/theme';
 import { useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-// PagerView is native-only — import conditionally
-let PagerView: any = null;
-if (Platform.OS !== 'web') {
-  PagerView = require('react-native-pager-view').default;
-}
 
 const TABS = [
   { name: 'index',       emoji: '🏠', label: 'Home' },
@@ -34,40 +29,28 @@ export default function TabLayout() {
   const [activeIndex, setActiveIndex] = useState(0);
   const pagerRef = useRef<any>(null);
   const insets = useSafeAreaInsets();
-  const isWeb = Platform.OS === 'web';
 
   function goTo(index: number) {
-    if (!isWeb) pagerRef.current?.setPage(index);
+    pagerRef.current?.setPage(index);
     setActiveIndex(index);
   }
 
   return (
     <View style={styles.container}>
-      {/* Native: PagerView with swipe. Web: simple view switcher */}
-      {isWeb || !PagerView ? (
-        <View style={styles.pager}>
-          {SCREENS.map((screen, i) => (
-            <View key={i} style={[styles.page, { display: activeIndex === i ? 'flex' : 'none' }]}>
-              {screen}
-            </View>
-          ))}
-        </View>
-      ) : (
-        <PagerView
-          ref={pagerRef}
-          style={styles.pager}
-          initialPage={0}
-          onPageSelected={(e: any) => setActiveIndex(e.nativeEvent.position)}
-          overdrag
-          overScrollMode="never"
-        >
-          {SCREENS.map((screen, i) => (
-            <View key={i} style={styles.page} collapsable={false}>
-              {screen}
-            </View>
-          ))}
-        </PagerView>
-      )}
+      <SwipePager
+        ref={pagerRef}
+        style={styles.pager}
+        initialPage={0}
+        onPageSelected={(e: any) => setActiveIndex(e.nativeEvent?.position ?? activeIndex)}
+        overdrag
+        overScrollMode="never"
+      >
+        {SCREENS.map((screen, i) => (
+          <View key={i} style={[styles.page, Platform.OS === 'web' && { display: activeIndex === i ? 'flex' : 'none' }]} collapsable={false}>
+            {screen}
+          </View>
+        ))}
+      </SwipePager>
 
       {/* Bottom tab bar */}
       <View style={[styles.tabBar, { paddingBottom: insets.bottom || 8 }]}>
