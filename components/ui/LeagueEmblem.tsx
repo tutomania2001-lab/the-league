@@ -1,6 +1,4 @@
-import Svg, {
-  Circle, Ellipse, G, Line, Path, Polygon, Rect,
-} from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 
 type Props = {
   size?: number;
@@ -8,52 +6,9 @@ type Props = {
 };
 
 export function LeagueEmblem({ size = 120, color = '#ffffff' }: Props) {
-  const s = size;
-  const cx = s / 2;
-  const cy = s / 2;
-  const r = s * 0.46;
-
   return (
-    <Svg width={s} height={s} viewBox="0 0 100 100">
-      {/* ── Outer double ring ───────────────────────────── */}
-      <Circle cx="50" cy="50" r="46" stroke={color} strokeWidth="1.8" fill="none" opacity="0.9" />
-      <Circle cx="50" cy="50" r="43" stroke={color} strokeWidth="0.7" fill="none" opacity="0.5" />
-
-      {/* ── Tick marks around ring (like runic text) ──── */}
-      {Array.from({ length: 32 }).map((_, i) => {
-        const angle = (i * 360) / 32;
-        const rad = (angle * Math.PI) / 180;
-        const r1 = 43.5;
-        const r2 = i % 4 === 0 ? 40 : 41.5;
-        const x1 = 50 + r1 * Math.cos(rad);
-        const y1 = 50 + r1 * Math.sin(rad);
-        const x2 = 50 + r2 * Math.cos(rad);
-        const y2 = 50 + r2 * Math.sin(rad);
-        return (
-          <Line
-            key={i} x1={x1} y1={y1} x2={x2} y2={y2}
-            stroke={color} strokeWidth={i % 4 === 0 ? 1.2 : 0.6}
-            opacity={i % 4 === 0 ? 0.8 : 0.4}
-          />
-        );
-      })}
-
-      {/* ── Small diamond accents at cardinal points ──── */}
-      {[0, 90, 180, 270].map((angle, i) => {
-        const rad = (angle * Math.PI) / 180;
-        const cx = 50 + 46 * Math.cos(rad);
-        const cy = 50 + 46 * Math.sin(rad);
-        const d = 1.8;
-        return (
-          <Polygon
-            key={i}
-            points={`${cx},${cy - d} ${cx + d},${cy} ${cx},${cy + d} ${cx - d},${cy}`}
-            fill={color} opacity="0.9"
-          />
-        );
-      })}
-
-      {/* ── Central phoenix / crown emblem ──────────────
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      {/* ── Central phoenix / crown emblem only ──────────────
            Built from paths to match LoL tournament style  */}
 
       {/* Crown — top teardrop/flame shape */}
