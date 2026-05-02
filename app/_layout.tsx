@@ -1,7 +1,9 @@
 import { supabase } from '@/lib/supabase';
 import { DEV_BYPASS } from '@/lib/dev';
 import { RootBackground } from '@/components/ui/RootBackground';
+import { Colors } from '@/constants/theme';
 import { Session } from '@supabase/supabase-js';
+import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
@@ -9,7 +11,16 @@ import 'react-native-reanimated';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+const AppTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: Colors.background,
+    card: Colors.surface,
+    text: Colors.text,
+    border: Colors.accentBorder,
+  },
+};
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
@@ -25,30 +36,21 @@ export default function RootLayout() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
-
-    // Handle email confirmation deep links
     const linkSub = Linking.addEventListener('url', async ({ url }) => {
       if (url.includes('auth/callback') || url.includes('access_token') || url.includes('code=')) {
         const { data } = await supabase.auth.exchangeCodeForSession(url);
         if (data.session) router.replace('/(tabs)');
       }
     });
-
-    return () => {
-      subscription.unsubscribe();
-      linkSub.remove();
-    };
+    return () => { subscription.unsubscribe(); linkSub.remove(); };
   }, []);
 
   useEffect(() => {
     if (loading) return;
     if (DEV_BYPASS.enabled) return;
     const inAuthGroup = segments[0] === 'auth';
-    if (!session && !inAuthGroup) {
-      router.replace('/auth/log-in');
-    } else if (session && inAuthGroup) {
-      router.replace('/(tabs)');
-    }
+    if (!session && !inAuthGroup) router.replace('/auth/log-in');
+    else if (session && inAuthGroup) router.replace('/(tabs)');
   }, [session, loading, segments]);
 
   if (loading) {
@@ -61,19 +63,20 @@ export default function RootLayout() {
   }
 
   return (
-    <View style={styles.root}>
-      {/* Animated background — particles, scan line, hex grid */}
-      <RootBackground />
-      {/* Stack with transparent screen backgrounds so video shows through */}
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: 'transparent' },
-          animation: 'fade',
-        }}
-      />
-      <StatusBar style="light" />
-    </View>
+    <ThemeProvider value={AppTheme}>
+      <View style={styles.root}>
+        <RootBackground />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: 'transparent' },
+            cardStyle: { backgroundColor: 'transparent' },
+            animation: 'fade',
+          }}
+        />
+        <StatusBar style="light" />
+      </View>
+    </ThemeProvider>
   );
 }
 
