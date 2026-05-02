@@ -78,20 +78,17 @@ export default function InviteScreen() {
         {!team && (pendingApproval ? (
           <View style={[styles.card, { borderColor: Colors.warning + '66', alignItems: 'center', gap: Spacing.md }]}>
             <Text style={{ fontSize: 40 }}>⏳</Text>
-            <Text style={[Typography.subheading, { textAlign: 'center', color: Colors.warning }]}>
-              Request Sent!
-            </Text>
+            <Text style={[Typography.subheading, { textAlign: 'center', color: Colors.warning }]}>Request Sent!</Text>
             <Text style={[Typography.body, { textAlign: 'center', fontSize: 12 }]}>
-              Your join request has been sent to the clan leader. You'll be able to access the clan once they approve you.
+              Your request has been sent to the clan leader. You'll join once they approve.
             </Text>
             <Button label="Back to Home" variant="secondary" onPress={() => router.replace('/(tabs)')} style={{ width: '100%' }} />
           </View>
         ) : (
-          /* Join a clan */
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Join a Clan</Text>
             <Text style={[Typography.body, { fontSize: 12, marginBottom: Spacing.sm }]}>
-              Enter the clan invite code. Any member can share it — the leader will approve your request.
+              Enter the clan invite code — any member can share it. The leader approves your request.
             </Text>
             <TextInput
               style={styles.input}
@@ -112,7 +109,7 @@ export default function InviteScreen() {
               style={styles.joinBtn}
             />
           </View>
-        ) : null)}
+        ))}
 
       </ScrollView>
     </SafeAreaView>
