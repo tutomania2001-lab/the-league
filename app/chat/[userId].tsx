@@ -26,6 +26,7 @@ export default function ChatScreen() {
   }, []);
 
   const { messages, loading, send } = useChat(myId, friendId);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   useEffect(() => {
     if (messages.length) setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
@@ -34,8 +35,14 @@ export default function ChatScreen() {
   async function handleSend() {
     if (!text.trim()) return;
     setSending(true);
-    await send(text);
-    setText('');
+    setSendError(null);
+    const content = text;
+    setText(''); // Clear immediately for responsiveness
+    const { error } = await send(content);
+    if (error) {
+      setSendError('Failed to send — are you logged in?');
+      setText(content); // Restore text on failure
+    }
     setSending(false);
   }
 
@@ -94,6 +101,13 @@ export default function ChatScreen() {
               );
             }}
           />
+        )}
+
+        {/* Send error */}
+        {sendError && (
+          <View style={{ backgroundColor: 'rgba(255,68,68,0.12)', paddingHorizontal: Spacing.md, paddingVertical: 6 }}>
+            <Text style={{ color: Colors.error, fontSize: 11 }}>{sendError}</Text>
+          </View>
         )}
 
         {/* Input */}

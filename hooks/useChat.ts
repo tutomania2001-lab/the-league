@@ -48,11 +48,35 @@ export function useChat(userId: string | undefined, friendId: string | undefined
       .eq('receiver_id', userId).eq('sender_id', friendId).eq('read', false);
   }
 
-  async function send(content: string) {
-    if (!userId || !friendId || !content.trim()) return;
-    await supabase.from('direct_messages').insert({
-      sender_id: userId, receiver_id: friendId, content: content.trim(),
-    });
+  async function send(content: string): Promise<{ error: string | null }> {
+    if (!userId || !friendId || !content.trim()) return { error: 'Not ready' };
+
+    // Optimistic — add to UI immediately
+    const optimistic: DirectMessage = {
+      id: `temp-${Date.now()}`,
+      sender_id: userId,
+      receiver_id: friendId,
+      content: content.trim(),
+      read: false,
+      created_at: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, optimistic]);
+
+    const { data, error } = await supabase
+      .from('direct_messages')
+      .insert({ sender_id: userId, receiver_id: friendId, content: content.trim() })
+      .select()
+      .single();
+
+    if (error) {
+      // Roll back optimistic update on failure
+      setMessages(prev => prev.filter(m => m.id !== optimistic.id));
+      return { error: error.message };
+    }
+
+    // Replace temp with real message
+    if (data) setMessages(prev => prev.map(m => m.id === optimistic.id ? data : m));
+    return { error: null };
   }
 
   async function markRead(messageId: string) {
