@@ -21,6 +21,11 @@ export type TeamRow = {
   invite_code: string;
   room_code: string | null;
   room_password: string | null;
+  clan_tag: string | null;
+  wins: number;
+  tournaments_played: number;
+  total_earnings: number;
+  bank_balance: number;
   created_at: string;
 };
 
