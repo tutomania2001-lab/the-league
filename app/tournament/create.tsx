@@ -4,6 +4,7 @@ import { GlowText } from '@/components/ui/GlowText';
 import { Input } from '@/components/ui/Input';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useTournament } from '@/hooks/useTournament';
+import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -20,10 +21,16 @@ export default function CreateTournamentScreen() {
   const [userId, setUserId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { profile } = useProfile(userId || undefined);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? ''));
   }, []);
+
+  // Redirect non-admins away
+  useEffect(() => {
+    if (profile && !profile.is_admin) router.replace('/(tabs)/tournaments');
+  }, [profile]);
 
   const prizePool = fee * 5 * 8 * 0.9;
 
