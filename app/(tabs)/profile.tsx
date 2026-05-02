@@ -8,6 +8,7 @@ import { RankBadge } from '@/components/ui/RankBadge';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useProfile } from '@/hooks/useProfile';
 import { useFriends } from '@/hooks/useFriends';
+import { useTeam } from '@/hooks/useTeam';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
@@ -21,6 +22,7 @@ export default function ProfileScreen() {
   const [emailVerified, setEmailVerified] = useState(false);
   const { profile, loading, updateProfile, refreshProfile } = useProfile(userId);
   const { friends, incoming } = useFriends(userId);
+  const { team, members } = useTeam(userId);
   const [editingRiotId, setEditingRiotId] = useState(false);
   const [riotId, setRiotId] = useState('');
   const [saving, setSaving] = useState(false);
@@ -251,6 +253,40 @@ export default function ProfileScreen() {
           )}
         </Card>
 
+        {/* Clan */}
+        {team ? (
+          <TouchableOpacity onPress={() => router.push('/(tabs)/team')} activeOpacity={0.85}>
+            <Card style={styles.clanCard}>
+              <View style={styles.clanRow}>
+                <View style={styles.clanIcon}>
+                  <Text style={{ fontSize: 22 }}>⚔️</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.clanName}>{team.name}</Text>
+                  <Text style={styles.clanMeta}>
+                    {team.captain_id === userId ? '👑 Captain' : '🎮 Member'} · {members.length}/10 players
+                  </Text>
+                </View>
+                <View style={styles.clanStats}>
+                  <Text style={styles.clanWins}>{(team as any).wins ?? 0}</Text>
+                  <Text style={styles.clanWinsLabel}>WINS</Text>
+                </View>
+                <Text style={{ color: Colors.gold, fontSize: 18, marginLeft: 4 }}>›</Text>
+              </View>
+            </Card>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={() => router.push('/(tabs)/team')} activeOpacity={0.85}>
+            <Card style={[styles.clanCard, { borderStyle: 'dashed', opacity: 0.6 }]}>
+              <View style={styles.clanRow}>
+                <Text style={{ fontSize: 22 }}>⚔️</Text>
+                <Text style={[Typography.body, { flex: 1 }]}>No clan — create or join one</Text>
+                <Text style={{ color: Colors.gold, fontSize: 18 }}>›</Text>
+              </View>
+            </Card>
+          </TouchableOpacity>
+        )}
+
         {/* Settings */}
         <Button
           label="⚙️ Settings"
@@ -271,6 +307,14 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
+  clanCard: { borderColor: Colors.gold + '55' },
+  clanRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  clanIcon: { width: 44, height: 44, borderRadius: 10, backgroundColor: 'rgba(200,155,60,0.15)', borderWidth: 1, borderColor: Colors.gold + '44', alignItems: 'center', justifyContent: 'center' },
+  clanName: { fontSize: 15, fontWeight: '800', color: Colors.gold },
+  clanMeta: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
+  clanStats: { alignItems: 'center' },
+  clanWins: { fontSize: 20, fontWeight: '900', color: Colors.gold, textShadowColor: Colors.gold, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 6 },
+  clanWinsLabel: { fontSize: 7, fontWeight: '700', color: Colors.gold + '88', letterSpacing: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   avatar: {
     width: 64, height: 64, borderRadius: 10,
