@@ -49,13 +49,6 @@ export function useFriends(userId: string | undefined) {
   useEffect(() => {
     if (!userId) { setLoading(false); return; }
     fetchAll(userId);
-
-    const sub = supabase.channel(`friends:${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' },
-        () => fetchAll(userId)
-      ).subscribe();
-
-    return () => { sub.unsubscribe(); };
   }, [userId]);
 
   async function sendRequest(riotId: string): Promise<{ error: string | null }> {

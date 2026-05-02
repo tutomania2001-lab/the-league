@@ -2,11 +2,9 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { GlowText } from '@/components/ui/GlowText';
 import { Input } from '@/components/ui/Input';
-import { RankBadge } from '@/components/ui/RankBadge';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useFriends } from '@/hooks/useFriends';
 import { supabase } from '@/lib/supabase';
-import { calculateLP } from '@/constants/ranks';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Image, RefreshControl,
@@ -110,7 +108,7 @@ export default function FriendsScreen() {
                 <FriendAvatar profile={f.profile} />
                 <View style={styles.friendInfo}>
                   <Text style={styles.friendName}>{f.profile.riot_id ?? f.profile.username}</Text>
-                  <RankBadge lp={calculateLP(0, 0)} size="sm" />
+                  <Text style={styles.friendSub}>Wild Rift Player</Text>
                 </View>
                 <TouchableOpacity style={styles.removeBtn} onPress={() => remove(f.id)}>
                   <Text style={styles.removeBtnText}>···</Text>
