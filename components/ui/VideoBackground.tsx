@@ -1,13 +1,12 @@
 import { AnimatedSplash } from '@/components/ui/AnimatedSplash';
 import { Colors } from '@/constants/theme';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEffect, useRef, useState } from 'react';
+import { ResizeMode, Video } from 'expo-av';
+import { useRef, useState } from 'react';
 import { Animated, StyleSheet, View, ViewStyle } from 'react-native';
 
-// Single looping background video used throughout the entire app.
-// Falls back to AnimatedSplash if the video fails to load.
-// Replace this URL with your preferred LoL/Wild Rift cinematic MP4.
-export const APP_VIDEO_URI = 'https://assets.mixkit.co/videos/3696/3696-720.mp4';
+// Single looping background video for the whole app.
+// Swap this URL for any direct .mp4 link — one change updates every screen.
+export const APP_VIDEO_URI = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
 
 type Props = {
   fallbackImageUri: string;
@@ -26,30 +25,14 @@ export function VideoBackground({
   const [videoError, setVideoError] = useState(false);
   const videoOpacity = useRef(new Animated.Value(0)).current;
 
-  const player = useVideoPlayer(APP_VIDEO_URI, p => {
-    p.loop = true;
-    p.muted = true;
-    p.play();
-  });
-
-  useEffect(() => {
-    const sub = player.addListener('statusChange', ({ status, error }) => {
-      if (status === 'readyToPlay') {
-        setVideoReady(true);
-        Animated.timing(videoOpacity, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }).start();
-      }
-      if (error) setVideoError(true);
-    });
-    // Fallback after 8s if video never loads
-    const timeout = setTimeout(() => {
-      if (!videoReady) setVideoError(true);
-    }, 8000);
-    return () => { sub.remove(); clearTimeout(timeout); };
-  }, [player]);
+  function onReadyForDisplay() {
+    setVideoReady(true);
+    Animated.timing(videoOpacity, {
+      toValue: 1,
+      duration: 1000,
+      useNativeDriver: true,
+    }).start();
+  }
 
   if (videoError) {
     return (
@@ -61,7 +44,7 @@ export function VideoBackground({
 
   return (
     <View style={[styles.container, style]}>
-      {/* Fallback splash visible while video loads */}
+      {/* Animated splash shows instantly while video loads */}
       {!videoReady && (
         <AnimatedSplash
           uri={fallbackImageUri}
@@ -72,22 +55,25 @@ export function VideoBackground({
         </AnimatedSplash>
       )}
 
-      {/* Video fades in */}
+      {/* expo-av Video — works natively in Expo Go */}
       <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: videoOpacity }]}>
-        <VideoView
-          player={player}
+        <Video
+          source={{ uri: APP_VIDEO_URI }}
           style={StyleSheet.absoluteFillObject}
-          contentFit="cover"
-          nativeControls={false}
-          allowsFullscreen={false}
-          allowsPictureInPicture={false}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay
+          isLooping
+          isMuted
+          onReadyForDisplay={onReadyForDisplay}
+          onError={() => setVideoError(true)}
+          useNativeControls={false}
         />
       </Animated.View>
 
-      {/* Overlay */}
+      {/* Dark overlay for text legibility */}
       <View style={[styles.overlay, { backgroundColor: `rgba(7,11,20,${overlayOpacity})` }]} />
 
-      {/* Hextech corners */}
+      {/* Hextech corner brackets */}
       <View style={[styles.corner, styles.tl]} />
       <View style={[styles.corner, styles.tr]} />
       <View style={[styles.corner, styles.bl]} />
