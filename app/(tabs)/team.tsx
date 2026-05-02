@@ -50,9 +50,11 @@ function TeamChat({ teamId, myId, memberProfiles }: { teamId: string; myId: stri
   async function handleSend() {
     if (!text.trim()) return;
     justSent.current = true;
-    setSending(true);
     const content = text.trim();
     setText('');
+    setSending(true);
+    // Double-clear after microtask to catch any trailing newline from onChangeText
+    setTimeout(() => setText(''), 0);
     await send(content);
     setSending(false);
   }
@@ -103,7 +105,13 @@ function TeamChat({ teamId, myId, memberProfiles }: { teamId: string; myId: stri
         <TextInput
           style={styles.chatTextInput}
           value={text}
-          onChangeText={v => { if (justSent.current) { justSent.current = false; setText(v.replace(/\n$/, '')); return; } setText(v); }}
+          onChangeText={v => {
+            // Block trailing newline that fires after Enter sends
+            const cleaned = v.replace(/\n/g, '');
+            if (justSent.current) { justSent.current = false; setText(cleaned); return; }
+            if (v.endsWith('\n') && v.trim() === text.trim()) { return; }
+            setText(v);
+          }}
           placeholder="Message team..."
           placeholderTextColor={Colors.textDim}
           multiline maxLength={500}
