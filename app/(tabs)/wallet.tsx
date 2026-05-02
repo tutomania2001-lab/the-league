@@ -3,13 +3,13 @@ import { GlowText } from '@/components/ui/GlowText';
 import { Card } from '@/components/ui/Card';
 import { PulseGlow } from '@/components/ui/PulseGlow';
 import { Typography, Spacing, Colors } from '@/constants/theme';
-import { ChampionVideos, VideoFallbacks } from '@/constants/videos';
+import { ChampionVideoIds, VideoFallbacks } from '@/constants/videos';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScrollView, Text } from 'react-native';
 
 export default function WalletScreen() {
   return (
-    <VideoBackground videoUri={ChampionVideos.wallet} fallbackImageUri={VideoFallbacks.wallet} overlayOpacity={0.6}>
+    <VideoBackground videoId={ChampionVideoIds.wallet} fallbackImageUri={VideoFallbacks.wallet} overlayOpacity={0.6}>
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: Spacing.lg, gap: Spacing.md }}>
           <PulseGlow duration={3000} minOpacity={0.65}>

@@ -1,12 +1,13 @@
 import { AnimatedSplash } from '@/components/ui/AnimatedSplash';
-import { PulseGlow } from '@/components/ui/PulseGlow';
 import { Colors } from '@/constants/theme';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, View, ViewStyle } from 'react-native';
+import YoutubePlayer from 'react-native-youtube-iframe';
+import { useRef, useState } from 'react';
+import { Animated, Dimensions, StyleSheet, View, ViewStyle } from 'react-native';
+
+const { width, height } = Dimensions.get('window');
 
 type Props = {
-  videoUri: string;
+  videoId: string;
   fallbackImageUri: string;
   children: React.ReactNode;
   style?: ViewStyle;
@@ -14,76 +15,57 @@ type Props = {
 };
 
 export function VideoBackground({
-  videoUri,
+  videoId,
   fallbackImageUri,
   children,
   style,
   overlayOpacity = 0.55,
 }: Props) {
   const [videoReady, setVideoReady] = useState(false);
-  const [videoError, setVideoError] = useState(false);
   const videoOpacity = useRef(new Animated.Value(0)).current;
 
-  const player = useVideoPlayer(videoUri, p => {
-    p.loop = true;
-    p.muted = true;
-    p.play();
-  });
-
-  useEffect(() => {
-    const sub = player.addListener('statusChange', ({ status }) => {
-      if (status === 'readyToPlay') {
-        setVideoReady(true);
-        Animated.timing(videoOpacity, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }).start();
-      }
-    });
-    return () => sub.remove();
-  }, [player]);
-
-  // Fallback to animated splash if video errors or takes too long
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!videoReady) setVideoError(true);
-    }, 6000);
-    return () => clearTimeout(timeout);
-  }, [videoReady]);
-
-  if (videoError) {
-    return (
-      <AnimatedSplash uri={fallbackImageUri} style={style} overlayOpacity={overlayOpacity}>
-        {children}
-      </AnimatedSplash>
-    );
+  function onReady() {
+    setVideoReady(true);
+    Animated.timing(videoOpacity, {
+      toValue: 1,
+      duration: 1000,
+      useNativeDriver: true,
+    }).start();
   }
 
   return (
     <View style={[styles.container, style]}>
-      {/* Animated splash shows while video loads */}
-      {!videoReady && (
-        <AnimatedSplash
-          uri={fallbackImageUri}
-          style={StyleSheet.absoluteFillObject}
-          overlayOpacity={overlayOpacity}
-        >
-          <View />
-        </AnimatedSplash>
-      )}
+      {/* Animated splash always visible underneath as fallback */}
+      <AnimatedSplash
+        uri={fallbackImageUri}
+        style={StyleSheet.absoluteFillObject}
+        overlayOpacity={0}
+      >
+        <View />
+      </AnimatedSplash>
 
-      {/* Video fades in once ready */}
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: videoOpacity }]}>
-        <VideoView
-          player={player}
-          style={StyleSheet.absoluteFillObject}
-          contentFit="cover"
-          nativeControls={false}
+      {/* YouTube video fades in once ready — scaled up to fill screen, controls hidden */}
+      <Animated.View style={[styles.videoWrap, { opacity: videoOpacity }]}>
+        <YoutubePlayer
+          height={height * 1.2}
+          width={width * 1.8}
+          videoId={videoId}
+          play
+          mute
+          loop
+          webViewStyle={{ opacity: 0.99 }}
+          initialPlayerParams={{
+            controls: false,
+            showClosedCaptions: false,
+            modestbranding: true,
+            rel: false,
+            fs: false,
+          }}
+          onReady={onReady}
         />
       </Animated.View>
 
-      {/* Dark overlay for legibility */}
+      {/* Dark overlay for text legibility */}
       <View style={[styles.overlay, { backgroundColor: `rgba(7,11,20,${overlayOpacity})` }]} />
 
       {/* Hextech corner brackets */}
@@ -92,7 +74,7 @@ export function VideoBackground({
       <View style={[styles.corner, styles.bottomLeft]} />
       <View style={[styles.corner, styles.bottomRight]} />
 
-      {/* Content */}
+      {/* Content on top */}
       <View style={styles.content}>{children}</View>
     </View>
   );
@@ -103,6 +85,13 @@ const cornerWidth = 2;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background, overflow: 'hidden' },
+  videoWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    top: -height * 0.1,
+    left: -width * 0.4,
+  },
   overlay: { ...StyleSheet.absoluteFillObject },
   content: { flex: 1 },
   corner: {

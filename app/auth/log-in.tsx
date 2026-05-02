@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/Input';
 import { VideoBackground } from '@/components/ui/VideoBackground';
 import { PulseGlow } from '@/components/ui/PulseGlow';
 import { Colors, Spacing, Typography } from '@/constants/theme';
-import { ChampionVideos, VideoFallbacks } from '@/constants/videos';
+import { ChampionVideoIds, VideoFallbacks } from '@/constants/videos';
 import { supabase } from '@/lib/supabase';
 import { DEV_BYPASS } from '@/lib/dev';
 import { useRouter } from 'expo-router';
@@ -33,7 +33,7 @@ export default function LogInScreen() {
   }
 
   return (
-    <VideoBackground videoUri={ChampionVideos.login} fallbackImageUri={VideoFallbacks.login} style={styles.bg}>
+    <VideoBackground videoId={ChampionVideoIds.login} fallbackImageUri={VideoFallbacks.login} style={styles.bg}>
       <SafeAreaView style={styles.safe}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">

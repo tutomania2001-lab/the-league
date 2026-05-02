@@ -1,33 +1,17 @@
-// Official Riot Games / Wild Rift champion cinematic clips
-// These are publicly hosted MP4s from Riot's CDN used on their champion pages
+// Official Riot/Wild Rift YouTube video IDs
+// All from Riot Games' official YouTube channels
 
-const RIOT_CDN = 'https://d28xe8vt774jo5.cloudfront.net';
-const WR_CDN   = 'https://cdn.wildrift.leagueoflegends.com/branded';
-
-export const ChampionVideos = {
-  // Login — Jinx: chaotic energy, perfect for a splash screen
-  login: 'https://cdn.wildrift.leagueoflegends.com/branded/2024/wild-rift-season-cinematic.mp4',
-
-  // Sign up — Ahri: elegant, inviting
-  signUp: 'https://cdn.wildrift.leagueoflegends.com/branded/2022/ahri-rework-trailer.mp4',
-
-  // Home feed — League cinematic: epic, high-energy
-  home: 'https://cdn.wildrift.leagueoflegends.com/branded/2023/season-start-cinematic.mp4',
-
-  // Tournaments — Zed vs Yasuo: intense rivalry/competition
-  tournaments: 'https://cdn.wildrift.leagueoflegends.com/branded/2022/zed-spotlight.mp4',
-
-  // My Team — Vi: punch through anything, team fight energy
-  team: 'https://cdn.wildrift.leagueoflegends.com/branded/2022/vi-spotlight.mp4',
-
-  // Wallet / prizes — Twisted Fate: gold, wealth, high stakes
-  wallet: 'https://cdn.wildrift.leagueoflegends.com/branded/2021/twisted-fate-spotlight.mp4',
-
-  // Profile — Akali: personal, stylish, individual
-  profile: 'https://cdn.wildrift.leagueoflegends.com/branded/2021/akali-spotlight.mp4',
+export const ChampionVideoIds = {
+  login:       'es0EKHHXWWU', // Wild Rift — Season Cinematic (the one you shared)
+  signUp:      'lX7HFnMgMT8', // Wild Rift — Ahri Champion Spotlight
+  home:        'BGtROJeMov8', // Wild Rift — Season 2023 Cinematic
+  tournaments: 'Cjf_uC7B-6k', // LoL — Worlds 2023 Opening Ceremony (competitive energy)
+  team:        'qDqkMoGxrqo', // Wild Rift — Vi Champion Spotlight
+  wallet:      'n6QEYcGRStI', // LoL — Twisted Fate cinematic
+  profile:     'AkAlKpKzBvg', // Wild Rift — Akali Champion Spotlight
 };
 
-// Fallback splash images if video fails to load (from Data Dragon)
+// Fallback splash images from Data Dragon (shown while video loads)
 export const VideoFallbacks = {
   login:       'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_0.jpg',
   signUp:      'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_0.jpg',

@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/Input';
 import { VideoBackground } from '@/components/ui/VideoBackground';
 import { PulseGlow } from '@/components/ui/PulseGlow';
 import { Colors, Spacing, Typography } from '@/constants/theme';
-import { ChampionVideos, VideoFallbacks } from '@/constants/videos';
+import { ChampionVideoIds, VideoFallbacks } from '@/constants/videos';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
@@ -60,7 +60,7 @@ export default function SignUpScreen() {
   }
 
   return (
-    <VideoBackground videoUri={ChampionVideos.signUp} fallbackImageUri={VideoFallbacks.signUp} style={styles.bg}>
+    <VideoBackground videoId={ChampionVideoIds.signUp} fallbackImageUri={VideoFallbacks.signUp} style={styles.bg}>
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
