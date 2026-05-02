@@ -337,8 +337,8 @@ function FeedVideo({ uri }: { uri: string }) {
   return (
     <VideoView
       player={player}
-      style={{ width: '100%', aspectRatio: 9 / 16, maxHeight: 500 }}
-      contentFit="cover"
+      style={{ width: '100%', aspectRatio: 16 / 9 }}
+      contentFit="fill"
       nativeControls
     />
   );
