@@ -20,15 +20,14 @@ function getTournamentSplash(index: number) {
   return FEATURED_CHAMPIONS[index % FEATURED_CHAMPIONS.length];
 }
 
-function TourneyThumb({ item, index, isActive, onSelect }: { item: any; index: number; isActive: boolean; onSelect: (t: any, champ: any) => void }) {
+function TourneyThumb({ item, index, isActive, onSelect }: { item: any; index: number; isActive: boolean; onSelect: (t: any, img: string) => void }) {
   const riftImg = getRiftImage(index);
-  const champ = getTournamentSplash(index);
   const scale = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     Animated.spring(scale, { toValue: isActive ? 1.08 : 1, useNativeDriver: true, friction: 6 }).start();
   }, [isActive]);
   return (
-    <TouchableOpacity onPress={() => onSelect(item, champ)} activeOpacity={0.8}>
+    <TouchableOpacity onPress={() => onSelect(item, riftImg)} activeOpacity={0.8}>
       <Animated.View style={[styles.tourneyThumb, { transform: [{ scale }], borderColor: isActive ? Colors.gold : Colors.accentBorder }]}>
         <Image source={{ uri: riftImg }} style={styles.tourneyThumbBg} resizeMode="cover" />
         <View style={styles.tourneyThumbOverlay} />
@@ -46,7 +45,7 @@ function TourneyThumb({ item, index, isActive, onSelect }: { item: any; index: n
   );
 }
 
-function TournamentStrip({ tournaments, activeId, onSelect }: { tournaments: any[]; activeId: string | null; onSelect: (t: any, champ: any) => void }) {
+function TournamentStrip({ tournaments, activeId, onSelect }: { tournaments: any[]; activeId: string | null; onSelect: (t: any, img: string) => void }) {
   return (
     <FlatList
       data={tournaments}
@@ -70,14 +69,15 @@ export default function HomeScreen() {
 
   // All tournaments to show in strip
   const allActive = [...featuredTournaments, ...activeBattles];
-  const defaultChamp = FEATURED_CHAMPIONS[0];
   const [activeTournament, setActiveTournament] = useState<any>(allActive[0] ?? null);
-  const [activeSplash, setActiveSplash] = useState(allActive[0] ? getTournamentSplash(0) : defaultChamp);
+  const [activeBannerImg, setActiveBannerImg] = useState<string>(
+    allActive[0] ? getRiftImage(0) : FEATURED_CHAMPIONS[0].splash
+  );
 
   useEffect(() => {
     if (allActive.length > 0 && !activeTournament) {
       setActiveTournament(allActive[0]);
-      setActiveSplash(getTournamentSplash(0));
+      setActiveBannerImg(getRiftImage(0));
     }
   }, [majorTournaments, teamBattles]);
 
@@ -98,7 +98,7 @@ export default function HomeScreen() {
             <TournamentStrip
               tournaments={allActive}
               activeId={activeTournament?.id ?? null}
-              onSelect={(t, champ) => { setActiveTournament(t); setActiveSplash(champ); }}
+              onSelect={(t, img) => { setActiveTournament(t); setActiveBannerImg(img); }}
             />
           ) : (
             // No tournaments — show rift image placeholders
@@ -111,10 +111,7 @@ export default function HomeScreen() {
               renderItem={({ item, index }) => {
                 const isActive = index === 0;
                 return (
-                  <TouchableOpacity onPress={() => {
-                    const champ = getTournamentSplash(index);
-                    setActiveSplash(champ);
-                  }} activeOpacity={0.8}>
+                  <TouchableOpacity onPress={() => setActiveBannerImg(item)} activeOpacity={0.8}>
                     <View style={[styles.tourneyThumb, { borderColor: isActive ? Colors.accent + '88' : Colors.accentBorder }]}>
                       <Image source={{ uri: item }} style={styles.tourneyThumbBg} resizeMode="cover" />
                       <View style={[styles.tourneyThumbOverlay, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
@@ -134,7 +131,7 @@ export default function HomeScreen() {
         {activeTournament ? (
           <TouchableOpacity onPress={() => router.push(`/tournament/${activeTournament.id}`)} activeOpacity={0.88}>
             <View style={styles.featuredBanner}>
-              <Image source={{ uri: activeSplash.splash }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
+              <Image source={{ uri: activeBannerImg }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
               <View style={styles.featuredBannerOverlay} />
               <View style={styles.featuredBannerContent}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
@@ -154,7 +151,7 @@ export default function HomeScreen() {
         ) : (
           /* No tournament — show champion splash as hero */
           <View style={styles.featuredBanner}>
-            <Image source={{ uri: activeSplash.splash }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
+            <Image source={{ uri: activeBannerImg }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
             <View style={styles.featuredBannerOverlay} />
             <View style={styles.featuredBannerContent}>
               <Text style={styles.featuredBannerType}>◈ THE LEAGUE</Text>
