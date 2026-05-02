@@ -15,9 +15,29 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
-// Assign a champion splash to each tournament by index
 function getTournamentSplash(index: number) {
   return FEATURED_CHAMPIONS[index % FEATURED_CHAMPIONS.length];
+}
+
+// Each thumb is its own component so hooks are valid
+function TourneyThumb({ item, index, isActive, onSelect }: { item: any; index: number; isActive: boolean; onSelect: (t: any, champ: any) => void }) {
+  const champ = getTournamentSplash(index);
+  const scale = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.spring(scale, { toValue: isActive ? 1.08 : 1, useNativeDriver: true, friction: 6 }).start();
+  }, [isActive]);
+  return (
+    <TouchableOpacity onPress={() => onSelect(item, champ)} activeOpacity={0.8}>
+      <Animated.View style={[styles.tourneyThumb, { transform: [{ scale }], borderColor: isActive ? Colors.gold : Colors.accentBorder }]}>
+        <Image source={{ uri: champ.splash }} style={styles.tourneyThumbBg} resizeMode="cover" />
+        <View style={styles.tourneyThumbOverlay} />
+        <Text style={styles.tourneyThumbName} numberOfLines={2}>{item.name}</Text>
+        {item.status === 'active' && (
+          <View style={styles.liveChip}><Text style={styles.liveChipText}>LIVE</Text></View>
+        )}
+      </Animated.View>
+    </TouchableOpacity>
+  );
 }
 
 function TournamentStrip({ tournaments, activeId, onSelect }: { tournaments: any[]; activeId: string | null; onSelect: (t: any, champ: any) => void }) {
@@ -28,26 +48,9 @@ function TournamentStrip({ tournaments, activeId, onSelect }: { tournaments: any
       showsHorizontalScrollIndicator={false}
       keyExtractor={t => t.id}
       contentContainerStyle={{ paddingHorizontal: Spacing.md, gap: Spacing.sm }}
-      renderItem={({ item, index }) => {
-        const champ = getTournamentSplash(index);
-        const isActive = activeId === item.id;
-        const scale = useRef(new Animated.Value(1)).current;
-        useEffect(() => {
-          Animated.spring(scale, { toValue: isActive ? 1.08 : 1, useNativeDriver: true, friction: 6 }).start();
-        }, [isActive]);
-        return (
-          <TouchableOpacity onPress={() => onSelect(item, champ)} activeOpacity={0.8}>
-            <Animated.View style={[styles.tourneyThumb, { transform: [{ scale }], borderColor: isActive ? Colors.gold : Colors.accentBorder }]}>
-              <Image source={{ uri: champ.splash }} style={styles.tourneyThumbBg} resizeMode="cover" />
-              <View style={styles.tourneyThumbOverlay} />
-              <Text style={styles.tourneyThumbName} numberOfLines={2}>{item.name}</Text>
-              {item.status === 'active' && (
-                <View style={styles.liveChip}><Text style={styles.liveChipText}>LIVE</Text></View>
-              )}
-            </Animated.View>
-          </TouchableOpacity>
-        );
-      }}
+      renderItem={({ item, index }) => (
+        <TourneyThumb item={item} index={index} isActive={activeId === item.id} onSelect={onSelect} />
+      )}
     />
   );
 }
@@ -57,9 +60,9 @@ export default function HomeScreen() {
   const { majorTournaments, teamBattles } = useTournamentList();
   const { matches: liveMatches } = useLiveMatches();
   const featuredTournaments = majorTournaments.filter(t => t.status !== 'completed');
-  const activeBattles = teamBattles.filter(t => t.status === 'active' || t.status === 'open').slice(0, 2);
+  const activeBattles = teamBattles.filter(t => t.status !== 'completed').slice(0, 4);
 
-  // Default background: first active tournament's splash, or first champion
+  // All tournaments to show in strip
   const allActive = [...featuredTournaments, ...activeBattles];
   const defaultChamp = FEATURED_CHAMPIONS[0];
   const [activeTournament, setActiveTournament] = useState<any>(allActive[0] ?? null);
