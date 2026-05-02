@@ -587,7 +587,7 @@ export default function TeamScreen() {
             </View>
 
             {/* ── MVP Banner ── */}
-            {mvp && memberProfiles[mvp.userId] && (
+            {mvp && (
               <View style={styles.mvpBanner}>
                 <View style={styles.mvpGlow} />
                 <View style={styles.mvpLeft}>
@@ -599,12 +599,12 @@ export default function TeamScreen() {
                     ? <Image source={{ uri: memberProfiles[mvp.userId].avatar_url }} style={styles.mvpAvatar} />
                     : <View style={[styles.mvpAvatar, { backgroundColor: 'rgba(200,155,60,0.3)', alignItems: 'center', justifyContent: 'center' }]}>
                         <Text style={{ color: Colors.gold, fontSize: 22, fontWeight: '900' }}>
-                          {(memberProfiles[mvp.userId]?.riot_id ?? memberProfiles[mvp.userId]?.username ?? '?')[0]}
+                          {(memberProfiles[mvp.userId]?.riot_id ?? memberProfiles[mvp.userId]?.username ?? '👑')[0]}
                         </Text>
                       </View>
                   }
                   <Text style={styles.mvpName} numberOfLines={1}>
-                    {memberProfiles[mvp.userId]?.riot_id ?? memberProfiles[mvp.userId]?.username}
+                    {memberProfiles[mvp.userId]?.riot_id ?? memberProfiles[mvp.userId]?.username ?? 'MVP Player'}
                   </Text>
                 </View>
                 <View style={styles.mvpRight}>
