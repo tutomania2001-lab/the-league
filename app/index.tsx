@@ -45,8 +45,6 @@ export default function LandingScreen() {
         allowsPictureInPicture={false}
       />
 
-      {/* Subtle bottom gradient only — keeps buttons readable, no full overlay */}
-      <View style={styles.bottomGradient} />
 
       {/* UI */}
       <SafeAreaView style={styles.safe} pointerEvents="box-none">
@@ -96,10 +94,6 @@ const styles = StyleSheet.create({
 
   video: { ...StyleSheet.absoluteFillObject },
 
-  bottomGradient: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, height: '45%',
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
 
   safe: { ...StyleSheet.absoluteFillObject },
 
