@@ -49,7 +49,8 @@ export default function RootLayout() {
     if (loading) return;
     if (DEV_BYPASS.enabled) return;
     const inAuthGroup = segments[0] === 'auth';
-    if (!session && !inAuthGroup) router.replace('/auth/log-in');
+    const onSplash = segments.length === 0 || segments[0] === 'index';
+    if (!session && !inAuthGroup && !onSplash) router.replace('/');
     else if (session && inAuthGroup) router.replace('/(tabs)');
   }, [session, loading, segments]);
 
