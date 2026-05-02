@@ -61,10 +61,10 @@ export default function IconPickerScreen() {
 
   function handleSave() {
     if (selected === null) { router.back(); return; }
-    // Optimistic — navigate back immediately, save in background
     const uri = `${DD_BASE}/${selected}.png`;
-    router.back();
+    // Update all screens instantly via broadcast, then go back
     updateProfile({ avatar_url: uri } as any);
+    router.back();
   }
 
   return (

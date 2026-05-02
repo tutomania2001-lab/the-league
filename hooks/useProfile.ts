@@ -1,9 +1,15 @@
 import { supabase } from '@/lib/supabase';
 import { UserRow } from '@/types/database';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-// Module-level cache — persists across screen navigations
+// Global cache and listeners — all useProfile instances share state
 const cache: Record<string, UserRow> = {};
+const listeners: Record<string, Set<(p: UserRow) => void>> = {};
+
+function broadcast(userId: string, profile: UserRow) {
+  cache[userId] = profile;
+  listeners[userId]?.forEach(fn => fn(profile));
+}
 
 export function useProfile(userId: string | undefined) {
   const [profile, setProfile] = useState<UserRow | null>(
@@ -11,40 +17,45 @@ export function useProfile(userId: string | undefined) {
   );
   const [loading, setLoading] = useState(!userId || !cache[userId]);
   const [error, setError] = useState<string | null>(null);
+  const setRef = useRef(setProfile);
+  setRef.current = setProfile;
 
   useEffect(() => {
     if (!userId) { setLoading(false); return; }
 
-    // If cached, show immediately and refresh in background
+    // Subscribe so any updateProfile call (from any screen) updates this instance
+    if (!listeners[userId]) listeners[userId] = new Set();
+    const handler = (p: UserRow) => setRef.current(p);
+    listeners[userId].add(handler);
+
+    // Show cached value instantly
     if (cache[userId]) {
       setProfile(cache[userId]);
       setLoading(false);
     }
 
+    // Fetch fresh from Supabase in background
     supabase
       .from('users')
       .select('*')
       .eq('id', userId)
       .single()
       .then(({ data, error }) => {
-        if (error) { setError(error.message); }
-        else if (data) {
-          cache[userId] = data;
-          setProfile(data);
-        }
+        if (error) setError(error.message);
+        else if (data) broadcast(userId, data);
         setLoading(false);
       });
+
+    return () => { listeners[userId]?.delete(handler); };
   }, [userId]);
 
   async function updateProfile(updates: Partial<Pick<UserRow, 'username' | 'riot_id' | 'avatar_url'>>) {
-    if (!userId) return { error: 'Not authenticated' };
+    if (!userId || !cache[userId]) return { error: 'Not ready' };
 
-    // Optimistic update — instant
-    const optimistic = { ...profile!, ...updates };
-    cache[userId] = optimistic;
-    setProfile(optimistic);
+    // Broadcast optimistic update to ALL screens using this profile
+    broadcast(userId, { ...cache[userId], ...updates });
 
-    // Background sync to Supabase
+    // Sync to Supabase in background
     const { data, error } = await supabase
       .from('users')
       .update(updates)
@@ -52,11 +63,7 @@ export function useProfile(userId: string | undefined) {
       .select()
       .single();
 
-    if (!error && data) {
-      cache[userId] = data;
-      setProfile(data);
-    }
-
+    if (!error && data) broadcast(userId, data);
     return { error: error?.message ?? null };
   }
 
