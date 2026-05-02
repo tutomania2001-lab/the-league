@@ -1,16 +1,25 @@
-import { Screen } from '@/components/ui/Screen';
+import { VideoBackground } from '@/components/ui/VideoBackground';
 import { GlowText } from '@/components/ui/GlowText';
 import { Card } from '@/components/ui/Card';
-import { Typography, Spacing } from '@/constants/theme';
-import { Text } from 'react-native';
+import { PulseGlow } from '@/components/ui/PulseGlow';
+import { Typography, Spacing, Colors } from '@/constants/theme';
+import { ChampionVideos, VideoFallbacks } from '@/constants/videos';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScrollView, Text } from 'react-native';
 
 export default function TeamScreen() {
   return (
-    <Screen>
-      <GlowText style={[Typography.title, { marginBottom: Spacing.lg }]}>⚔️ My Team</GlowText>
-      <Card>
-        <Text style={Typography.body}>Team dashboard coming in Phase 3.</Text>
-      </Card>
-    </Screen>
+    <VideoBackground videoUri={ChampionVideos.team} fallbackImageUri={VideoFallbacks.team} overlayOpacity={0.65}>
+      <SafeAreaView style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ padding: Spacing.lg, gap: Spacing.md }}>
+          <PulseGlow duration={2200} minOpacity={0.7}>
+            <GlowText style={Typography.title}>⚔️ My Team</GlowText>
+          </PulseGlow>
+          <Card>
+            <Text style={[Typography.body, { color: Colors.text }]}>Team dashboard coming in Phase 3.</Text>
+          </Card>
+        </ScrollView>
+      </SafeAreaView>
+    </VideoBackground>
   );
 }

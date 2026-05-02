@@ -1,10 +1,10 @@
 import { Button } from '@/components/ui/Button';
 import { GlowText } from '@/components/ui/GlowText';
 import { Input } from '@/components/ui/Input';
-import { AnimatedSplash } from '@/components/ui/AnimatedSplash';
+import { VideoBackground } from '@/components/ui/VideoBackground';
 import { PulseGlow } from '@/components/ui/PulseGlow';
 import { Colors, Spacing, Typography } from '@/constants/theme';
-import { Splashes } from '@/constants/champions';
+import { ChampionVideos, VideoFallbacks } from '@/constants/videos';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -31,7 +31,7 @@ export default function SignUpScreen() {
   }
 
   return (
-    <AnimatedSplash uri={Splashes.Ahri} style={styles.bg}>
+    <VideoBackground videoUri={ChampionVideos.signUp} fallbackImageUri={VideoFallbacks.signUp} style={styles.bg}>
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -53,7 +53,7 @@ export default function SignUpScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </AnimatedSplash>
+    </VideoBackground>
   );
 }
 

@@ -2,9 +2,10 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { GlowText } from '@/components/ui/GlowText';
 import { PulseGlow } from '@/components/ui/PulseGlow';
-import { AnimatedSplash } from '@/components/ui/AnimatedSplash';
+import { VideoBackground } from '@/components/ui/VideoBackground';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { FEATURED_CHAMPIONS } from '@/constants/champions';
+import { ChampionVideos, VideoFallbacks } from '@/constants/videos';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated, Dimensions, FlatList, Image,
@@ -42,8 +43,8 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Animated hero */}
-      <AnimatedSplash uri={activeChamp.splash} style={styles.hero} overlayOpacity={0.45}>
+      {/* Video hero */}
+      <VideoBackground videoUri={ChampionVideos.home} fallbackImageUri={activeChamp.splash} style={styles.hero} overlayOpacity={0.45}>
         <SafeAreaView>
           <View style={styles.heroContent}>
             <Text style={styles.heroLabel}>WILD RIFT TOURNAMENT</Text>
@@ -53,7 +54,7 @@ export default function HomeScreen() {
             <Badge variant="open" />
           </View>
         </SafeAreaView>
-      </AnimatedSplash>
+      </VideoBackground>
 
       {/* Champion selector strip */}
       <View style={styles.champStrip}>
