@@ -121,7 +121,14 @@ export default function ChatScreen() {
             multiline
             maxLength={500}
             onSubmitEditing={handleSend}
+            blurOnSubmit={false}
             returnKeyType="send"
+            onKeyPress={({ nativeEvent }) => {
+              // Web: Enter sends, Shift+Enter adds newline
+              if (nativeEvent.key === 'Enter' && !(nativeEvent as any).shiftKey) {
+                handleSend();
+              }
+            }}
           />
           <TouchableOpacity
             style={[styles.sendBtn, !text.trim() && { opacity: 0.4 }]}
