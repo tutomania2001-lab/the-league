@@ -228,8 +228,8 @@ export default function TeamScreen() {
         </Text>
 
         {/* Room code — required to enter tournaments */}
-        {(team as any).room_code ? (
-          <RoomCodeCard code={(team as any).room_code} password={(team as any).room_password} />
+        {team.room_code ? (
+          <RoomCodeCard code={team.room_code} password={team.room_password} />
         ) : isCaptain ? (
           <Card style={{ gap: Spacing.sm, borderColor: Colors.error + '55' }}>
             <Text style={{ color: Colors.error, fontWeight: '700', fontSize: 13 }}>

@@ -19,6 +19,8 @@ export type TeamRow = {
   name: string;
   captain_id: string;
   invite_code: string;
+  room_code: string | null;
+  room_password: string | null;
   created_at: string;
 };
 
