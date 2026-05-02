@@ -59,20 +59,28 @@ export default function IconPickerScreen() {
     setFiltered(icons.filter(i => i.id.toString().includes(search.trim())));
   }, [search, icons]);
 
-  async function handleSave() {
-    if (selected === null) return;
-    setSaving(true);
+  function handleSave() {
+    if (selected === null) { router.back(); return; }
+    // Optimistic — navigate back immediately, save in background
     const uri = `${DD_BASE}/${selected}.png`;
-    await updateProfile({ avatar_url: uri } as any);
-    setSaving(false);
     router.back();
+    updateProfile({ avatar_url: uri } as any);
   }
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Text style={styles.closeText}>✕</Text>
+        </TouchableOpacity>
         <GlowText style={Typography.heading}>Choose Icon</GlowText>
-        <Button label="✓ Save" onPress={handleSave} loading={saving} disabled={selected === null} style={{ paddingVertical: 6, paddingHorizontal: 16, minHeight: 36 }} />
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={selected === null}
+          style={[styles.saveBtn, selected === null && styles.saveBtnDisabled]}
+        >
+          <Text style={[styles.saveBtnText, selected === null && { opacity: 0.4 }]}>✓ Save</Text>
+        </TouchableOpacity>
       </View>
 
       <Input
@@ -133,6 +141,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', padding: Spacing.md, paddingBottom: Spacing.sm,
   },
+  closeBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  closeText: { fontSize: 16, color: Colors.textMuted, fontWeight: '600' },
+  saveBtn: {
+    paddingHorizontal: 16, paddingVertical: 8,
+    backgroundColor: Colors.accent, borderRadius: 8,
+  },
+  saveBtnDisabled: { backgroundColor: Colors.accentDim },
+  saveBtnText: { fontSize: 13, fontWeight: '700', color: Colors.background },
   search: { marginHorizontal: Spacing.md, marginBottom: Spacing.sm },
   grid: { padding: Spacing.md, gap: Spacing.sm },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl },
