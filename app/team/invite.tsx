@@ -1,15 +1,14 @@
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { GlowText } from '@/components/ui/GlowText';
-import { Input } from '@/components/ui/Input';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useTeam } from '@/hooks/useTeam';
 import { supabase } from '@/lib/supabase';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Clipboard from 'expo-clipboard';
+import { TextInput } from 'react-native';
 
 export default function InviteScreen() {
   const router = useRouter();
@@ -25,7 +24,7 @@ export default function InviteScreen() {
   }, []);
 
   async function handleJoin() {
-    if (!/^\d{5}$/.test(code)) { setError('Enter the 5-digit Wild Rift room code'); return; }
+    if (!code.trim()) { setError('Enter a clan invite code'); return; }
     setLoading(true);
     setError(null);
     const { error } = await joinTeam(code.trim());
@@ -33,9 +32,9 @@ export default function InviteScreen() {
     router.replace('/(tabs)/team');
   }
 
-  async function copyCode() {
-    if (!team?.room_code) return;
-    await Clipboard.setStringAsync(team.room_code);
+  async function copyInviteCode() {
+    if (!team?.invite_code) return;
+    await Clipboard.setStringAsync(team.invite_code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -43,57 +42,57 @@ export default function InviteScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <GlowText style={Typography.title}>📨 Join a Team</GlowText>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
+            <Text style={{ color: Colors.gold, fontSize: 15, fontWeight: '600' }}>‹ Back</Text>
+          </TouchableOpacity>
+          <GlowText style={[Typography.heading, { color: Colors.gold }]}>👥 Invite to Clan</GlowText>
+        </View>
 
-        {/* Show current team's room code to share */}
-        {team?.room_code && (
-          <Card glow style={{ gap: Spacing.sm }}>
-            <Text style={Typography.label}>🎮 Your Team's Room Code</Text>
-            <Text style={[Typography.body, { fontSize: 11 }]}>
-              Share this 5-digit code — teammates use it to join in Wild Rift AND in the app.
+        {/* Show current clan invite code */}
+        {team?.invite_code && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Your Clan Invite Code</Text>
+            <Text style={[Typography.body, { fontSize: 12, marginBottom: Spacing.sm }]}>
+              Share this code with players you want to invite to your clan.
             </Text>
             <View style={styles.codeRow}>
-              <GlowText style={styles.codeText}>{team.room_code}</GlowText>
-              <Button
-                label={copied ? '✓ Copied!' : '📋 Copy'}
-                variant="secondary"
-                onPress={copyCode}
-                style={styles.copyBtn}
-              />
+              <Text style={styles.codeText}>{team.invite_code}</Text>
+              <TouchableOpacity style={[styles.copyBtn, copied && styles.copyBtnDone]} onPress={copyInviteCode}>
+                <Text style={{ color: copied ? Colors.success : Colors.gold, fontSize: 12, fontWeight: '700' }}>
+                  {copied ? '✓ Copied' : '📋 Copy'}
+                </Text>
+              </TouchableOpacity>
             </View>
-          </Card>
+          </View>
         )}
 
-        {/* Join another team */}
-        <Card style={{ gap: Spacing.md }}>
-          <Text style={Typography.label}>Join a Team</Text>
-          <Text style={[Typography.body, { fontSize: 12 }]}>
-            Enter the 5-digit Wild Rift room code shared by your team captain.
+        {/* Join a clan */}
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Join a Clan</Text>
+          <Text style={[Typography.body, { fontSize: 12, marginBottom: Spacing.sm }]}>
+            Enter the clan invite code shared by the captain.
           </Text>
-          <Input
-            label="Wild Rift Room Code (5 digits)"
-            placeholder="e.g. 48271"
+          <TextInput
+            style={styles.input}
             value={code}
-            onChangeText={v => setCode(v.replace(/[^0-9]/g, '').slice(0, 5))}
-            keyboardType="numeric"
-            maxLength={5}
+            onChangeText={v => setCode(v.toUpperCase())}
+            placeholder="e.g. A3F9X2BK"
+            placeholderTextColor={Colors.textDim}
+            autoCapitalize="characters"
             autoCorrect={false}
+            maxLength={12}
           />
-          {code.length > 0 && code.length < 5 && (
-            <Text style={{ color: Colors.warning, fontSize: 11 }}>
-              {5 - code.length} more digit{5 - code.length !== 1 ? 's' : ''} needed
-            </Text>
-          )}
-          {error && <Text style={{ color: Colors.error, fontSize: 12 }}>{error}</Text>}
+          {error && <Text style={{ color: Colors.error, fontSize: 12, marginTop: 4 }}>{error}</Text>}
           <Button
-            label="Join Team"
+            label={loading ? 'Joining...' : 'Join Clan'}
             onPress={handleJoin}
             loading={loading}
-            disabled={code.length !== 5}
+            disabled={!code.trim()}
+            style={styles.joinBtn}
           />
-        </Card>
+        </View>
 
-        <Button label="Back" variant="ghost" onPress={() => router.back()} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -102,7 +101,21 @@ export default function InviteScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
-  codeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  codeText: { fontSize: 28, fontWeight: '900', letterSpacing: 6 },
-  copyBtn: { paddingVertical: 8, paddingHorizontal: 14, minHeight: 36 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.xs },
+  card: {
+    backgroundColor: 'rgba(10,8,3,0.85)', borderRadius: 12,
+    borderWidth: 1, borderColor: Colors.gold + '44', padding: Spacing.md, gap: Spacing.xs,
+  },
+  cardLabel: { fontSize: 11, fontWeight: '800', color: Colors.gold, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 2 },
+  codeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(200,155,60,0.08)', borderRadius: 8, borderWidth: 1, borderColor: Colors.gold + '44', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  codeText: { fontSize: 22, fontWeight: '900', color: Colors.gold, letterSpacing: 4 },
+  copyBtn: { backgroundColor: 'rgba(200,155,60,0.15)', borderRadius: 6, borderWidth: 1, borderColor: Colors.gold + '55', paddingHorizontal: 10, paddingVertical: 5 },
+  copyBtnDone: { backgroundColor: 'rgba(0,255,136,0.12)', borderColor: Colors.success + '55' },
+  input: {
+    backgroundColor: 'rgba(20,16,4,0.9)', borderRadius: 8, borderWidth: 1,
+    borderColor: Colors.gold + '44', paddingHorizontal: Spacing.md,
+    paddingVertical: 12, color: Colors.text, fontSize: 16,
+    letterSpacing: 3, fontWeight: '700',
+  },
+  joinBtn: { backgroundColor: Colors.gold, marginTop: Spacing.sm },
 });

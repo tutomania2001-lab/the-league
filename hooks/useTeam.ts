@@ -46,11 +46,11 @@ export function useTeam(userId: string | undefined) {
 
   async function joinTeam(inviteCode: string) {
     if (!userId) return { error: 'Not authenticated' };
-    const code = inviteCode.trim();
-    // Search by room_code (5-digit Wild Rift code) — same code for game and app
+    const code = inviteCode.trim().toUpperCase();
+    // Search by invite_code — the clan's unique join code (not the Wild Rift room code)
     const { data: found, error } = await supabase
-      .from('teams').select('*').eq('room_code', code.toUpperCase()).single();
-    if (error || !found) return { error: 'Team not found — check the 5-digit Wild Rift room code' };
+      .from('teams').select('*').eq('invite_code', code).single();
+    if (error || !found) return { error: 'Clan not found — check the invite code' };
     const { error: joinError } = await supabase
       .from('team_members').insert({ team_id: found.id, user_id: userId });
     if (joinError) return { error: joinError.message };
