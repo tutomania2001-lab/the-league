@@ -358,17 +358,22 @@ export default function TeamScreen() {
     supabase.from('team_bank_transactions').select('*, user:users(riot_id,username,avatar_url)')
       .eq('team_id', team.id).order('created_at', { ascending: false }).limit(10)
       .then(({ data }) => { if (data) setBankTxns(data); });
-    // MVP — only shows when someone has actual wins
-    supabase.rpc('get_team_mvp', { p_team_id: team.id })
-      .then(({ data }) => { if (data?.[0]?.wins > 0) setMvp(data[0]); else setMvp(null); })
-      .catch(() => setMvp(null));
-  }, [team?.id, members, Object.keys(memberProfiles).length]);
+  }, [team?.id]);
 
   useEffect(() => {
-    if (!members.length) return;
+    if (!members.length || !team?.id) return;
     supabase.from('users').select('id, riot_id, username, avatar_url, status').in('id', members.map(m => m.user_id))
-      .then(({ data }) => { if (data) setMemberProfiles(Object.fromEntries(data.map(u => [u.id, u]))); });
-  }, [members]);
+      .then(({ data }) => {
+        if (data) setMemberProfiles(Object.fromEntries(data.map(u => [u.id, u])));
+      });
+    // Fetch MVP after profiles — ensures name/avatar are available
+    supabase.rpc('get_team_mvp', { p_team_id: team.id })
+      .then(({ data }) => {
+        if (data?.[0]?.wins > 0) setMvp(data[0]);
+        else setMvp(null);
+      })
+      .catch(() => setMvp(null));
+  }, [members, team?.id]);
 
   async function handleCreate() {
     if (!teamName.trim()) { setError('Team name is required'); return; }
