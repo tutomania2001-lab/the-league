@@ -1,6 +1,6 @@
 import { getRankFromLP, getRankLabel, getLPProgress } from '@/constants/ranks';
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, StyleSheet, Text, View } from 'react-native';
 
 type Props = {
@@ -14,86 +14,103 @@ export function RankBadge({ lp, showProgress = false, size = 'md' }: Props) {
   const label = getRankLabel(lp);
   const progress = getLPProgress(lp);
 
-  const progressAnim = useRef(new Animated.Value(0)).current;
-  const hasAnimated = useRef(false);
+  // Pixel-based width animation — reliable across all RN versions
+  const [trackWidth, setTrackWidth] = useState(0);
+  const fillWidth = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Small delay ensures layout is complete before animating
-    const t = setTimeout(() => {
-      Animated.timing(progressAnim, {
-        toValue: progress,
-        duration: 1200,
+    if (trackWidth === 0) return;
+    fillWidth.setValue(0);
+    const timer = setTimeout(() => {
+      Animated.timing(fillWidth, {
+        toValue: progress * trackWidth,
+        duration: 1100,
         useNativeDriver: false,
       }).start();
-      hasAnimated.current = true;
-    }, 300);
-    return () => clearTimeout(t);
-  }, [progress]);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [trackWidth, progress]);
 
   const iconSize = size === 'sm' ? 28 : size === 'md' ? 40 : 56;
   const labelSize = size === 'sm' ? 12 : size === 'md' ? 14 : 18;
 
   const nextLabel = rank.division
     ? rank.division === 'I'
-      ? nextTierName(rank.tier)
+      ? `${nextTierName(rank.tier)} IV`
       : `${rank.tier} ${prevDiv(rank.division)}`
     : nextTierName(rank.tier);
 
+  const lpNeeded = rank.division
+    ? 100 - rank.divisionLP
+    : rank.nextThreshold - rank.totalLP;
+
   return (
     <View>
-      {/* Badge row */}
+      {/* Badge */}
       <View style={[styles.badge, { backgroundColor: rank.bgColor, borderColor: rank.color + '66' }]}>
         <Image source={{ uri: rank.icon }} style={{ width: iconSize, height: iconSize }} resizeMode="contain" />
         <View style={{ gap: 2 }}>
           <Text style={[styles.label, { color: rank.color, fontSize: labelSize }]}>{label}</Text>
           {showProgress && (
-            <Text style={[styles.lpText, { color: rank.color + 'bb' }]}>
-              {rank.division ? `${rank.divisionLP} LP` : `${rank.divisionLP} LP`}
-            </Text>
+            <Text style={[styles.divLP, { color: rank.color + 'cc' }]}>{rank.divisionLP} LP</Text>
           )}
         </View>
       </View>
 
-      {/* Progress bar + LP info */}
       {showProgress && (
-        <View style={styles.progressSection}>
-          {/* Track */}
-          <View style={[styles.track, { borderColor: rank.color + '33' }]}>
-            <Animated.View
-              style={[
-                styles.fill,
-                {
-                  backgroundColor: rank.color,
-                  shadowColor: rank.color,
-                  width: progressAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%'],
-                  }),
-                },
-              ]}
-            />
-          </View>
+        <View style={styles.section}>
 
-          {/* LP labels */}
-          <View style={styles.lpRow}>
-            <Text style={[styles.lpSmall, { color: Colors.textMuted }]}>0 LP</Text>
-            <Text style={[styles.lpSmall, { color: Colors.textMuted }]}>100 LP</Text>
+          {/* Progress bar — pixel-width animated */}
+          <View style={styles.trackWrap}>
+            <View
+              style={[styles.track, { borderColor: rank.color + '44' }]}
+              onLayout={e => setTrackWidth(e.nativeEvent.layout.width)}
+            >
+              <Animated.View
+                style={[
+                  styles.fill,
+                  {
+                    width: fillWidth,
+                    backgroundColor: rank.color,
+                    shadowColor: rank.color,
+                  },
+                ]}
+              />
+            </View>
+            <View style={styles.lpEnds}>
+              <Text style={[styles.lpEnd, { color: Colors.textMuted }]}>0</Text>
+              <Text style={[styles.lpEnd, { color: rank.color }]}>{rank.divisionLP} / 100 LP</Text>
+              <Text style={[styles.lpEnd, { color: Colors.textMuted }]}>100</Text>
+            </View>
           </View>
 
           {/* Next rank */}
           <View style={styles.nextRow}>
-            <Text style={[styles.nextLabel, { color: Colors.textMuted }]}>Next: </Text>
-            <Text style={[styles.nextLabel, { color: rank.color }]}>{nextLabel}</Text>
-            <Text style={[styles.nextLabel, { color: Colors.textMuted }]}>
-              {' '}· {100 - rank.divisionLP} LP needed
+            <Text style={[styles.nextText, { color: Colors.textMuted }]}>
+              Next rank: <Text style={{ color: rank.color }}>{nextLabel}</Text>
+            </Text>
+            <Text style={[styles.nextText, { color: Colors.textMuted }]}>
+              {lpNeeded} LP to go
             </Text>
           </View>
 
-          {/* Total LP */}
-          <View style={[styles.totalRow, { borderColor: rank.color + '33', backgroundColor: rank.bgColor }]}>
-            <Text style={[styles.totalLabel, { color: Colors.textMuted }]}>Total LP</Text>
-            <Text style={[styles.totalValue, { color: rank.color }]}>{rank.totalLP.toLocaleString()} LP</Text>
+          {/* Total LP — stylish panel */}
+          <View style={[styles.totalPanel, { borderColor: rank.color + '55' }]}>
+            <View style={styles.totalLeft}>
+              <Image source={{ uri: rank.icon }} style={styles.totalIcon} resizeMode="contain" />
+              <View>
+                <Text style={[styles.totalTier, { color: rank.color }]}>{rank.tier.toUpperCase()}</Text>
+                <Text style={[styles.totalSub, { color: Colors.textMuted }]}>SEASON STANDING</Text>
+              </View>
+            </View>
+            <View style={styles.totalRight}>
+              <Text style={[styles.totalLP, { color: rank.color, textShadowColor: rank.color }]}>
+                {rank.totalLP.toLocaleString()}
+              </Text>
+              <Text style={[styles.totalLPLabel, { color: rank.color + '99' }]}>TOTAL LP</Text>
+            </View>
           </View>
+
         </View>
       )}
     </View>
@@ -103,7 +120,7 @@ export function RankBadge({ lp, showProgress = false, size = 'md' }: Props) {
 function nextTierName(tier: string): string {
   const order = ['Iron', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Emerald', 'Diamond', 'Master', 'Grandmaster', 'Challenger'];
   const i = order.indexOf(tier);
-  return i < order.length - 1 ? `${order[i + 1]} IV` : 'Challenger';
+  return i < order.length - 1 ? order[i + 1] : 'Challenger';
 }
 
 function prevDiv(div: string): string {
@@ -119,28 +136,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs,
   },
   label: { fontWeight: '800', letterSpacing: 0.5 },
-  lpText: { fontSize: 11, fontWeight: '600' },
-  progressSection: { marginTop: Spacing.sm, gap: Spacing.xs },
+  divLP: { fontSize: 11, fontWeight: '700' },
+
+  section: { marginTop: Spacing.sm, gap: Spacing.sm },
+
+  trackWrap: { gap: 4 },
   track: {
-    height: 8, borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    height: 10, borderRadius: 5,
+    backgroundColor: 'rgba(255,255,255,0.07)',
     borderWidth: 1, overflow: 'hidden',
   },
   fill: {
-    height: '100%', borderRadius: 4,
+    height: '100%', borderRadius: 5,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8, shadowRadius: 6,
+    shadowOpacity: 1, shadowRadius: 8,
   },
-  lpRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  lpSmall: { fontSize: 9, fontWeight: '600' },
-  nextRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  nextLabel: { fontSize: 11, fontWeight: '600' },
-  totalRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginTop: Spacing.xs,
-    borderRadius: Radius.md, borderWidth: 1,
-    paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs,
+  lpEnds: { flexDirection: 'row', justifyContent: 'space-between' },
+  lpEnd: { fontSize: 10, fontWeight: '600' },
+
+  nextRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
-  totalLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
-  totalValue: { fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
+  nextText: { fontSize: 11, fontWeight: '600' },
+
+  // Total LP panel
+  totalPanel: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderRadius: Radius.lg, borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  totalLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  totalIcon: { width: 36, height: 36 },
+  totalTier: { fontSize: 13, fontWeight: '900', letterSpacing: 2 },
+  totalSub: { fontSize: 9, fontWeight: '700', letterSpacing: 1.5, marginTop: 1 },
+  totalRight: { alignItems: 'flex-end' },
+  totalLP: {
+    fontSize: 28, fontWeight: '900', letterSpacing: 1,
+    textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10,
+  },
+  totalLPLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 2, marginTop: 1 },
 });
