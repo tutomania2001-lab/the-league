@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { DEV_BYPASS } from '@/lib/dev';
 import { RootBackground } from '@/components/ui/RootBackground';
+import { FriendsPanel } from '@/components/ui/FriendsPanel';
 import { Colors } from '@/constants/theme';
 import { Session } from '@supabase/supabase-js';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
@@ -25,6 +26,7 @@ const AppTheme = {
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string>();
   const router = useRouter();
   const segments = useSegments();
 
@@ -35,6 +37,7 @@ export default function RootLayout() {
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      setUserId(session?.user?.id);
     });
     const linkSub = Linking.addEventListener('url', async ({ url }) => {
       if (url.includes('auth/callback') || url.includes('access_token') || url.includes('code=')) {
@@ -75,6 +78,8 @@ export default function RootLayout() {
             animation: 'fade',
           }}
         />
+        {/* Persistent friends panel — only shown when authenticated */}
+        {session && <FriendsPanel userId={userId} />}
         <StatusBar style="light" />
       </View>
     </ThemeProvider>
