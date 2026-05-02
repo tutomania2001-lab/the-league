@@ -131,7 +131,18 @@ export default function TeamScreen() {
   if (!team) return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <GlowText style={Typography.title}>⚔️ My Team</GlowText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <GlowText style={Typography.title}>⚔️ My Team</GlowText>
+          {step === 'room' && (
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={{ padding: 8 }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Text style={{ color: Colors.textMuted, fontSize: 13 }}>Cancel</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {step === 'room' ? (
           /* Step 1 — Wild Rift Room Code */
@@ -195,6 +206,7 @@ export default function TeamScreen() {
             {error && <Text style={{ color: Colors.error, fontSize: 12 }}>{error}</Text>}
             <Button label="Create Team" onPress={handleCreate} loading={creating} />
             <Button label="‹ Back" variant="ghost" onPress={() => { setStep('room'); setError(null); }} />
+            <Button label="Cancel" variant="ghost" onPress={() => { setStep('room'); setRoomCode(''); setRoomPassword(''); setTeamName(''); setError(null); router.back(); }} />
           </Card>
         )}
 
