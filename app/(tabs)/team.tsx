@@ -359,11 +359,13 @@ export default function TeamScreen() {
   const [editingCode, setEditingCode] = useState(false);
   const [newCode, setNewCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const { posts, loading: feedLoading, toggleLike, createPost, deletePost, uploadMedia, refresh: refreshFeed, fetchComments, addComment, deleteComment } = useTeamFeed(team?.id, userId);
+  const { posts, loading: feedLoading, toggleLike, createPost, deletePost, uploadMedia, refresh: refreshFeed, fetchComments, addComment, deleteComment, fetchNotifications, markNotificationsRead } = useTeamFeed(team?.id, userId);
   const [expandedComments, setExpandedComments] = useState<Record<string, PostComment[]>>({});
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [commentLoading, setCommentLoading] = useState<Record<string, boolean>>({});
   const [showNewPost, setShowNewPost] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [postCaption, setPostCaption] = useState('');
   const [postMedia, setPostMedia] = useState<{ uri: string; type: 'image' | 'video' } | null>(null);
   const [posting, setPosting] = useState(false);
@@ -827,10 +829,66 @@ export default function TeamScreen() {
         {/* FEED */}
         {activeTab === 'feed' && userId && team && (
           <View style={{ flex: 1 }}>
-            {/* New post button */}
-            <TouchableOpacity style={styles.newPostBtn} onPress={() => setShowNewPost(true)}>
-              <Text style={styles.newPostBtnText}>📸  Share a highlight...</Text>
-            </TouchableOpacity>
+            {/* Feed header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: Spacing.sm }}>
+              <TouchableOpacity style={[styles.newPostBtn, { flex: 1 }]} onPress={() => setShowNewPost(true)}>
+                <Text style={styles.newPostBtnText}>📸  Share a highlight...</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.notifBtn}
+                onPress={async () => {
+                  if (!userId) return;
+                  const notifs = await fetchNotifications(userId);
+                  setNotifications(notifs);
+                  setShowNotifications(true);
+                  markNotificationsRead(userId);
+                }}
+              >
+                <Text style={{ fontSize: 20 }}>🔔</Text>
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <View style={styles.notifBadge}>
+                    <Text style={styles.notifBadgeText}>{notifications.filter(n => !n.read).length}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Notifications modal */}
+            <Modal visible={showNotifications} animationType="slide" transparent onRequestClose={() => setShowNotifications(false)}>
+              <View style={styles.notifsBackdrop}>
+                <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={() => setShowNotifications(false)} />
+              </View>
+              <View style={styles.notifsSheet}>
+                <View style={styles.notifsHeader}>
+                  <Text style={styles.notifsTitle}>🔔 Notifications</Text>
+                  <TouchableOpacity onPress={() => setShowNotifications(false)}>
+                    <Text style={{ color: Colors.textMuted, fontSize: 16 }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView contentContainerStyle={{ padding: Spacing.sm, gap: Spacing.xs }}>
+                  {notifications.length === 0 ? (
+                    <View style={{ alignItems: 'center', padding: Spacing.xl }}>
+                      <Text style={{ fontSize: 32 }}>🔔</Text>
+                      <Text style={[Typography.body, { textAlign: 'center', marginTop: 8 }]}>No notifications yet</Text>
+                    </View>
+                  ) : notifications.map(n => (
+                    <View key={n.id} style={[styles.notifRow, !n.read && styles.notifRowUnread]}>
+                      {n.from_user?.avatar_url
+                        ? <Image source={{ uri: n.from_user.avatar_url }} style={styles.notifAvatar} />
+                        : <View style={[styles.notifAvatar, { backgroundColor: 'rgba(200,155,60,0.2)', alignItems: 'center', justifyContent: 'center' }]}>
+                            <Text style={{ color: Colors.gold, fontWeight: '800' }}>{(n.from_user?.riot_id ?? n.from_user?.username ?? '?')[0]}</Text>
+                          </View>
+                      }
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.notifContent}>{n.content}</Text>
+                        <Text style={styles.notifTime}>{timeAgo(n.created_at)}</Text>
+                      </View>
+                      {!n.read && <View style={styles.notifDot} />}
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            </Modal>
 
             {feedLoading ? (
               <ActivityIndicator color={Colors.gold} style={{ flex: 1 }} />
@@ -891,7 +949,7 @@ export default function TeamScreen() {
                         }
                       }}>
                         <Text style={styles.likeIcon}>💬</Text>
-                        <Text style={styles.likeCount}>{expandedComments[post.id]?.length ?? 'View'}</Text>
+                        <Text style={styles.likeCount}>{expandedComments[post.id]?.length ?? post.comments_count ?? 0}</Text>
                       </TouchableOpacity>
                     </View>
 
@@ -1174,8 +1232,21 @@ const styles = StyleSheet.create({
   bannerStatLabel: { fontSize: 9, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
   bannerStatDiv: { width: 1, height: 24, backgroundColor: Colors.gold + '33' },
   // Feed styles
-  newPostBtn: { margin: Spacing.sm, padding: Spacing.md, backgroundColor: 'rgba(10,8,3,0.8)', borderRadius: 10, borderWidth: 1, borderColor: Colors.gold + '44', flexDirection: 'row', alignItems: 'center' },
+  newPostBtn: { margin: Spacing.sm, marginRight: 4, padding: Spacing.md, backgroundColor: 'rgba(10,8,3,0.8)', borderRadius: 10, borderWidth: 1, borderColor: Colors.gold + '44', flexDirection: 'row', alignItems: 'center' },
   newPostBtnText: { color: Colors.textMuted, fontSize: 13 },
+  notifBtn: { position: 'relative', padding: 10, marginRight: 4 },
+  notifBadge: { position: 'absolute', top: 4, right: 4, backgroundColor: Colors.error, borderRadius: 8, minWidth: 16, height: 16, paddingHorizontal: 3, alignItems: 'center', justifyContent: 'center' },
+  notifBadgeText: { color: '#fff', fontSize: 9, fontWeight: '900' },
+  notifsBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 99 },
+  notifsSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(10,8,3,0.99)', borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 2, borderTopColor: Colors.gold + '55', maxHeight: '70%', zIndex: 100 },
+  notifsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.gold + '33' },
+  notifsTitle: { fontSize: 16, fontWeight: '800', color: Colors.gold },
+  notifRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.sm, borderRadius: 10, backgroundColor: 'rgba(20,14,0,0.6)' },
+  notifRowUnread: { backgroundColor: 'rgba(200,155,60,0.08)', borderWidth: 1, borderColor: Colors.gold + '22' },
+  notifAvatar: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: Colors.gold + '44' },
+  notifContent: { fontSize: 12, color: Colors.text, lineHeight: 16 },
+  notifTime: { fontSize: 10, color: Colors.textMuted, marginTop: 2 },
+  notifDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.gold },
   postCard: { backgroundColor: 'rgba(10,8,3,0.85)', borderBottomWidth: 1, borderBottomColor: Colors.gold + '22' },
   postHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.sm },
   postAvatar: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: Colors.gold + '44' },

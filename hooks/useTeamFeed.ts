@@ -147,12 +147,47 @@ export function useTeamFeed(teamId: string | undefined, myId: string | undefined
       .insert({ post_id: postId, user_id: userId, content: content.trim() })
       .select('*, author:users(riot_id, username, avatar_url)').single();
     if (error) return { error: error.message };
+
+    // Update local comments_count optimistically
+    setPosts(prev => prev.map(p => p.id === postId
+      ? { ...p, comments_count: (p.comments_count ?? 0) + 1 }
+      : p
+    ));
+
+    // Notify post author (skip if commenting on own post)
+    const { data: post } = await supabase.from('team_posts').select('user_id, team_id').eq('id', postId).single();
+    if (post && post.user_id !== userId) {
+      const commenterName = data?.author?.riot_id ?? data?.author?.username ?? 'Someone';
+      await supabase.from('team_notifications').insert({
+        user_id: post.user_id,
+        from_user_id: userId,
+        post_id: postId,
+        team_id: post.team_id,
+        type: 'comment',
+        content: `${commenterName} commented: "${content.trim().slice(0, 50)}${content.length > 50 ? '…' : ''}"`,
+      });
+    }
+
     return { error: null, comment: data as PostComment };
+  }
+
+  async function fetchNotifications(userId: string) {
+    const { data } = await supabase
+      .from('team_notifications')
+      .select('*, from_user:users!team_notifications_from_user_id_fkey(riot_id, username, avatar_url)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(30);
+    return data ?? [];
+  }
+
+  async function markNotificationsRead(userId: string) {
+    await supabase.from('team_notifications').update({ read: true }).eq('user_id', userId).eq('read', false);
   }
 
   async function deleteComment(commentId: string) {
     await supabase.from('team_post_comments').delete().eq('id', commentId);
   }
 
-  return { posts, loading, toggleLike, createPost, deletePost, uploadMedia, fetchComments, addComment, deleteComment, refresh: fetchPosts };
+  return { posts, loading, toggleLike, createPost, deletePost, uploadMedia, fetchComments, addComment, deleteComment, fetchNotifications, markNotificationsRead, refresh: fetchPosts };
 }
