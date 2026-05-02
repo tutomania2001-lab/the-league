@@ -5,18 +5,34 @@ import { useEffect, useState } from 'react';
 export function useTeam(userId: string | undefined) {
   const [team, setTeam] = useState<TeamRow | null>(null);
   const [members, setMembers] = useState<TeamMemberRow[]>([]);
+  const [pendingMembers, setPendingMembers] = useState<TeamMemberRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function fetchTeam(uid: string) {
+    // Find membership (active only — pending members haven't been approved yet)
     const { data: membership } = await supabase
-      .from('team_members').select('team_id').eq('user_id', uid).maybeSingle();
-    if (!membership) { setLoading(false); return; }
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', uid)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (!membership) {
+      // Check if they're pending somewhere
+      setLoading(false);
+      return;
+    }
+
     const [teamRes, membersRes] = await Promise.all([
       supabase.from('teams').select('*').eq('id', membership.team_id).single(),
       supabase.from('team_members').select('*').eq('team_id', membership.team_id),
     ]);
+
     if (teamRes.data) setTeam(teamRes.data);
-    if (membersRes.data) setMembers(membersRes.data);
+    if (membersRes.data) {
+      setMembers(membersRes.data.filter((m: any) => m.status === 'active' || !m.status));
+      setPendingMembers(membersRes.data.filter((m: any) => m.status === 'pending'));
+    }
     setLoading(false);
   }
 
@@ -30,33 +46,48 @@ export function useTeam(userId: string | undefined) {
     const { data, error } = await supabase
       .from('teams')
       .insert({
-        name,
-        captain_id: userId,
+        name, captain_id: userId,
         ...(roomCode ? { room_code: roomCode.toUpperCase() } : {}),
         ...(roomPassword ? { room_password: roomPassword } : {}),
       })
-      .select()
-      .single();
+      .select().single();
     if (error) return { error: error.message };
-    await supabase.from('team_members').insert({ team_id: data.id, user_id: userId });
+    await supabase.from('team_members').insert({ team_id: data.id, user_id: userId, status: 'active' });
     setTeam(data);
-    setMembers([{ team_id: data.id, user_id: userId, joined_at: new Date().toISOString() }]);
+    setMembers([{ team_id: data.id, user_id: userId, joined_at: new Date().toISOString() } as any]);
     return { error: null, team: data };
   }
 
+  // Join via invite code — adds as PENDING (captain must approve)
   async function joinTeam(inviteCode: string) {
     if (!userId) return { error: 'Not authenticated' };
     const code = inviteCode.trim().toUpperCase();
-    // Search by invite_code — the clan's unique join code (not the Wild Rift room code)
     const { data: found, error } = await supabase
       .from('teams').select('*').eq('invite_code', code).single();
     if (error || !found) return { error: 'Clan not found — check the invite code' };
     const { error: joinError } = await supabase
-      .from('team_members').insert({ team_id: found.id, user_id: userId });
+      .from('team_members')
+      .insert({ team_id: found.id, user_id: userId, status: 'pending' });
     if (joinError) return { error: joinError.message };
-    setTeam(found);
-    await fetchTeam(userId);
-    return { error: null };
+    return { error: null, pendingApproval: true };
+  }
+
+  // Captain approves a pending member
+  async function approveMember(memberId: string) {
+    if (!team) return;
+    await supabase.from('team_members')
+      .update({ status: 'active' })
+      .eq('team_id', team.id)
+      .eq('user_id', memberId);
+    if (userId) fetchTeam(userId);
+  }
+
+  // Captain rejects / any member kicks
+  async function removeMember(memberId: string) {
+    if (!team) return;
+    await supabase.from('team_members').delete()
+      .eq('team_id', team.id).eq('user_id', memberId);
+    if (userId) fetchTeam(userId);
   }
 
   async function leaveTeam() {
@@ -64,11 +95,12 @@ export function useTeam(userId: string | undefined) {
     await supabase.from('team_members').delete().eq('team_id', team.id).eq('user_id', userId);
     setTeam(null);
     setMembers([]);
+    setPendingMembers([]);
   }
 
   async function refreshTeam() {
     if (userId) await fetchTeam(userId);
   }
 
-  return { team, members, loading, createTeam, joinTeam, leaveTeam, refreshTeam };
+  return { team, members, pendingMembers, loading, createTeam, joinTeam, approveMember, removeMember, leaveTeam, refreshTeam };
 }

@@ -326,7 +326,7 @@ function TeamChat({ teamId, myId, memberProfiles }: { teamId: string; myId: stri
 export default function TeamScreen() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>();
-  const { team, members, loading, createTeam, leaveTeam, refreshTeam } = useTeam(userId);
+  const { team, members, pendingMembers, loading, createTeam, leaveTeam, refreshTeam, approveMember, removeMember } = useTeam(userId);
   const { teamBattles } = useTournamentList();
   const openTournaments = teamBattles.filter(t => t.status === 'open');
   const [memberProfiles, setMemberProfiles] = useState<Record<string, any>>({});
@@ -563,7 +563,7 @@ export default function TeamScreen() {
                       <Text style={[styles.roleText, { color: roleCfg.color }]}>{roleCfg.label}</Text>
                     </View>
                     {isCaptain && m.user_id !== userId && (
-                      <TouchableOpacity style={styles.kickBtn} onPress={async () => { await supabase.from('team_members').delete().eq('team_id', team.id).eq('user_id', m.user_id); refreshTeam(); }}>
+                      <TouchableOpacity style={styles.kickBtn} onPress={() => removeMember(m.user_id)}>
                         <Text style={{ color: Colors.error, fontSize: 11 }}>Kick</Text>
                       </TouchableOpacity>
                     )}
@@ -577,6 +577,44 @@ export default function TeamScreen() {
                 </View>
               ))}
             </View>
+            {/* Pending approvals — captain only */}
+            {isCaptain && pendingMembers.length > 0 && (
+              <View style={[styles.sectionCard, { borderColor: Colors.warning + '55', marginTop: Spacing.sm }]}>
+                <Text style={[styles.sectionTitle, { color: Colors.warning }]}>
+                  ⏳ Pending Approval ({pendingMembers.length})
+                </Text>
+                {pendingMembers.map(m => {
+                  const p = memberProfiles[m.user_id];
+                  return (
+                    <View key={m.user_id} style={styles.memberRow}>
+                      {p?.avatar_url
+                        ? <Image source={{ uri: p.avatar_url }} style={styles.memberAvatar} />
+                        : <View style={[styles.memberAvatar, { backgroundColor: 'rgba(255,170,0,0.15)', alignItems:'center', justifyContent:'center' }]}>
+                            <Text style={{ color: Colors.warning, fontSize: 16, fontWeight: '800' }}>{(p?.riot_id ?? p?.username ?? '?')[0]}</Text>
+                          </View>
+                      }
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.memberName}>{p?.riot_id ?? p?.username ?? 'Player'}</Text>
+                        <Text style={{ fontSize: 10, color: Colors.warning }}>Wants to join</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, backgroundColor: 'rgba(0,255,136,0.15)', borderWidth: 1, borderColor: Colors.success + '55', marginRight: 6 }}
+                        onPress={() => approveMember(m.user_id)}
+                      >
+                        <Text style={{ color: Colors.success, fontWeight: '800', fontSize: 12 }}>✓</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, backgroundColor: 'rgba(255,68,68,0.1)', borderWidth: 1, borderColor: Colors.error + '44' }}
+                        onPress={() => removeMember(m.user_id)}
+                      >
+                        <Text style={{ color: Colors.error, fontWeight: '800', fontSize: 12 }}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
             <Button label="📨 Invite Players" variant="secondary" onPress={() => router.push('/team/invite')} style={{ borderColor: Colors.gold + '88', marginTop: Spacing.sm }} />
             <Button label="Leave Clan" variant="ghost" onPress={leaveTeam} style={{ borderColor: Colors.error + '44', marginTop: Spacing.xs }} />
           </ScrollView>
