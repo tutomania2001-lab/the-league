@@ -1,33 +1,59 @@
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { GlowText } from '@/components/ui/GlowText';
+import { PulseGlow } from '@/components/ui/PulseGlow';
+import { AnimatedSplash } from '@/components/ui/AnimatedSplash';
 import { Colors, Spacing, Typography } from '@/constants/theme';
-import { FEATURED_CHAMPIONS, Splashes } from '@/constants/champions';
-import { useState } from 'react';
+import { FEATURED_CHAMPIONS } from '@/constants/champions';
+import { useEffect, useRef, useState } from 'react';
 import {
-  Dimensions, FlatList, Image, ImageBackground,
+  Animated, Dimensions, FlatList, Image,
   ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
+function AnimatedChampIcon({ item, isActive, onPress }: { item: typeof FEATURED_CHAMPIONS[0]; isActive: boolean; onPress: () => void }) {
+  const scale = useRef(new Animated.Value(isActive ? 1.1 : 1)).current;
+  const borderOpacity = useRef(new Animated.Value(isActive ? 1 : 0.3)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: isActive ? 1.15 : 1, useNativeDriver: true, friction: 6 }),
+      Animated.timing(borderOpacity, { toValue: isActive ? 1 : 0.3, duration: 200, useNativeDriver: true }),
+    ]).start();
+  }, [isActive]);
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+      <Animated.View style={[styles.champIcon, { transform: [{ scale }], borderColor: isActive ? Colors.accent : Colors.accentBorder }]}>
+        <Image source={{ uri: item.icon }} style={styles.champImg} />
+      </Animated.View>
+      {isActive && (
+        <Text style={styles.champName}>{item.name}</Text>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 export default function HomeScreen() {
   const [activeChamp, setActiveChamp] = useState(FEATURED_CHAMPIONS[0]);
 
   return (
     <View style={styles.container}>
-      {/* Hero champion splash */}
-      <ImageBackground source={{ uri: activeChamp.splash }} style={styles.hero} resizeMode="cover">
-        <View style={styles.heroOverlay} />
+      {/* Animated hero */}
+      <AnimatedSplash uri={activeChamp.splash} style={styles.hero} overlayOpacity={0.45}>
         <SafeAreaView>
           <View style={styles.heroContent}>
             <Text style={styles.heroLabel}>WILD RIFT TOURNAMENT</Text>
-            <GlowText style={styles.heroTitle} intensity="high">◈ THE LEAGUE</GlowText>
+            <PulseGlow duration={2200} minOpacity={0.75}>
+              <GlowText style={styles.heroTitle} intensity="high">◈ THE LEAGUE</GlowText>
+            </PulseGlow>
             <Badge variant="open" />
           </View>
         </SafeAreaView>
-      </ImageBackground>
+      </AnimatedSplash>
 
       {/* Champion selector strip */}
       <View style={styles.champStrip}>
@@ -38,14 +64,11 @@ export default function HomeScreen() {
           keyExtractor={c => c.name}
           contentContainerStyle={{ paddingHorizontal: Spacing.md, gap: Spacing.sm }}
           renderItem={({ item }) => (
-            <TouchableOpacity onPress={() => setActiveChamp(item)} activeOpacity={0.8}>
-              <View style={[styles.champIcon, activeChamp.name === item.name && styles.champIconActive]}>
-                <Image source={{ uri: item.icon }} style={styles.champImg} />
-              </View>
-              {activeChamp.name === item.name && (
-                <Text style={styles.champName}>{item.name}</Text>
-              )}
-            </TouchableOpacity>
+            <AnimatedChampIcon
+              item={item}
+              isActive={activeChamp.name === item.name}
+              onPress={() => setActiveChamp(item)}
+            />
           )}
         />
       </View>

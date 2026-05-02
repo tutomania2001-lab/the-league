@@ -1,13 +1,15 @@
 import { Button } from '@/components/ui/Button';
 import { GlowText } from '@/components/ui/GlowText';
 import { Input } from '@/components/ui/Input';
+import { AnimatedSplash } from '@/components/ui/AnimatedSplash';
+import { PulseGlow } from '@/components/ui/PulseGlow';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { Splashes } from '@/constants/champions';
 import { supabase } from '@/lib/supabase';
 import { DEV_BYPASS } from '@/lib/dev';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ImageBackground, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LogInScreen() {
@@ -31,8 +33,7 @@ export default function LogInScreen() {
   }
 
   return (
-    <ImageBackground source={{ uri: Splashes.Jinx }} style={styles.bg} resizeMode="cover">
-      <View style={styles.overlay} />
+    <AnimatedSplash uri={Splashes.Jinx} style={styles.bg}>
       <SafeAreaView style={styles.safe}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -40,7 +41,9 @@ export default function LogInScreen() {
             {/* Logo */}
             <View style={styles.logoBlock}>
               <Text style={styles.logoTop}>WILD RIFT</Text>
-              <GlowText style={styles.logoMain} intensity="high">◈ THE LEAGUE</GlowText>
+              <PulseGlow duration={2500} minOpacity={0.7}>
+                <GlowText style={styles.logoMain} intensity="high">◈ THE LEAGUE</GlowText>
+              </PulseGlow>
               <Text style={styles.logoSub}>Compete. Win. Dominate.</Text>
             </View>
 
@@ -90,7 +93,7 @@ export default function LogInScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </ImageBackground>
+    </AnimatedSplash>
   );
 }
 

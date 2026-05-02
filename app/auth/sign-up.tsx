@@ -1,12 +1,14 @@
 import { Button } from '@/components/ui/Button';
 import { GlowText } from '@/components/ui/GlowText';
 import { Input } from '@/components/ui/Input';
+import { AnimatedSplash } from '@/components/ui/AnimatedSplash';
+import { PulseGlow } from '@/components/ui/PulseGlow';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { Splashes } from '@/constants/champions';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ImageBackground, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SignUpScreen() {
@@ -29,13 +31,14 @@ export default function SignUpScreen() {
   }
 
   return (
-    <ImageBackground source={{ uri: Splashes.Ahri }} style={styles.bg} resizeMode="cover">
-      <View style={styles.overlay} />
+    <AnimatedSplash uri={Splashes.Ahri} style={styles.bg}>
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
             <View style={styles.logoBlock}>
-              <GlowText style={styles.logoMain} intensity="high">◈ Join The League</GlowText>
+              <PulseGlow duration={2000} minOpacity={0.6}>
+                <GlowText style={styles.logoMain} intensity="high">◈ Join The League</GlowText>
+              </PulseGlow>
               <Text style={styles.logoSub}>Create your account to compete</Text>
             </View>
             <View style={styles.card}>
@@ -50,7 +53,7 @@ export default function SignUpScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </ImageBackground>
+    </AnimatedSplash>
   );
 }
 
