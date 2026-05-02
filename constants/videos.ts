@@ -1,14 +1,16 @@
 // Official Riot/Wild Rift YouTube video IDs
 // All from Riot Games' official YouTube channels
 
+// To find a YouTube video ID: open the video on YouTube, copy the part after "?v="
+// e.g. youtube.com/watch?v=es0EKHHXWWU → ID is "es0EKHHXWWU"
 export const ChampionVideoIds = {
-  login:       'es0EKHHXWWU', // Wild Rift — Season Cinematic (the one you shared)
-  signUp:      'lX7HFnMgMT8', // Wild Rift — Ahri Champion Spotlight
-  home:        'BGtROJeMov8', // Wild Rift — Season 2023 Cinematic
-  tournaments: 'Cjf_uC7B-6k', // LoL — Worlds 2023 Opening Ceremony (competitive energy)
-  team:        'qDqkMoGxrqo', // Wild Rift — Vi Champion Spotlight
-  wallet:      'n6QEYcGRStI', // LoL — Twisted Fate cinematic
-  profile:     'AkAlKpKzBvg', // Wild Rift — Akali Champion Spotlight
+  login:       'es0EKHHXWWU', // Wild Rift Season Cinematic — swap any of these with your preferred video IDs
+  signUp:      'es0EKHHXWWU',
+  home:        'es0EKHHXWWU',
+  tournaments: 'es0EKHHXWWU',
+  team:        'es0EKHHXWWU',
+  wallet:      'es0EKHHXWWU',
+  profile:     'es0EKHHXWWU',
 };
 
 // Fallback splash images from Data Dragon (shown while video loads)

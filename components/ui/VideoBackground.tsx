@@ -22,6 +22,7 @@ export function VideoBackground({
   overlayOpacity = 0.55,
 }: Props) {
   const [videoReady, setVideoReady] = useState(false);
+  const [videoError, setVideoError] = useState(false);
   const videoOpacity = useRef(new Animated.Value(0)).current;
 
   function onReady() {
@@ -33,18 +34,31 @@ export function VideoBackground({
     }).start();
   }
 
+  function onError() {
+    setVideoError(true);
+  }
+
+  // If video fails just show animated splash
+  if (videoError) {
+    return (
+      <AnimatedSplash uri={fallbackImageUri} style={style} overlayOpacity={overlayOpacity}>
+        {children}
+      </AnimatedSplash>
+    );
+  }
+
   return (
     <View style={[styles.container, style]}>
-      {/* Animated splash always visible underneath as fallback */}
+      {/* Animated splash always visible underneath */}
       <AnimatedSplash
         uri={fallbackImageUri}
         style={StyleSheet.absoluteFillObject}
-        overlayOpacity={0}
+        overlayOpacity={videoReady ? 0 : overlayOpacity}
       >
         <View />
       </AnimatedSplash>
 
-      {/* YouTube video fades in once ready — scaled up to fill screen, controls hidden */}
+      {/* YouTube video fades in once ready */}
       <Animated.View style={[styles.videoWrap, { opacity: videoOpacity }]}>
         <YoutubePlayer
           height={height * 1.2}
@@ -53,15 +67,22 @@ export function VideoBackground({
           play
           mute
           loop
-          webViewStyle={{ opacity: 0.99 }}
+          webViewStyle={{ opacity: 0.99, backgroundColor: 'transparent' }}
+          webViewProps={{
+            allowsInlineMediaPlayback: true,
+            mediaPlaybackRequiresUserAction: false,
+            userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+          }}
           initialPlayerParams={{
             controls: false,
             showClosedCaptions: false,
             modestbranding: true,
             rel: false,
             fs: false,
+            iv_load_policy: 3,
           }}
           onReady={onReady}
+          onError={onError}
         />
       </Animated.View>
 
