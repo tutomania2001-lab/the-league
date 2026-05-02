@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { DEV_BYPASS } from '@/lib/dev';
 import { LoopingVideo } from '@/components/ui/LoopingVideo';
 import { Session } from '@supabase/supabase-js';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import 'react-native-reanimated';
@@ -61,14 +61,18 @@ export default function RootLayout() {
 
   return (
     <View style={styles.root}>
-      {/* Single global video background — plays once, persists across all screens */}
+      {/* Single global video — absolute behind everything */}
       <LoopingVideo style={StyleSheet.absoluteFillObject} />
-      {/* Global dark overlay */}
-      <View style={styles.overlay} />
-      {/* App screens render on top */}
-      <View style={styles.content}>
-        <Slot />
-      </View>
+      {/* Dark overlay */}
+      <View style={styles.overlay} pointerEvents="none" />
+      {/* Stack with transparent screen backgrounds so video shows through */}
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: 'transparent' },
+          animation: 'fade',
+        }}
+      />
       <StatusBar style="light" />
     </View>
   );
@@ -77,5 +81,4 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(7,11,20,0.58)' },
-  content: { flex: 1 },
 });
