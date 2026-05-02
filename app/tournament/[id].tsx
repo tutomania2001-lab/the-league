@@ -100,8 +100,11 @@ export default function TournamentDetailScreen() {
               if (cancelError) throw cancelError;
 
               setCancelling(false);
-              Alert.alert('Cancelled', `Tournament cancelled. ${entryTxns.length} players refunded 90%.`);
-              router.replace('/(tabs)/tournaments');
+              Alert.alert(
+                'Tournament Cancelled',
+                `${entryTxns.length} player${entryTxns.length !== 1 ? 's' : ''} refunded 90% of their entry fee.`,
+                [{ text: 'OK', onPress: () => router.back() }]
+              );
             } catch (e: any) {
               setCancelling(false);
               Alert.alert('Error', e?.message ?? 'Failed to cancel tournament. Try again.');

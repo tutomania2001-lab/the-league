@@ -7,7 +7,9 @@ export function useTournamentList() {
   const [loading, setLoading] = useState(true);
 
   async function fetch() {
-    const { data } = await supabase.from('tournaments').select('*').order('created_at', { ascending: false });
+    const { data } = await supabase.from('tournaments').select('*')
+      .neq('status', 'cancelled')
+      .order('created_at', { ascending: false });
     if (data) setTournaments(data);
     setLoading(false);
   }
