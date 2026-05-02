@@ -32,8 +32,8 @@ function getRoleLabel(captainId: string, userId: string) {
 }
 
 // ── Team Banner ────────────────────────────────────────────
-function TeamBanner({ team, memberCount, wins, onInvite }: {
-  team: any; memberCount: number; wins: number; onInvite: () => void;
+function TeamBanner({ team, memberCount, wins }: {
+  team: any; memberCount: number; wins: number;
 }) {
   const level = Math.floor(wins / 3) + 1;
   const tag = team.name.slice(0, 4).toUpperCase();
@@ -95,10 +95,6 @@ function TeamBanner({ team, memberCount, wins, onInvite }: {
         </View>
       </View>
 
-      {/* Invite button */}
-      <TouchableOpacity style={styles.inviteBtn} onPress={onInvite}>
-        <Text style={styles.inviteBtnText}>+ Invite</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -443,7 +439,7 @@ export default function TeamScreen() {
   // ── Clan Hub ─────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe}>
-      <TeamBanner team={team} memberCount={members.length} wins={wins} onInvite={() => router.push('/team/invite')} />
+      <TeamBanner team={team} memberCount={members.length} wins={wins} />
 
       {/* Tab bar */}
       <View style={styles.tabBar}>
@@ -504,16 +500,25 @@ export default function TeamScreen() {
 
             {/* Clan Invite Code — visible to all members */}
             <View style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>🔗 Clan Invite Code</Text>
-              <Text style={[Typography.body, { fontSize: 11, marginBottom: Spacing.xs }]}>
-                Share this with friends to invite them to your clan
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>🔗 Clan Invite Code</Text>
+                <TouchableOpacity onPress={() => setShowInfo(true)}>
+                  <Text style={{ color: Colors.textMuted, fontSize: 12 }}>ℹ️</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={[Typography.body, { fontSize: 11, marginBottom: Spacing.sm }]}>
+                Share with friends — they paste it in My Team → 📨 Invite / Join
               </Text>
               <TouchableOpacity
                 style={styles.roomCodeBlock}
-                onPress={async () => { await Clipboard.setStringAsync(team.invite_code); }}
+                onPress={async () => { await Clipboard.setStringAsync(team.invite_code); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
               >
-                <Text style={[styles.codeText, { fontSize: 18, letterSpacing: 4 }]}>{team.invite_code}</Text>
-                <Text style={styles.copyText}>📋 Copy</Text>
+                <Text style={styles.codeText}>{team.invite_code}</Text>
+                <View style={[styles.copyChip, copied && { backgroundColor: 'rgba(0,255,136,0.15)', borderColor: Colors.success + '55' }]}>
+                  <Text style={{ color: copied ? Colors.success : Colors.gold, fontSize: 11, fontWeight: '700' }}>
+                    {copied ? '✓ Copied' : '📋 Copy'}
+                  </Text>
+                </View>
               </TouchableOpacity>
             </View>
 
