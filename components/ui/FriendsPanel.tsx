@@ -1,5 +1,5 @@
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { useFriends } from '@/hooks/useFriends';
+import { useFriends, useRecentPlayers } from '@/hooks/useFriends';
 import { supabase } from '@/lib/supabase';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -15,9 +15,10 @@ type Props = { userId: string | undefined };
 
 export function FriendsPanel({ userId }: Props) {
   const insets = useSafeAreaInsets();
-  const { friends, incoming, loading, accept, decline, remove } = useFriends(userId);
+  const { friends, incoming, loading, accept, decline, remove, sendRequest } = useFriends(userId);
+  const { recentPlayers } = useRecentPlayers(userId);
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<'friends' | 'requests'>('friends');
+  const [tab, setTab] = useState<'friends' | 'requests' | 'recent'>('friends');
   const [refreshing, setRefreshing] = useState(false);
   const slideX = useRef(new Animated.Value(PANEL_W)).current;
   const backdropOp = useRef(new Animated.Value(0)).current;
@@ -49,7 +50,7 @@ export function FriendsPanel({ userId }: Props) {
   }
 
   const pendingCount = incoming.length;
-  const listData = tab === 'friends' ? friends : incoming;
+  const listData = tab === 'friends' ? friends : tab === 'requests' ? incoming : [];
 
   return (
     <>
@@ -79,21 +80,19 @@ export function FriendsPanel({ userId }: Props) {
 
         {/* Tabs */}
         <View style={styles.tabs}>
-          <TouchableOpacity
-            style={[styles.tab, tab === 'friends' && styles.tabActive]}
-            onPress={() => setTab('friends')}
-          >
-            <Text style={[styles.tabText, tab === 'friends' && styles.tabTextActive]}>
-              All ({friends.length})
-            </Text>
+          <TouchableOpacity style={[styles.tab, tab === 'friends' && styles.tabActive]} onPress={() => setTab('friends')}>
+            <Text style={[styles.tabText, tab === 'friends' && styles.tabTextActive]}>All ({friends.length})</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, tab === 'requests' && styles.tabActive]}
-            onPress={() => setTab('requests')}
-          >
-            <Text style={[styles.tabText, tab === 'requests' && styles.tabTextActive]}>
-              Requests{pendingCount > 0 ? ` (${pendingCount})` : ''}
-            </Text>
+          <TouchableOpacity style={[styles.tab, tab === 'recent' && styles.tabActive]} onPress={() => setTab('recent')}>
+            <Text style={[styles.tabText, tab === 'recent' && styles.tabTextActive]}>Recent</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.tab, tab === 'requests' && styles.tabActive]} onPress={() => setTab('requests')}>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={[styles.tabText, tab === 'requests' && styles.tabTextActive]}>Req</Text>
+              {pendingCount > 0 && (
+                <View style={styles.tabBadge}><Text style={styles.tabBadgeText}>{pendingCount}</Text></View>
+              )}
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -108,7 +107,39 @@ export function FriendsPanel({ userId }: Props) {
             />
           }
         >
-          {listData.length === 0 ? (
+          {/* Recent tab */}
+          {tab === 'recent' ? (
+            recentPlayers.length === 0 ? (
+              <View style={styles.empty}>
+                <Text style={{ fontSize: 28, marginBottom: 6 }}>⚔️</Text>
+                <Text style={[Typography.body, { textAlign: 'center', fontSize: 12 }]}>No recent matches yet</Text>
+                <Text style={[Typography.body, { textAlign: 'center', fontSize: 11, marginTop: 4, color: Colors.textDim }]}>
+                  Players you face in tournaments appear here
+                </Text>
+              </View>
+            ) : (
+              recentPlayers.map(p => (
+                <View key={p.id} style={styles.friendRow}>
+                  {p.avatar_url ? (
+                    <Image source={{ uri: p.avatar_url }} style={styles.avatar} />
+                  ) : (
+                    <View style={styles.avatarFallback}>
+                      <Text style={styles.avatarLetter}>{(p.riot_id ?? p.username ?? 'S')[0].toUpperCase()}</Text>
+                    </View>
+                  )}
+                  <View style={styles.friendInfo}>
+                    <Text style={styles.friendName} numberOfLines={1}>{p.riot_id ?? p.username}</Text>
+                    <Text style={styles.friendStatus}>⚔️ Recent opponent</Text>
+                  </View>
+                  {!friends.some(f => f.profile?.id === p.id) && (
+                    <TouchableOpacity style={styles.addFriendBtn} onPress={() => p.riot_id && sendRequest(p.riot_id)}>
+                      <Text style={styles.addFriendText}>+ Add</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))
+            )
+          ) : listData.length === 0 ? (
             <View style={styles.empty}>
               <Text style={{ fontSize: 28, marginBottom: 6 }}>
                 {tab === 'friends' ? '🎮' : '📭'}
@@ -120,7 +151,6 @@ export function FriendsPanel({ userId }: Props) {
           ) : (
             listData.map(f => (
               <View key={f.id} style={styles.friendRow}>
-                {/* Avatar */}
                 {f.profile?.avatar_url ? (
                   <Image source={{ uri: f.profile.avatar_url }} style={styles.avatar} />
                 ) : (
@@ -130,18 +160,14 @@ export function FriendsPanel({ userId }: Props) {
                     </Text>
                   </View>
                 )}
-
-                {/* Info */}
                 <View style={styles.friendInfo}>
                   <Text style={styles.friendName} numberOfLines={1}>
                     {f.profile?.riot_id ?? f.profile?.username ?? 'Player'}
                   </Text>
                   <Text style={styles.friendStatus}>
-                    {tab === 'requests' ? '⏳ Pending' : '● Online'}
+                    {tab === 'requests' ? '⏳ Pending' : '● Friend'}
                   </Text>
                 </View>
-
-                {/* Actions */}
                 {tab === 'requests' ? (
                   <View style={styles.reqActions}>
                     <TouchableOpacity style={styles.acceptBtn} onPress={() => accept(f.id)}>
@@ -214,10 +240,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.accentBorder,
   },
-  tab: { flex: 1, paddingVertical: Spacing.sm, alignItems: 'center' },
+  tab: { flex: 1, paddingVertical: Spacing.sm, alignItems: 'center', position: 'relative' },
   tabActive: { borderBottomWidth: 2, borderBottomColor: Colors.accent },
   tabText: { fontSize: 11, fontWeight: '600', color: Colors.textMuted },
   tabTextActive: { color: Colors.accent },
+  tabBadge: {
+    position: 'absolute', top: -4, right: -4,
+    backgroundColor: Colors.accent, borderRadius: 8,
+    minWidth: 14, height: 14, paddingHorizontal: 2,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tabBadgeText: { color: Colors.background, fontSize: 8, fontWeight: '900' },
 
   list: { padding: Spacing.sm, gap: Spacing.xs, paddingBottom: Spacing.xxl },
   empty: { alignItems: 'center', paddingTop: Spacing.xxl },
@@ -252,6 +285,12 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   moreBtn: { padding: 4 },
+  addFriendBtn: {
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 6, borderWidth: 1, borderColor: Colors.accent + '66',
+    backgroundColor: Colors.accentDim,
+  },
+  addFriendText: { color: Colors.accent, fontSize: 10, fontWeight: '700' },
 
   // Floating tab
   floatTab: {
