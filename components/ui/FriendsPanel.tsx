@@ -7,8 +7,9 @@ import { StatusDot, UserStatus, STATUS_CONFIG } from '@/components/ui/StatusDot'
 import { MiniProfile, MiniProfileUser } from '@/components/ui/MiniProfile';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, Easing, Image, RefreshControl,
-  ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, Animated, Dimensions, Easing, Image,
+  RefreshControl, ScrollView, StyleSheet, Text,
+  TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -37,6 +38,11 @@ export function FriendsPanel({ userId: userIdProp }: Props) {
   const { incoming: teamInvites, sendInvite, accept: acceptInvite, decline: declineInvite } = useTeamInvites(userId);
   const { team, members } = useTeam(userId);
   const [open, setOpen] = useState(false);
+  const [addingFriend, setAddingFriend] = useState(false);
+  const [addRiotId, setAddRiotId] = useState('');
+  const [addLoading, setAddLoading] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addSuccess, setAddSuccess] = useState(false);
   const [tab, setTab] = useState<'friends' | 'recent' | 'requests'>('friends');
   const isCaptain = team?.captain_id === userId;
   const hasTeamSpace = members.length < 5;
@@ -67,6 +73,17 @@ export function FriendsPanel({ userId: userIdProp }: Props) {
       Animated.timing(slideX, { toValue: PANEL_W, duration: 250, useNativeDriver: true, easing: Easing.in(Easing.cubic) }),
       Animated.timing(backdropOp, { toValue: 0, duration: 250, useNativeDriver: true }),
     ]).start();
+  }
+
+  async function handleAddFriend() {
+    if (!addRiotId.trim()) { setAddError('Enter a Riot ID'); return; }
+    setAddLoading(true); setAddError(null); setAddSuccess(false);
+    const { error } = await sendRequest(addRiotId.trim());
+    setAddLoading(false);
+    if (error) { setAddError(error); return; }
+    setAddSuccess(true);
+    setAddRiotId('');
+    setTimeout(() => { setAddSuccess(false); setAddingFriend(false); }, 2000);
   }
 
   function openMiniProfile(user: MiniProfileUser, isFriend: boolean) {
@@ -172,10 +189,48 @@ export function FriendsPanel({ userId: userIdProp }: Props) {
             <StatusDot status="online" size={7} />
             <Text style={styles.onlineText}>{friends.filter(f => (f.profile?.status ?? 'offline') !== 'offline').length} online</Text>
           </View>
+          <TouchableOpacity onPress={() => { setAddingFriend(true); setAddError(null); setAddSuccess(false); }} style={styles.addFriendBtn}>
+            <Text style={styles.addFriendBtnText}>+ Add</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={close} style={styles.closeBtn}>
             <Text style={styles.closeBtnText}>✕</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Inline Add Friend form */}
+        {addingFriend && (
+          <View style={styles.addForm}>
+            <View style={styles.addRow}>
+              <TextInput
+                style={styles.addInput}
+                value={addRiotId}
+                onChangeText={setAddRiotId}
+                placeholder="Riot ID e.g. Name#TAG"
+                placeholderTextColor={Colors.textDim}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoFocus
+                onSubmitEditing={handleAddFriend}
+                returnKeyType="send"
+              />
+              <TouchableOpacity
+                style={[styles.addSendBtn, addLoading && { opacity: 0.5 }]}
+                onPress={handleAddFriend}
+                disabled={addLoading}
+              >
+                {addLoading
+                  ? <ActivityIndicator color={Colors.background} size="small" />
+                  : <Text style={styles.addSendText}>→</Text>
+                }
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.addCancelBtn} onPress={() => { setAddingFriend(false); setAddRiotId(''); setAddError(null); setAddSuccess(false); }}>
+                <Text style={styles.addCancelText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {addError && <Text style={styles.addError}>{addError}</Text>}
+            {addSuccess && <Text style={styles.addSuccess}>✓ Request sent!</Text>}
+          </View>
+        )}
 
         {/* Tabs */}
         <View style={styles.tabs}>
@@ -303,8 +358,38 @@ const styles = StyleSheet.create({
   panelTitle: { fontSize: 15, fontWeight: '800', color: Colors.text, letterSpacing: 1, flex: 1 },
   onlineCount: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   onlineText: { fontSize: 10, color: Colors.textMuted },
-  closeBtn: { padding: 4 },
+  closeBtn: { padding: 4, marginLeft: 2 },
   closeBtnText: { color: Colors.textMuted, fontSize: 14 },
+  addFriendBtn: {
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 6, borderWidth: 1, borderColor: Colors.accent + '66',
+    backgroundColor: Colors.accentDim,
+  },
+  addFriendBtnText: { color: Colors.accent, fontSize: 11, fontWeight: '700' },
+  addForm: {
+    paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs,
+    borderBottomWidth: 1, borderBottomColor: Colors.accentBorder,
+    backgroundColor: 'rgba(0,200,255,0.04)', gap: 4,
+  },
+  addRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  addInput: {
+    flex: 1, height: 34, backgroundColor: Colors.surfaceAlt,
+    borderRadius: 8, borderWidth: 1, borderColor: Colors.accentBorder,
+    paddingHorizontal: Spacing.sm, color: Colors.text, fontSize: 12,
+  },
+  addSendBtn: {
+    width: 32, height: 32, borderRadius: 8,
+    backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
+  },
+  addSendText: { color: Colors.background, fontSize: 14, fontWeight: '900' },
+  addCancelBtn: {
+    width: 28, height: 28, borderRadius: 6,
+    backgroundColor: Colors.surfaceAlt, borderWidth: 1, borderColor: Colors.accentBorder,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  addCancelText: { color: Colors.textMuted, fontSize: 12 },
+  addError: { color: Colors.error, fontSize: 10, paddingLeft: 2 },
+  addSuccess: { color: Colors.success, fontSize: 10, paddingLeft: 2 },
 
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.accentBorder },
   tab: { flex: 1, paddingVertical: Spacing.sm, alignItems: 'center', position: 'relative' },
