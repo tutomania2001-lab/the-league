@@ -1,0 +1,177 @@
+import { BracketView } from '@/components/tournament/BracketView';
+import { MatchCard } from '@/components/tournament/MatchCard';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { GlowText } from '@/components/ui/GlowText';
+import { Colors, Spacing, Typography } from '@/constants/theme';
+import { useTournament } from '@/hooks/useTournament';
+import { useTeam } from '@/hooks/useTeam';
+import { supabase } from '@/lib/supabase';
+import { TeamRow, TournamentStatus } from '@/types/database';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const badgeVariant: Record<TournamentStatus, 'open' | 'active' | 'completed'> = {
+  open: 'open', active: 'active', completed: 'completed',
+};
+
+export default function TournamentDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const { tournament, matches, registeredTeamIds, loading } = useTournament(id);
+  const [userId, setUserId] = useState<string>();
+  const { team } = useTeam(userId);
+  const [teams, setTeams] = useState<Record<string, TeamRow>>({});
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
+  }, []);
+
+  useEffect(() => {
+    if (!matches.length && !registeredTeamIds.length) return;
+    const ids = [...new Set([
+      ...matches.flatMap(m => [m.team_a_id, m.team_b_id]).filter(Boolean) as string[],
+      ...registeredTeamIds,
+    ])];
+    if (!ids.length) return;
+    supabase.from('teams').select('*').in('id', ids).then(({ data }) => {
+      if (data) setTeams(Object.fromEntries(data.map(t => [t.id, t])));
+    });
+  }, [matches, registeredTeamIds]);
+
+  const isRegistered = team ? registeredTeamIds.includes(team.id) : false;
+  const isFull = registeredTeamIds.length >= (tournament?.max_teams ?? 8);
+  const prizePool = tournament
+    ? tournament.entry_fee_per_player * 5 * tournament.max_teams * (1 - tournament.platform_cut_percent / 100)
+    : 0;
+
+  async function handleJoin() {
+    if (!team || !id) return;
+    setJoining(true);
+    setJoinError(null);
+    const { error } = await supabase.from('tournament_teams')
+      .insert({ tournament_id: id, team_id: team.id });
+    if (error) setJoinError(error.message);
+    setJoining(false);
+  }
+
+  if (loading) return <SafeAreaView style={styles.safe}><ActivityIndicator color={Colors.accent} style={{ flex: 1 }} /></SafeAreaView>;
+  if (!tournament) return <SafeAreaView style={styles.safe}><Text style={[Typography.body, { padding: Spacing.lg }]}>Tournament not found</Text></SafeAreaView>;
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); setRefreshing(false); }} tintColor={Colors.accent} />}
+      >
+        {/* Header */}
+        <View style={styles.titleRow}>
+          <GlowText style={[Typography.title, { flex: 1 }]}>{tournament.name}</GlowText>
+          <Badge variant={badgeVariant[tournament.status]} />
+        </View>
+
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          <Card style={styles.statCard}>
+            <Text style={Typography.label}>Entry Fee</Text>
+            <Text style={[Typography.heading, { color: Colors.text }]}>£{tournament.entry_fee_per_player}<Text style={Typography.body}>/player</Text></Text>
+          </Card>
+          <Card style={styles.statCard}>
+            <Text style={Typography.label}>Prize Pool</Text>
+            <GlowText style={[Typography.heading, { color: Colors.gold }]}>£{prizePool.toFixed(0)}</GlowText>
+          </Card>
+          <Card style={styles.statCard}>
+            <Text style={Typography.label}>Teams</Text>
+            <Text style={[Typography.heading, { color: Colors.text }]}>{registeredTeamIds.length}<Text style={Typography.body}>/{tournament.max_teams}</Text></Text>
+          </Card>
+        </View>
+
+        {/* Join button */}
+        {tournament.status === 'open' && (
+          <View style={{ gap: Spacing.xs }}>
+            {!team ? (
+              <Button label="Create a team first to enter" variant="secondary" onPress={() => router.push('/(tabs)/team')} />
+            ) : isRegistered ? (
+              <Card style={{ alignItems: 'center' }}>
+                <Text style={{ color: Colors.success, fontWeight: '700' }}>✓ Your team is registered</Text>
+              </Card>
+            ) : isFull ? (
+              <Card style={{ alignItems: 'center' }}>
+                <Text style={Typography.body}>Tournament is full</Text>
+              </Card>
+            ) : (
+              <>
+                <Button
+                  label={`Enter with ${team.name} — £${tournament.entry_fee_per_player * 5} total`}
+                  onPress={handleJoin}
+                  loading={joining}
+                />
+                <Text style={[Typography.body, { textAlign: 'center', fontSize: 11 }]}>
+                  £{tournament.entry_fee_per_player} deducted from each of your 5 players' wallets
+                </Text>
+              </>
+            )}
+            {joinError && <Text style={{ color: Colors.error, textAlign: 'center' }}>{joinError}</Text>}
+          </View>
+        )}
+
+        {/* Registered teams */}
+        {registeredTeamIds.length > 0 && (
+          <View>
+            <Text style={[Typography.label, { marginBottom: Spacing.sm }]}>Registered Teams ({registeredTeamIds.length}/{tournament.max_teams})</Text>
+            <View style={styles.teamList}>
+              {registeredTeamIds.map(tid => (
+                <Card key={tid} style={styles.teamRow}>
+                  <Text style={{ fontSize: 16 }}>⚔️</Text>
+                  <Text style={[Typography.subheading, { flex: 1 }]}>{teams[tid]?.name ?? 'Loading...'}</Text>
+                  {team?.id === tid && <Text style={[Typography.label, { color: Colors.accent }]}>YOU</Text>}
+                </Card>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Bracket */}
+        {matches.length > 0 && (
+          <View>
+            <Text style={[Typography.label, { marginBottom: Spacing.sm }]}>Bracket</Text>
+            <Card style={{ padding: 0, overflow: 'hidden' }}>
+              <BracketView matches={matches} teams={teams} />
+            </Card>
+          </View>
+        )}
+
+        {/* Match list */}
+        {matches.length > 0 && (
+          <View style={{ gap: Spacing.sm }}>
+            <Text style={Typography.label}>Matches</Text>
+            {matches.map(m => (
+              <MatchCard
+                key={m.id}
+                match={m}
+                teamA={m.team_a_id ? teams[m.team_a_id] ?? null : null}
+                teamB={m.team_b_id ? teams[m.team_b_id] ?? null : null}
+              />
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: 'transparent' },
+  scroll: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
+  statsRow: { flexDirection: 'row', gap: Spacing.sm },
+  statCard: { flex: 1, gap: 4, padding: Spacing.sm },
+  teamList: { gap: Spacing.xs },
+  teamRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.sm },
+});

@@ -2,10 +2,13 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { GlowText } from '@/components/ui/GlowText';
 import { PulseGlow } from '@/components/ui/PulseGlow';
+import { TournamentCard } from '@/components/tournament/TournamentCard';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { FEATURED_CHAMPIONS } from '@/constants/champions';
+import { useTournamentList } from '@/hooks/useTournament';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
@@ -28,7 +31,10 @@ function AnimatedChampIcon({ item, isActive, onPress }: { item: typeof FEATURED_
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [activeChamp, setActiveChamp] = useState(FEATURED_CHAMPIONS[0]);
+  const { tournaments } = useTournamentList();
+  const activeTournaments = tournaments.filter(t => t.status !== 'completed').slice(0, 3);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -78,6 +84,15 @@ export default function HomeScreen() {
             </Card>
           ))}
         </View>
+
+        {activeTournaments.length > 0 && (
+          <View style={{ gap: Spacing.sm }}>
+            <Text style={Typography.label}>Active Tournaments</Text>
+            {activeTournaments.map(t => (
+              <TournamentCard key={t.id} tournament={t} onPress={() => router.push(`/tournament/${t.id}`)} />
+            ))}
+          </View>
+        )}
 
         <Card style={styles.infoCard}>
           <Text style={Typography.label}>How it works</Text>
