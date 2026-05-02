@@ -51,6 +51,9 @@ export function useFriends(userId: string | undefined) {
   useEffect(() => {
     if (!userId) { setLoading(false); return; }
     fetchAll(userId);
+    // Refresh every 30s so online status stays current
+    const interval = setInterval(() => fetchAll(userId), 30000);
+    return () => clearInterval(interval);
   }, [userId]);
 
   async function sendRequest(riotId: string): Promise<{ error: string | null }> {

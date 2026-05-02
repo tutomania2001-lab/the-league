@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { DEV_BYPASS } from '@/lib/dev';
 import { RootBackground } from '@/components/ui/RootBackground';
 import { FriendsPanel } from '@/components/ui/FriendsPanel';
+import { usePresence } from '@/hooks/usePresence';
 import { Colors } from '@/constants/theme';
 import { Session } from '@supabase/supabase-js';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
@@ -30,6 +31,9 @@ export default function RootLayout() {
   const [userId, setUserId] = useState<string>();
   const router = useRouter();
   const segments = useSegments();
+
+  // Sets online/away/offline in DB based on app state
+  usePresence(userId);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
