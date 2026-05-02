@@ -502,6 +502,21 @@ export default function TeamScreen() {
               )}
             </View>
 
+            {/* Clan Invite Code — visible to all members */}
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>🔗 Clan Invite Code</Text>
+              <Text style={[Typography.body, { fontSize: 11, marginBottom: Spacing.xs }]}>
+                Share this with friends to invite them to your clan
+              </Text>
+              <TouchableOpacity
+                style={styles.roomCodeBlock}
+                onPress={async () => { await Clipboard.setStringAsync(team.invite_code); }}
+              >
+                <Text style={[styles.codeText, { fontSize: 18, letterSpacing: 4 }]}>{team.invite_code}</Text>
+                <Text style={styles.copyText}>📋 Copy</Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Stats */}
             <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>📊 Clan Stats</Text>

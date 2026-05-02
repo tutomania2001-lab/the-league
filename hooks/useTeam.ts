@@ -70,13 +70,19 @@ export function useTeam(userId: string | undefined) {
     return { error: null, team: data };
   }
 
-  // Join via invite code — adds as PENDING (captain must approve)
+  // Join via invite code OR room code — adds as PENDING (captain must approve)
   async function joinTeam(inviteCode: string) {
     if (!userId) return { error: 'Not authenticated' };
     const code = inviteCode.trim().toUpperCase();
-    const { data: found, error } = await supabase
-      .from('teams').select('*').eq('invite_code', code).single();
-    if (error || !found) return { error: 'Clan not found — check the invite code' };
+    // Try invite_code first, then room_code
+    let found: any = null;
+    const { data: byInvite } = await supabase.from('teams').select('*').eq('invite_code', code).maybeSingle();
+    if (byInvite) { found = byInvite; }
+    else {
+      const { data: byRoom } = await supabase.from('teams').select('*').eq('room_code', code).maybeSingle();
+      if (byRoom) found = byRoom;
+    }
+    if (!found) return { error: 'Clan not found — check your invite or room code' };
     const { error: joinError } = await supabase
       .from('team_members')
       .insert({ team_id: found.id, user_id: userId, status: 'pending' });
