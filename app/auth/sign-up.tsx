@@ -7,6 +7,7 @@ import { Colors, Spacing, Typography } from '@/constants/theme';
 import { ChampionVideos, VideoFallbacks } from '@/constants/videos';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,6 +19,7 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
 
   async function handleSignUp() {
     if (!riotId.trim()) { setError('Riot ID is required'); return; }
@@ -27,10 +29,14 @@ export default function SignUpScreen() {
     setLoading(true);
     setError(null);
 
+    // Redirect back into app after email confirmation
+    const redirectTo = Linking.createURL('/auth/callback');
+
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
+        emailRedirectTo: redirectTo,
         data: {
           username: riotId.trim(),
           riot_id: riotId.trim(),
@@ -50,6 +56,7 @@ export default function SignUpScreen() {
     }
 
     setLoading(false);
+    setConfirmed(true);
   }
 
   return (
@@ -63,6 +70,26 @@ export default function SignUpScreen() {
               </PulseGlow>
               <Text style={styles.logoSub}>Your Riot ID is your identity here</Text>
             </View>
+
+            {/* Confirmation sent state */}
+            {confirmed ? (
+              <View style={styles.card}>
+                <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: Spacing.sm }}>📧</Text>
+                <GlowText style={[Typography.subheading, { textAlign: 'center', marginBottom: Spacing.sm }]}>
+                  Check your email
+                </GlowText>
+                <Text style={[Typography.body, { textAlign: 'center', color: Colors.text, marginBottom: Spacing.md }]}>
+                  We sent a confirmation link to{'\n'}
+                  <Text style={{ color: Colors.accent }}>{email}</Text>
+                  {'\n\n'}Tap the link in the email to activate your account and log in.
+                </Text>
+                <Button
+                  label="Back to Log In"
+                  variant="secondary"
+                  onPress={() => router.replace('/auth/log-in')}
+                />
+              </View>
+            ) : (
             <View style={styles.card}>
               <Input
                 label="Riot ID"
@@ -97,6 +124,7 @@ export default function SignUpScreen() {
               <Button label="Create Account" onPress={handleSignUp} loading={loading} style={{ marginTop: Spacing.lg }} />
               <Button label="Already have an account? Log in" variant="ghost" onPress={() => router.replace('/auth/log-in')} style={{ marginTop: Spacing.xs }} />
             </View>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
