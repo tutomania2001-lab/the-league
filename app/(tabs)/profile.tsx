@@ -17,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function ProfileScreen() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>();
+  const [userEmail, setUserEmail] = useState<string>();
+  const [emailVerified, setEmailVerified] = useState(false);
   const { profile, loading, updateProfile, refreshProfile } = useProfile(userId);
   const { friends, incoming } = useFriends(userId);
   const [editingRiotId, setEditingRiotId] = useState(false);
@@ -24,16 +26,34 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
+  const [resendDone, setResendDone] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await refreshProfile();
+    // Re-check email verification status
+    const { data } = await supabase.auth.getUser();
+    if (data.user) setEmailVerified(!!data.user.email_confirmed_at);
     setRefreshing(false);
   }, [refreshProfile]);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id);
+      setUserEmail(data.user?.email);
+      setEmailVerified(!!data.user?.email_confirmed_at);
+    });
   }, []);
+
+  async function handleResendVerification() {
+    if (!userEmail) return;
+    setResendingEmail(true);
+    await supabase.auth.resend({ type: 'signup', email: userEmail });
+    setResendingEmail(false);
+    setResendDone(true);
+    setTimeout(() => setResendDone(false), 5000);
+  }
 
   useEffect(() => {
     if (profile?.riot_id) setRiotId(profile.riot_id);
@@ -182,15 +202,51 @@ export default function ProfileScreen() {
           {saved && <Text style={{ color: Colors.success, fontSize: 12, marginTop: Spacing.xs }}>✓ Saved</Text>}
         </Card>
 
+        {/* Email verification */}
+        <Card style={!emailVerified ? { borderColor: Colors.warning + '66' } : {}}>
+          <View style={styles.row}>
+            <Text style={Typography.label}>Email Verification</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {emailVerified
+                ? <Text style={{ color: Colors.success, fontSize: 12, fontWeight: '700' }}>✓ Verified</Text>
+                : <Text style={{ color: Colors.warning, fontSize: 12, fontWeight: '700' }}>⚠ Unverified</Text>
+              }
+            </View>
+          </View>
+          <Text style={[Typography.body, { marginTop: Spacing.xs, fontSize: 12, color: Colors.textMuted }]}>
+            {userEmail}
+          </Text>
+          {!emailVerified && (
+            <View style={{ gap: Spacing.sm, marginTop: Spacing.sm }}>
+              <Text style={[Typography.body, { fontSize: 12 }]}>
+                Your email is not verified. Check your inbox or resend the verification link.
+              </Text>
+              {resendDone ? (
+                <Text style={{ color: Colors.success, fontSize: 12, fontWeight: '600' }}>
+                  ✓ Verification email sent — check your inbox
+                </Text>
+              ) : (
+                <Button
+                  label="Resend Verification Email"
+                  variant="secondary"
+                  onPress={handleResendVerification}
+                  loading={resendingEmail}
+                  style={{ borderColor: Colors.warning + '88' }}
+                />
+              )}
+            </View>
+          )}
+        </Card>
+
         {/* KYC */}
         <Card>
-          <Text style={Typography.label}>Verification Status</Text>
+          <Text style={Typography.label}>Identity Verification</Text>
           <View style={{ marginTop: Spacing.sm }}>
             <Badge variant={profile?.kyc_verified ? 'active' : 'open'} />
           </View>
           {!profile?.kyc_verified && (
-            <Text style={[Typography.body, { marginTop: Spacing.sm }]}>
-              Identity verification required before withdrawing winnings.
+            <Text style={[Typography.body, { marginTop: Spacing.sm, fontSize: 12 }]}>
+              Required before withdrawing winnings. Powered by Stripe Identity.
             </Text>
           )}
         </Card>
