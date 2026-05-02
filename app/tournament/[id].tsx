@@ -16,7 +16,7 @@ import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text,
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const badgeVariant: Record<TournamentStatus, 'open' | 'active' | 'completed'> = {
-  open: 'open', active: 'active', completed: 'completed',
+  open: 'open', active: 'active', completed: 'completed', cancelled: 'completed',
 };
 
 const HOLDING_PERCENT = 0.10; // 10% non-refundable holding deposit
@@ -45,9 +45,11 @@ export default function TournamentDetailScreen() {
   async function handleCancel() {
     if (!id || !tournament) return;
 
+    const refundAmount = Number((tournament.prize_pool * REFUND_PERCENT).toFixed(2));
+
     Alert.alert(
       'Cancel Tournament',
-      `This will refund 90% of entry fees to all players. The 10% holding deposit is non-refundable.\n\nTotal to refund: £${(tournament.prize_pool * REFUND_PERCENT).toFixed(2)}\n\nContinue?`,
+      `Players will be refunded 90% of entry fees.\n\nRefund: £${refundAmount}\nHeld (10%): £${(tournament.prize_pool * HOLDING_PERCENT).toFixed(2)}\n\nContinue?`,
       [
         { text: 'Keep Tournament', style: 'cancel' },
         {
@@ -55,36 +57,55 @@ export default function TournamentDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             setCancelling(true);
+            try {
+              // Try to find transactions with tournament_id first
+              let entryTxns: any[] = [];
+              const { data: byTournament } = await supabase
+                .from('transactions')
+                .select('user_id, amount')
+                .eq('tournament_id', id)
+                .eq('type', 'entry_fee')
+                .eq('status', 'completed');
 
-            // Find all entry_fee transactions for this tournament
-            const { data: entryTxns } = await supabase
-              .from('transactions')
-              .select('*')
-              .eq('tournament_id', id)
-              .eq('type', 'entry_fee')
-              .eq('status', 'completed');
+              if (byTournament?.length) {
+                entryTxns = byTournament;
+              } else {
+                // Fallback: get players from tournament_lineups and calculate per-team fee
+                const { data: lineups } = await supabase
+                  .from('tournament_lineups')
+                  .select('user_id')
+                  .eq('tournament_id', id);
+                if (lineups?.length) {
+                  const feePerPlayer = tournament.entry_fee_per_player;
+                  entryTxns = lineups.map(l => ({ user_id: l.user_id, amount: feePerPlayer }));
+                }
+              }
 
-            // Refund 90% to each payer
-            if (entryTxns?.length) {
+              // Refund 90% to each payer
               for (const txn of entryTxns) {
-                const refundAmount = Number((txn.amount * REFUND_PERCENT).toFixed(2));
-                await supabase.rpc('increment_wallet', { user_id: txn.user_id, amount: refundAmount });
+                const refund = Number((txn.amount * REFUND_PERCENT).toFixed(2));
+                await supabase.rpc('increment_wallet', { user_id: txn.user_id, amount: refund });
                 await supabase.from('transactions').insert({
-                  user_id: txn.user_id,
-                  type: 'topup',
-                  amount: refundAmount,
-                  status: 'completed',
-                  tournament_id: id,
+                  user_id: txn.user_id, type: 'prize',
+                  amount: refund, status: 'completed',
                 });
               }
+
+              // Cancel the tournament
+              const { error: cancelError } = await supabase
+                .from('tournaments')
+                .update({ status: 'cancelled' })
+                .eq('id', id);
+
+              if (cancelError) throw cancelError;
+
+              setCancelling(false);
+              Alert.alert('Cancelled', `Tournament cancelled. ${entryTxns.length} players refunded 90%.`);
+              router.replace('/(tabs)/tournaments');
+            } catch (e: any) {
+              setCancelling(false);
+              Alert.alert('Error', e?.message ?? 'Failed to cancel tournament. Try again.');
             }
-
-            // Mark tournament as cancelled
-            await supabase.from('tournaments').update({ status: 'cancelled' }).eq('id', id);
-
-            setCancelling(false);
-            Alert.alert('Tournament Cancelled', 'All players have been refunded 90% of their entry fees.');
-            router.replace('/(tabs)/tournaments');
           },
         },
       ]
