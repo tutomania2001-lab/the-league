@@ -2,6 +2,12 @@ import { supabase } from '@/lib/supabase';
 import { MatchRow, TournamentRow } from '@/types/database';
 import { useEffect, useState } from 'react';
 
+// Global listeners — any useTournamentList instance refreshes when signalled
+const refreshListeners = new Set<() => void>();
+export function refreshTournamentList() {
+  refreshListeners.forEach(fn => fn());
+}
+
 export function useTournamentList() {
   const [tournaments, setTournaments] = useState<TournamentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,7 +20,11 @@ export function useTournamentList() {
     setLoading(false);
   }
 
-  useEffect(() => { fetch(); }, []);
+  useEffect(() => {
+    fetch();
+    refreshListeners.add(fetch);
+    return () => { refreshListeners.delete(fetch); };
+  }, []);
 
   return { tournaments, loading, refresh: fetch };
 }

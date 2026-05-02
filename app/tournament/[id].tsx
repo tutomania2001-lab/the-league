@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { GlowText } from '@/components/ui/GlowText';
 import { Colors, Spacing, Typography } from '@/constants/theme';
-import { useTournament } from '@/hooks/useTournament';
+import { useTournament, refreshTournamentList } from '@/hooks/useTournament';
 import { useTeam } from '@/hooks/useTeam';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
@@ -100,6 +100,7 @@ export default function TournamentDetailScreen() {
               if (cancelError) throw cancelError;
 
               setCancelling(false);
+              refreshTournamentList(); // instantly removes from list
               Alert.alert(
                 'Tournament Cancelled',
                 `${entryTxns.length} player${entryTxns.length !== 1 ? 's' : ''} refunded 90% of their entry fee.`,
