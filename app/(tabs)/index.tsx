@@ -15,30 +15,62 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
-function AnimatedChampIcon({ item, isActive, onPress }: { item: typeof FEATURED_CHAMPIONS[0]; isActive: boolean; onPress: () => void }) {
-  const scale = useRef(new Animated.Value(1)).current;
+// Assign a champion splash to each tournament by index
+function getTournamentSplash(index: number) {
+  return FEATURED_CHAMPIONS[index % FEATURED_CHAMPIONS.length];
+}
 
-  useEffect(() => {
-    Animated.spring(scale, { toValue: isActive ? 1.15 : 1, useNativeDriver: true, friction: 6 }).start();
-  }, [isActive]);
-
+function TournamentStrip({ tournaments, activeId, onSelect }: { tournaments: any[]; activeId: string | null; onSelect: (t: any, champ: any) => void }) {
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
-      <Animated.View style={[styles.champIcon, { transform: [{ scale }], borderColor: isActive ? Colors.accent : Colors.accentBorder }]}>
-        <Image source={{ uri: item.icon }} style={styles.champImg} />
-      </Animated.View>
-      {isActive && <Text style={styles.champName}>{item.name}</Text>}
-    </TouchableOpacity>
+    <FlatList
+      data={tournaments}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyExtractor={t => t.id}
+      contentContainerStyle={{ paddingHorizontal: Spacing.md, gap: Spacing.sm }}
+      renderItem={({ item, index }) => {
+        const champ = getTournamentSplash(index);
+        const isActive = activeId === item.id;
+        const scale = useRef(new Animated.Value(1)).current;
+        useEffect(() => {
+          Animated.spring(scale, { toValue: isActive ? 1.08 : 1, useNativeDriver: true, friction: 6 }).start();
+        }, [isActive]);
+        return (
+          <TouchableOpacity onPress={() => onSelect(item, champ)} activeOpacity={0.8}>
+            <Animated.View style={[styles.tourneyThumb, { transform: [{ scale }], borderColor: isActive ? Colors.gold : Colors.accentBorder }]}>
+              <Image source={{ uri: champ.splash }} style={styles.tourneyThumbBg} resizeMode="cover" />
+              <View style={styles.tourneyThumbOverlay} />
+              <Text style={styles.tourneyThumbName} numberOfLines={2}>{item.name}</Text>
+              {item.status === 'active' && (
+                <View style={styles.liveChip}><Text style={styles.liveChipText}>LIVE</Text></View>
+              )}
+            </Animated.View>
+          </TouchableOpacity>
+        );
+      }}
+    />
   );
 }
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [activeChamp, setActiveChamp] = useState(FEATURED_CHAMPIONS[0]);
   const { majorTournaments, teamBattles } = useTournamentList();
   const { matches: liveMatches } = useLiveMatches();
-  const featuredTournaments = majorTournaments.filter(t => t.status !== 'completed').slice(0, 2);
+  const featuredTournaments = majorTournaments.filter(t => t.status !== 'completed');
   const activeBattles = teamBattles.filter(t => t.status === 'active' || t.status === 'open').slice(0, 2);
+
+  // Default background: first active tournament's splash, or first champion
+  const allActive = [...featuredTournaments, ...activeBattles];
+  const defaultChamp = FEATURED_CHAMPIONS[0];
+  const [activeTournament, setActiveTournament] = useState<any>(allActive[0] ?? null);
+  const [activeSplash, setActiveSplash] = useState(allActive[0] ? getTournamentSplash(0) : defaultChamp);
+
+  useEffect(() => {
+    if (allActive.length > 0 && !activeTournament) {
+      setActiveTournament(allActive[0]);
+      setActiveSplash(getTournamentSplash(0));
+    }
+  }, [majorTournaments, teamBattles]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -51,43 +83,39 @@ export default function HomeScreen() {
           <Badge variant="open" />
         </View>
 
-        <View style={styles.champStrip}>
-          <FlatList
-            data={FEATURED_CHAMPIONS}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={c => c.name}
-            contentContainerStyle={{ paddingHorizontal: Spacing.md, gap: Spacing.sm }}
-            renderItem={({ item }) => (
-              <AnimatedChampIcon item={item} isActive={activeChamp.name === item.name} onPress={() => setActiveChamp(item)} />
-            )}
-          />
-        </View>
-
-        <Card glow style={styles.featuredCard}>
-          <View style={styles.featuredRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={Typography.label}>Season 1 · Open</Text>
-              <GlowText style={[Typography.heading, { marginTop: 4 }]}>🏆 First Tournament</GlowText>
-              <Text style={[Typography.body, { marginTop: 4 }]}>8 teams · $5/player entry · Winner takes all</Text>
-            </View>
-            <Image source={{ uri: activeChamp.icon }} style={styles.featuredIcon} />
+        {/* Tournament splash strip */}
+        {allActive.length > 0 && (
+          <View style={styles.champStrip}>
+            <TournamentStrip
+              tournaments={allActive}
+              activeId={activeTournament?.id ?? null}
+              onSelect={(t, champ) => { setActiveTournament(t); setActiveSplash(champ); }}
+            />
           </View>
-        </Card>
+        )}
 
-        <View style={styles.statsRow}>
-          {[
-            { label: 'Prize Pool', value: '$180', icon: '💰' },
-            { label: 'Teams', value: '0 / 8', icon: '⚔️' },
-            { label: 'Entry Fee', value: '$5', icon: '🎮' },
-          ].map(s => (
-            <Card key={s.label} style={styles.statCard}>
-              <Text style={{ fontSize: 22 }}>{s.icon}</Text>
-              <GlowText style={{ fontSize: 18, fontWeight: '800' }}>{s.value}</GlowText>
-              <Text style={[Typography.label, { marginTop: 2 }]}>{s.label}</Text>
-            </Card>
-          ))}
-        </View>
+        {/* Active tournament featured card */}
+        {activeTournament && (
+          <TouchableOpacity onPress={() => router.push(`/tournament/${activeTournament.id}`)} activeOpacity={0.88}>
+            <View style={styles.featuredBanner}>
+              <Image source={{ uri: activeSplash.splash }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
+              <View style={styles.featuredBannerOverlay} />
+              <View style={styles.featuredBannerContent}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                  <Badge variant={activeTournament.status === 'active' ? 'active' : 'open'} />
+                  <Text style={styles.featuredBannerType}>
+                    {activeTournament.tournament_type === 'tournament' ? '🏟️ OFFICIAL' : '⚔️ TEAM BATTLE'}
+                  </Text>
+                </View>
+                <GlowText style={styles.featuredBannerTitle}>{activeTournament.name}</GlowText>
+                <View style={{ flexDirection: 'row', gap: Spacing.md, marginTop: 4 }}>
+                  <Text style={styles.featuredBannerStat}>🏆 £{activeTournament.prize_pool > 0 ? activeTournament.prize_pool.toFixed(0) : (activeTournament.entry_fee_per_player * 36).toFixed(0)}</Text>
+                  <Text style={styles.featuredBannerStat}>💰 £{activeTournament.entry_fee_per_player}/player</Text>
+                </View>
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* Live matches banner */}
         {liveMatches.length > 0 && (
@@ -166,6 +194,26 @@ const styles = StyleSheet.create({
   champIconActive: { borderColor: Colors.accent },
   champImg: { width: 44, height: 44 },
   champName: { fontSize: 8, color: Colors.accent, textAlign: 'center', marginTop: 2, fontWeight: '700' },
+
+  // Tournament thumbnail strip
+  tourneyThumb: {
+    width: 100, height: 80, borderRadius: 10, overflow: 'hidden',
+    borderWidth: 1.5, justifyContent: 'flex-end',
+  },
+  tourneyThumbBg: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  tourneyThumbOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  tourneyThumbName: { fontSize: 10, fontWeight: '800', color: '#fff', padding: 5, lineHeight: 13 },
+  liveChip: { position: 'absolute', top: 5, right: 5, backgroundColor: Colors.live, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 },
+  liveChipText: { fontSize: 8, fontWeight: '900', color: '#fff' },
+
+  // Featured banner
+  featuredBanner: { height: 160, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: Colors.gold + '55' },
+  featuredBannerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.52)' },
+  featuredBannerContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: Spacing.md, gap: 4 },
+  featuredBannerType: { fontSize: 9, fontWeight: '800', color: Colors.gold, letterSpacing: 1.5 },
+  featuredBannerTitle: { fontSize: 20, fontWeight: '900', color: '#fff', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  featuredBannerStat: { fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: '600' },
+
   featuredCard: { gap: Spacing.sm },
   featuredRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   featuredIcon: { width: 56, height: 56, borderRadius: 10, borderWidth: 1, borderColor: Colors.accentBorder },
