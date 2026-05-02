@@ -337,6 +337,7 @@ export default function TeamScreen() {
   const [lineupFee, setLineupFee] = useState(0);
   const [joiningTournament, setJoiningTournament] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [showInviteInfo, setShowInviteInfo] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => { supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id)); }, []);
@@ -502,7 +503,7 @@ export default function TeamScreen() {
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>🔗 Clan Invite Code</Text>
-                <TouchableOpacity onPress={() => setShowInfo(true)}>
+                <TouchableOpacity onPress={() => setShowInviteInfo(true)}>
                   <Text style={{ color: Colors.textMuted, fontSize: 12 }}>ℹ️</Text>
                 </TouchableOpacity>
               </View>
@@ -716,6 +717,26 @@ export default function TeamScreen() {
         />
       )}
       <RoomCodeInfo visible={showInfo} onClose={() => setShowInfo(false)} />
+
+      {/* Clan invite info modal */}
+      <Modal transparent visible={showInviteInfo} animationType="fade" onRequestClose={() => setShowInviteInfo(false)}>
+        <TouchableOpacity style={styles.infoBackdrop} activeOpacity={1} onPress={() => setShowInviteInfo(false)} />
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>🔗 How to invite players</Text>
+          {[
+            '1. Copy your Clan Invite Code above',
+            '2. Share it with your friend (Discord, WhatsApp, etc.)',
+            '3. They open the app → My Team tab',
+            '4. Tap 📨 Invite / Join',
+            '5. They paste the code and tap Request to Join',
+            '6. You\'ll see them in the Pending Approval section',
+            '7. Tap ✓ to approve them into your clan',
+          ].map((s, i) => <Text key={i} style={styles.infoStep}>{s}</Text>)}
+          <TouchableOpacity style={styles.infoDismiss} onPress={() => setShowInviteInfo(false)}>
+            <Text style={{ color: Colors.gold, fontWeight: '700', fontSize: 13 }}>Got it</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
