@@ -46,9 +46,11 @@ export function useTeam(userId: string | undefined) {
 
   async function joinTeam(inviteCode: string) {
     if (!userId) return { error: 'Not authenticated' };
+    const code = inviteCode.trim();
+    // Search by room_code (5-digit Wild Rift code) — same code for game and app
     const { data: found, error } = await supabase
-      .from('teams').select('*').eq('invite_code', inviteCode.toUpperCase().trim()).single();
-    if (error || !found) return { error: 'Team not found — check your invite code' };
+      .from('teams').select('*').eq('room_code', code.toUpperCase()).single();
+    if (error || !found) return { error: 'Team not found — check the 5-digit Wild Rift room code' };
     const { error: joinError } = await supabase
       .from('team_members').insert({ team_id: found.id, user_id: userId });
     if (joinError) return { error: joinError.message };

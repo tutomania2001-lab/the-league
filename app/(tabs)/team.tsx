@@ -347,13 +347,6 @@ export default function TeamScreen() {
           </Card>
         )}
 
-        {/* App invite code */}
-        <Card style={{ gap: Spacing.xs }}>
-          <Text style={Typography.label}>App Invite Code</Text>
-          <GlowText style={[Typography.heading, { letterSpacing: 5 }]}>{team.invite_code}</GlowText>
-          <Text style={[Typography.body, { fontSize: 11 }]}>Share with teammates to join The League team</Text>
-        </Card>
-
         {/* Roster */}
         <View style={{ gap: Spacing.xs }}>
           <Text style={Typography.label}>Roster ({members.length}/5)</Text>
