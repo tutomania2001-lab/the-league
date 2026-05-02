@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { DEV_BYPASS } from '@/lib/dev';
-import { LoopingVideo } from '@/components/ui/LoopingVideo';
+import { RootBackground } from '@/components/ui/RootBackground';
 import { Session } from '@supabase/supabase-js';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -8,6 +8,7 @@ import * as Linking from 'expo-linking';
 import 'react-native-reanimated';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
+
 import { Colors } from '@/constants/theme';
 
 export default function RootLayout() {
@@ -61,10 +62,8 @@ export default function RootLayout() {
 
   return (
     <View style={styles.root}>
-      {/* Single global video — absolute behind everything */}
-      <LoopingVideo style={StyleSheet.absoluteFillObject} />
-      {/* Dark overlay */}
-      <View style={styles.overlay} pointerEvents="none" />
+      {/* Animated background — particles, scan line, hex grid */}
+      <RootBackground />
       {/* Stack with transparent screen backgrounds so video shows through */}
       <Stack
         screenOptions={{
@@ -80,5 +79,4 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(7,11,20,0.58)' },
 });
