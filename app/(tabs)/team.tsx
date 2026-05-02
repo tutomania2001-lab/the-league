@@ -121,14 +121,20 @@ function RoomCodeInfo({ visible, onClose }: { visible: boolean; onClose: () => v
 }
 
 // ── Lineup picker ──────────────────────────────────────────
-function LineupPicker({ visible, members, memberProfiles, onConfirm, onClose, fee }: {
+function LineupPicker({ visible, members, memberProfiles, onConfirm, onClose, fee, captainId }: {
   visible: boolean; members: any[]; memberProfiles: Record<string, any>;
-  onConfirm: (ids: string[]) => void; onClose: () => void; fee: number;
+  onConfirm: (ids: string[], captainPaysAll: boolean) => void;
+  onClose: () => void; fee: number; captainId: string;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
+  const [captainPaysAll, setCaptainPaysAll] = useState(false);
+
   function toggle(id: string) {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : prev.length < 5 ? [...prev, id] : prev);
   }
+
+  const totalFee = fee * 5;
+
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
@@ -141,27 +147,59 @@ function LineupPicker({ visible, members, memberProfiles, onConfirm, onClose, fe
             <Text style={{ color: Colors.textMuted, fontSize: 16 }}>✕</Text>
           </TouchableOpacity>
         </View>
-        <Text style={[Typography.body, { paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm, fontSize: 12 }]}>
-          Choose 5 players for this tournament. Each pays £{fee}.
-        </Text>
+
+        {/* Payment method toggle */}
+        <View style={styles.paymentToggle}>
+          <TouchableOpacity
+            style={[styles.payOption, !captainPaysAll && styles.payOptionActive]}
+            onPress={() => setCaptainPaysAll(false)}
+          >
+            <Text style={[styles.payOptionIcon]}>👥</Text>
+            <View>
+              <Text style={[styles.payOptionTitle, !captainPaysAll && { color: Colors.gold }]}>Split Payment</Text>
+              <Text style={styles.payOptionSub}>£{fee} each · 5 players</Text>
+            </View>
+            {!captainPaysAll && <View style={styles.payOptionCheck}><Text style={{ color: '#000', fontSize: 10, fontWeight: '900' }}>✓</Text></View>}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.payOption, captainPaysAll && styles.payOptionActive]}
+            onPress={() => setCaptainPaysAll(true)}
+          >
+            <Text style={styles.payOptionIcon}>👑</Text>
+            <View>
+              <Text style={[styles.payOptionTitle, captainPaysAll && { color: Colors.gold }]}>Captain Pays All</Text>
+              <Text style={styles.payOptionSub}>£{totalFee} from captain's wallet</Text>
+            </View>
+            {captainPaysAll && <View style={styles.payOptionCheck}><Text style={{ color: '#000', fontSize: 10, fontWeight: '900' }}>✓</Text></View>}
+          </TouchableOpacity>
+        </View>
+
         <ScrollView contentContainerStyle={{ padding: Spacing.sm, gap: Spacing.xs }}>
           {members.map(m => {
             const p = memberProfiles[m.user_id];
             const name = p?.riot_id ?? p?.username ?? 'Player';
             const isSelected = selected.includes(m.user_id);
+            const isCaptain = m.user_id === captainId;
             return (
               <TouchableOpacity key={m.user_id} onPress={() => toggle(m.user_id)}
                 style={[styles.lineupRow, isSelected && styles.lineupRowSelected]}>
                 {p?.avatar_url
                   ? <Image source={{ uri: p.avatar_url }} style={styles.lineupAvatar} />
-                  : <View style={[styles.lineupAvatar, { backgroundColor: Colors.accentDim, alignItems:'center', justifyContent:'center' }]}>
-                      <Text style={{ color: Colors.accent, fontWeight: '800' }}>{name[0]}</Text>
+                  : <View style={[styles.lineupAvatar, { backgroundColor: 'rgba(200,155,60,0.15)', alignItems:'center', justifyContent:'center' }]}>
+                      <Text style={{ color: Colors.gold, fontWeight: '800' }}>{name[0]}</Text>
                     </View>
                 }
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.lineupName, isSelected && { color: Colors.gold }]}>{name}</Text>
-                  <StatusDot status={p?.status ?? 'offline'} size={7} showLabel />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <StatusDot status={p?.status ?? 'offline'} size={7} showLabel />
+                    {isCaptain && <Text style={{ fontSize: 9, color: Colors.gold, fontWeight: '700' }}>CAPTAIN</Text>}
+                  </View>
                 </View>
+                {isSelected && !captainPaysAll && (
+                  <Text style={{ fontSize: 11, color: Colors.gold, fontWeight: '700' }}>£{fee}</Text>
+                )}
                 <View style={[styles.lineupCheck, isSelected && styles.lineupCheckDone]}>
                   {isSelected && <Text style={{ color: '#000', fontSize: 10, fontWeight: '900' }}>✓</Text>}
                 </View>
@@ -169,14 +207,24 @@ function LineupPicker({ visible, members, memberProfiles, onConfirm, onClose, fe
             );
           })}
         </ScrollView>
+
         <View style={styles.lineupFooter}>
-          <View>
+          <View style={{ gap: 2 }}>
             <Text style={{ color: selected.length === 5 ? Colors.gold : Colors.textMuted, fontWeight: '700', fontSize: 14 }}>
               {selected.length}/5 selected
             </Text>
-            {selected.length === 5 && <Text style={{ color: Colors.accent, fontSize: 12 }}>Total: £{fee * 5}</Text>}
+            {selected.length === 5 && (
+              <Text style={{ color: Colors.accent, fontSize: 12 }}>
+                {captainPaysAll ? `Captain pays £${totalFee}` : `5 × £${fee} = £${totalFee}`}
+              </Text>
+            )}
           </View>
-          <Button label="Confirm Lineup →" onPress={() => onConfirm(selected)} disabled={selected.length !== 5} style={{ minWidth: 140 }} />
+          <Button
+            label="Confirm →"
+            onPress={() => onConfirm(selected, captainPaysAll)}
+            disabled={selected.length !== 5}
+            style={{ minWidth: 130, backgroundColor: Colors.gold }}
+          />
         </View>
       </View>
     </Modal>
@@ -312,13 +360,42 @@ export default function TeamScreen() {
     setCreating(false);
   }
 
-  async function handleEnterTournament(ids: string[]) {
-    if (!team || !lineupTournamentId) return;
+  async function handleEnterTournament(ids: string[], captainPaysAll: boolean) {
+    if (!team || !lineupTournamentId || !userId) return;
     setJoiningTournament(true);
-    const { error: regError } = await supabase.from('tournament_teams').insert({ tournament_id: lineupTournamentId, team_id: team.id });
+
+    // Register team in tournament
+    const { error: regError } = await supabase.from('tournament_teams')
+      .insert({ tournament_id: lineupTournamentId, team_id: team.id });
+
     if (!regError || regError.message.includes('duplicate')) {
-      await supabase.from('tournament_lineups').insert(ids.map(uid => ({ tournament_id: lineupTournamentId, team_id: team.id, user_id: uid })));
+      // Save lineup
+      await supabase.from('tournament_lineups').insert(
+        ids.map(uid => ({ tournament_id: lineupTournamentId, team_id: team.id, user_id: uid }))
+      );
+
+      // Deduct entry fees
+      const { data: tournament } = await supabase
+        .from('tournaments').select('entry_fee_per_player').eq('id', lineupTournamentId).single();
+      const fee = tournament?.entry_fee_per_player ?? lineupFee;
+
+      if (captainPaysAll) {
+        // Captain pays full £fee×5
+        await supabase.rpc('decrement_wallet', { user_id: userId, amount: fee * 5 });
+        await supabase.from('transactions').insert({
+          user_id: userId, type: 'entry_fee', amount: fee * 5, status: 'completed',
+        });
+      } else {
+        // Each of the 5 selected players pays individually
+        for (const uid of ids) {
+          await supabase.rpc('decrement_wallet', { user_id: uid, amount: fee });
+          await supabase.from('transactions').insert({
+            user_id: uid, type: 'entry_fee', amount: fee, status: 'completed',
+          });
+        }
+      }
     }
+
     setJoiningTournament(false);
     setLineupTournamentId(null);
     router.push(`/tournament/${lineupTournamentId}`);
@@ -575,6 +652,7 @@ export default function TeamScreen() {
           members={members}
           memberProfiles={memberProfiles}
           fee={lineupFee}
+          captainId={team.captain_id}
           onConfirm={handleEnterTournament}
           onClose={() => setLineupTournamentId(null)}
         />
@@ -681,6 +759,13 @@ const styles = StyleSheet.create({
   // Lineup
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 99 },
   lineupSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(10,8,3,0.99)', borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 2, borderTopColor: Colors.gold + '66', maxHeight: '82%', zIndex: 100 },
+  paymentToggle: { flexDirection: 'row', gap: Spacing.sm, padding: Spacing.sm, paddingHorizontal: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.gold + '22' },
+  payOption: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, padding: Spacing.sm, borderRadius: 10, borderWidth: 1, borderColor: Colors.gold + '22', backgroundColor: 'rgba(20,16,4,0.6)' },
+  payOptionActive: { borderColor: Colors.gold + '88', backgroundColor: 'rgba(200,155,60,0.1)' },
+  payOptionIcon: { fontSize: 20 },
+  payOptionTitle: { fontSize: 12, fontWeight: '700', color: Colors.textMuted },
+  payOptionSub: { fontSize: 10, color: Colors.textDim, marginTop: 1 },
+  payOptionCheck: { width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.gold, alignItems: 'center', justifyContent: 'center', marginLeft: 'auto' },
   lineupHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.gold + '33' },
   lineupTitle: { fontSize: 16, fontWeight: '800', color: Colors.gold },
   lineupRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, borderRadius: 10, borderWidth: 1, borderColor: Colors.gold + '22', backgroundColor: 'rgba(20,16,4,0.8)' },
