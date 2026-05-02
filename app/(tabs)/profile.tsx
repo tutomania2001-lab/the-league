@@ -68,13 +68,9 @@ export default function ProfileScreen() {
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <PulseGlow duration={3000} minOpacity={0.8}>
-              <GlowText style={Typography.heading}>{profile?.username ?? 'Summoner'}</GlowText>
+              <GlowText style={Typography.heading}>{profile?.riot_id ?? profile?.username ?? 'Summoner'}</GlowText>
             </PulseGlow>
-            {profile?.riot_id && (
-              <Text style={[Typography.body, { color: Colors.accent, marginTop: 2 }]}>
-                {profile.riot_id}
-              </Text>
-            )}
+            <Text style={[Typography.body, { marginTop: 2 }]}>Wild Rift Player</Text>
           </View>
         </View>
 
@@ -115,6 +111,7 @@ export default function ProfileScreen() {
             )}
           </View>
           {editingRiotId ? (
+
             <View style={{ gap: Spacing.sm, marginTop: Spacing.sm }}>
               <Input
                 value={riotId}
