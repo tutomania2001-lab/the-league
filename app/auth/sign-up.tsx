@@ -13,20 +13,42 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SignUpScreen() {
   const router = useRouter();
+  const [riotId, setRiotId] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
-  const [riotId, setRiotId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSignUp() {
+    if (!riotId.trim()) { setError('Riot ID is required'); return; }
+    if (!email.trim()) { setError('Email is required'); return; }
+    if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
+
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.signUp({
-      email, password, options: { data: { username } },
+
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: {
+          username: riotId.trim(),
+          riot_id: riotId.trim(),
+        },
+      },
     });
-    if (error) setError(error.message);
+
+    if (signUpError) {
+      setError(signUpError.message);
+      setLoading(false);
+      return;
+    }
+
+    // Update riot_id in users table after account creation
+    if (data.user) {
+      await supabase.from('users').update({ riot_id: riotId.trim(), username: riotId.trim() }).eq('id', data.user.id);
+    }
+
     setLoading(false);
   }
 
@@ -39,14 +61,39 @@ export default function SignUpScreen() {
               <PulseGlow duration={2000} minOpacity={0.6}>
                 <GlowText style={styles.logoMain} intensity="high">◈ Join The League</GlowText>
               </PulseGlow>
-              <Text style={styles.logoSub}>Create your account to compete</Text>
+              <Text style={styles.logoSub}>Your Riot ID is your identity here</Text>
             </View>
             <View style={styles.card}>
-              <Input label="Username" placeholder="SummonerName" value={username} onChangeText={setUsername} autoCapitalize="none" />
-              <Input label="Email" placeholder="you@email.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" style={{ marginTop: Spacing.md }} />
-              <Input label="Password" placeholder="••••••••" value={password} onChangeText={setPassword} secureTextEntry style={{ marginTop: Spacing.md }} />
-              <Input label="Riot ID (optional)" placeholder="Name#TAG" value={riotId} onChangeText={setRiotId} autoCapitalize="none" style={{ marginTop: Spacing.md }} />
-              {error && <Text style={{ color: Colors.error, fontSize: 13, textAlign: 'center', marginTop: Spacing.sm }}>{error}</Text>}
+              <Input
+                label="Riot ID"
+                placeholder="Name#TAG"
+                value={riotId}
+                onChangeText={setRiotId}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Input
+                label="Email"
+                placeholder="you@email.com"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={{ marginTop: Spacing.md }}
+              />
+              <Input
+                label="Password"
+                placeholder="Min. 8 characters"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                style={{ marginTop: Spacing.md }}
+              />
+              {error && (
+                <Text style={{ color: Colors.error, fontSize: 13, textAlign: 'center', marginTop: Spacing.sm }}>
+                  {error}
+                </Text>
+              )}
               <Button label="Create Account" onPress={handleSignUp} loading={loading} style={{ marginTop: Spacing.lg }} />
               <Button label="Already have an account? Log in" variant="ghost" onPress={() => router.replace('/auth/log-in')} style={{ marginTop: Spacing.xs }} />
             </View>

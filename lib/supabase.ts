@@ -1,4 +1,3 @@
-import 'react-native-get-random-values';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
@@ -11,11 +10,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
-    flowType: 'pkce',
   },
   global: {
-    headers: {
-      'x-app-name': 'the-league-mobile',
-    },
+    headers: { 'x-app-name': 'the-league-mobile' },
   },
 });
