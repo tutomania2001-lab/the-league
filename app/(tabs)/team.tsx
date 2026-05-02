@@ -9,6 +9,7 @@ import { useTeam } from '@/hooks/useTeam';
 import { useTeamChat } from '@/hooks/useTeamChat';
 import { useTournamentList } from '@/hooks/useTournament';
 import { supabase } from '@/lib/supabase';
+import { withClanTag } from '@/lib/clanTag';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -272,7 +273,7 @@ function TeamChat({ teamId, myId, memberProfiles }: { teamId: string; myId: stri
         renderItem={({ item }) => {
           const isMe = item.user_id === myId;
           const p = memberProfiles[item.user_id];
-          const name = p?.riot_id ?? p?.username ?? '?';
+          const name = withClanTag(p?.riot_id ?? p?.username ?? '?', team?.clan_tag);
           const avatar = p?.avatar_url;
           return (
             <View style={[styles.chatRow, isMe && styles.chatRowMe]}>
@@ -747,7 +748,7 @@ export default function TeamScreen() {
                       </View>
                   }
                   <Text style={styles.mvpName} numberOfLines={1}>
-                    {memberProfiles[mvp.userId]?.riot_id ?? memberProfiles[mvp.userId]?.username ?? 'MVP Player'}
+                    {withClanTag(memberProfiles[mvp.userId]?.riot_id ?? memberProfiles[mvp.userId]?.username ?? 'MVP Player', team?.clan_tag)}
                   </Text>
                 </View>
                 <View style={styles.mvpRight}>
@@ -792,7 +793,7 @@ export default function TeamScreen() {
                   {bankTxns.slice(0, 4).map(t => (
                     <View key={t.id} style={styles.bankTxn}>
                       <Text style={styles.bankTxnName} numberOfLines={1}>
-                        {t.user?.riot_id ?? t.user?.username ?? 'Member'}
+                        {withClanTag(t.user?.riot_id ?? t.user?.username ?? 'Member', team?.clan_tag)}
                       </Text>
                       <Text style={styles.bankTxnAmt}>+£{t.amount.toFixed(2)}</Text>
                     </View>
@@ -843,7 +844,7 @@ export default function TeamScreen() {
                         </View>
                     }
                     <View style={{ flex: 1, gap: 3 }}>
-                      <Text style={styles.memberName}>{p?.riot_id ?? p?.username ?? 'Player'}</Text>
+                      <Text style={styles.memberName}>{withClanTag(p?.riot_id ?? p?.username ?? 'Player', team?.clan_tag)}</Text>
                       <StatusDot status={p?.status ?? 'offline'} size={8} showLabel />
                     </View>
                     <View style={[styles.roleBadge, { backgroundColor: roleCfg.bg, borderColor: roleCfg.color + '55' }]}>
@@ -1021,7 +1022,7 @@ export default function TeamScreen() {
                           </View>
                       }
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.postAuthor}>{post.author?.riot_id ?? post.author?.username ?? 'Member'}</Text>
+                        <Text style={styles.postAuthor}>{withClanTag(post.author?.riot_id ?? post.author?.username ?? 'Member', team?.clan_tag)}</Text>
                         <Text style={styles.postTime}>{timeAgo(post.created_at)}</Text>
                       </View>
                       {post.user_id === userId && (
@@ -1065,7 +1066,7 @@ export default function TeamScreen() {
                     {/* Caption */}
                     {post.caption && (
                       <View style={styles.captionRow}>
-                        <Text style={styles.captionAuthor}>{post.author?.riot_id ?? post.author?.username} </Text>
+                        <Text style={styles.captionAuthor}>{withClanTag(post.author?.riot_id ?? post.author?.username, team?.clan_tag)} </Text>
                         <Text style={styles.captionText}>{post.caption}</Text>
                       </View>
                     )}
@@ -1075,7 +1076,7 @@ export default function TeamScreen() {
                       <View style={styles.commentsSection}>
                         {expandedComments[post.id].map(c => (
                           <View key={c.id} style={styles.commentRow}>
-                            <Text style={styles.commentAuthor}>{c.author?.riot_id ?? c.author?.username ?? 'Member'} </Text>
+                            <Text style={styles.commentAuthor}>{withClanTag(c.author?.riot_id ?? c.author?.username ?? 'Member', team?.clan_tag)} </Text>
                             <Text style={styles.commentText}>{c.content}</Text>
                             {c.user_id === userId && (
                               <TouchableOpacity onPress={async () => {

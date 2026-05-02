@@ -44,15 +44,20 @@ export function useTeam(userId: string | undefined) {
     fetchTeam(userId);
   }, [userId]);
 
-  // Re-fetch whenever team membership changes
+  // Re-fetch whenever team membership or team data (e.g. clan_tag) changes
   useEffect(() => {
     if (!team?.id || !userId) return;
-    const channelName = `team-members-${team.id}-${Math.random().toString(36).slice(2, 6)}`;
-    const ch = supabase.channel(channelName);
+    const suffix = Math.random().toString(36).slice(2, 6);
+    const ch = supabase.channel(`team-watch-${team.id}-${suffix}`);
     ch.on('postgres_changes', {
       event: '*', schema: 'public', table: 'team_members',
       filter: `team_id=eq.${team.id}`,
-    }, () => fetchTeam(userId)).subscribe();
+    }, () => fetchTeam(userId))
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'teams',
+        filter: `id=eq.${team.id}`,
+      }, () => fetchTeam(userId))
+      .subscribe();
     return () => { ch.unsubscribe(); };
   }, [team?.id, userId]);
 

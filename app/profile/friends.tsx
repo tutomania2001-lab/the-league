@@ -4,6 +4,7 @@ import { GlowText } from '@/components/ui/GlowText';
 import { Input } from '@/components/ui/Input';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useFriends } from '@/hooks/useFriends';
+import { withClanTag } from '@/lib/clanTag';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -80,7 +81,7 @@ export default function FriendsScreen() {
               <Card key={f.id} style={styles.friendRow}>
                 <FriendAvatar profile={f.profile} />
                 <View style={styles.friendInfo}>
-                  <Text style={styles.friendName}>{f.profile.riot_id ?? f.profile.username}</Text>
+                  <Text style={styles.friendName}>{withClanTag(f.profile.riot_id ?? f.profile.username, (f.profile as any).clan_tag)}</Text>
                   <Text style={styles.friendSub}>Wants to play with you</Text>
                 </View>
                 <View style={styles.actions}>
@@ -114,7 +115,7 @@ export default function FriendsScreen() {
               <Card key={f.id} style={styles.friendRow}>
                 <FriendAvatar profile={f.profile} />
                 <View style={styles.friendInfo}>
-                  <Text style={styles.friendName}>{f.profile.riot_id ?? f.profile.username}</Text>
+                  <Text style={styles.friendName}>{withClanTag(f.profile.riot_id ?? f.profile.username, (f.profile as any).clan_tag)}</Text>
                   <Text style={styles.friendSub}>Wild Rift Player</Text>
                 </View>
                 <TouchableOpacity style={styles.removeBtn} onPress={() => remove(f.id)}>
@@ -133,7 +134,7 @@ export default function FriendsScreen() {
               <Card key={f.id} style={[styles.friendRow, { opacity: 0.6 }]}>
                 <FriendAvatar profile={f.profile} />
                 <View style={styles.friendInfo}>
-                  <Text style={styles.friendName}>{f.profile.riot_id ?? f.profile.username}</Text>
+                  <Text style={styles.friendName}>{withClanTag(f.profile.riot_id ?? f.profile.username, (f.profile as any).clan_tag)}</Text>
                   <Text style={styles.friendSub}>Pending...</Text>
                 </View>
                 <TouchableOpacity onPress={() => remove(f.id)}>
