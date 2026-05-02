@@ -9,7 +9,7 @@ import { RIFT_IMAGES, getRiftImage } from '@/constants/rift';
 import { useTournamentList } from '@/hooks/useTournament';
 import { useLiveMatches } from '@/hooks/useMatch';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, FlatList, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -62,8 +62,15 @@ function TournamentStrip({ tournaments, activeId, onSelect }: { tournaments: any
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { majorTournaments, teamBattles } = useTournamentList();
+  const { majorTournaments, teamBattles, refresh } = useTournamentList();
   const { matches: liveMatches } = useLiveMatches();
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function onRefresh() {
+    setRefreshing(true);
+    await refresh();
+    setRefreshing(false);
+  }
   const featuredTournaments = majorTournaments.filter(t => t.status !== 'completed');
   const activeBattles = teamBattles.filter(t => t.status !== 'completed').slice(0, 4);
 
@@ -83,7 +90,10 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} colors={[Colors.accent]} />}
+      >
         <View style={styles.header}>
           <PulseGlow duration={2200} minOpacity={0.75}>
             <GlowText style={styles.heroTitle} intensity="high">◈ THE LEAGUE</GlowText>

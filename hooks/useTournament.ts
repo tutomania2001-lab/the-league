@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { MatchRow, TournamentRow } from '@/types/database';
 import { useEffect, useState } from 'react';
+import { useAppRefresh } from './useAppRefresh';
 
 // Global listeners — any useTournamentList instance refreshes when signalled
 const refreshListeners = new Set<() => void>();
@@ -23,6 +24,8 @@ export function useTournamentList() {
     }
     setLoading(false);
   }
+
+  useAppRefresh(fetch);
 
   useEffect(() => {
     fetch();

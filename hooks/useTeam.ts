@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { TeamMemberRow, TeamRow } from '@/types/database';
 import { useEffect, useState } from 'react';
+import { useAppRefresh } from './useAppRefresh';
 
 export function useTeam(userId: string | undefined) {
   const [team, setTeam] = useState<TeamRow | null>(null);
@@ -35,6 +36,8 @@ export function useTeam(userId: string | undefined) {
     }
     setLoading(false);
   }
+
+  useAppRefresh(() => { if (userId) fetchTeam(userId); });
 
   useEffect(() => {
     if (!userId) { setLoading(false); return; }

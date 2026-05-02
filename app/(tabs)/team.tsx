@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Dimensions, FlatList, Image,
-  KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet,
+  KeyboardAvoidingView, Modal, Platform, RefreshControl, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -626,7 +626,10 @@ export default function TeamScreen() {
 
         {/* OVERVIEW */}
         {activeTab === 'overview' && (
-          <ScrollView contentContainerStyle={styles.tabContent}>
+          <ScrollView
+            contentContainerStyle={styles.tabContent}
+            refreshControl={<RefreshControl refreshing={false} onRefresh={refreshTeam} tintColor={Colors.gold} colors={[Colors.gold]} />}
+          >
             {/* Room code card */}
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>

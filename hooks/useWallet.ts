@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { TransactionRow } from '@/types/database';
 import { useEffect, useState } from 'react';
+import { useAppRefresh } from './useAppRefresh';
 
 export function useWallet(userId: string | undefined) {
   const [balance, setBalance] = useState(0);
@@ -17,6 +18,8 @@ export function useWallet(userId: string | undefined) {
     if (t.data) setTransactions(t.data);
     setLoading(false);
   }
+
+  useAppRefresh(() => { if (userId) fetch(userId); });
 
   useEffect(() => {
     if (!userId) { setLoading(false); return; }
