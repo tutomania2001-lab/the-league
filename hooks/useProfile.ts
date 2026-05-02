@@ -29,7 +29,7 @@ export function useProfile(userId: string | undefined) {
     return () => { sub.unsubscribe(); };
   }, [userId]);
 
-  async function updateProfile(updates: Partial<Pick<UserRow, 'username' | 'riot_id'>>) {
+  async function updateProfile(updates: Partial<Pick<UserRow, 'username' | 'riot_id' | 'avatar_url'>>) {
     if (!userId) return { error: 'Not authenticated' };
     const { data, error } = await supabase
       .from('users')

@@ -9,7 +9,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ProfileScreen() {
@@ -52,11 +52,20 @@ export default function ProfileScreen() {
 
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {(profile?.username ?? 'S')[0].toUpperCase()}
-            </Text>
-          </View>
+          <TouchableOpacity onPress={() => router.push('/profile/icon-picker')} activeOpacity={0.8}>
+            <View style={styles.avatar}>
+              {profile?.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
+              ) : (
+                <Text style={styles.avatarText}>
+                  {(profile?.username ?? 'S')[0].toUpperCase()}
+                </Text>
+              )}
+              <View style={styles.editBadge}>
+                <Text style={{ fontSize: 10 }}>✏️</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <PulseGlow duration={3000} minOpacity={0.8}>
               <GlowText style={Typography.heading}>{profile?.username ?? 'Summoner'}</GlowText>
@@ -162,12 +171,20 @@ const styles = StyleSheet.create({
   scroll: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   avatar: {
-    width: 60, height: 60, borderRadius: 30,
+    width: 64, height: 64, borderRadius: 10,
     backgroundColor: Colors.accentDim,
     borderWidth: 2, borderColor: Colors.accent,
     alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
   },
+  avatarImg: { width: 64, height: 64, borderRadius: 8 },
   avatarText: { fontSize: 26, fontWeight: '800', color: Colors.accent },
+  editBadge: {
+    position: 'absolute', bottom: -4, right: -4,
+    backgroundColor: Colors.surface, borderRadius: 10,
+    width: 20, height: 20, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.accentBorder,
+  },
   balance: { fontSize: 36, fontWeight: '900', marginTop: Spacing.xs },
   statsRow: { flexDirection: 'row', gap: Spacing.sm },
   statCard: { flex: 1, alignItems: 'center', gap: 4, padding: Spacing.sm },
