@@ -83,8 +83,8 @@ export default function RootLayout() {
             animation: 'fade',
           }}
         />
-        {/* Persistent friends panel — shown when authenticated or dev bypass */}
-        {(session || DEV_BYPASS.enabled) && <FriendsPanel userId={userId} />}
+        {/* Friends panel — only inside the app, never on auth/landing screens */}
+        {(session || DEV_BYPASS.enabled) && segments[0] === '(tabs)' && <FriendsPanel userId={userId} />}
         <StatusBar style="light" />
       </View>
     </ThemeProvider>
