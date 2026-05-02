@@ -1,4 +1,3 @@
-import { GlowText } from '@/components/ui/GlowText';
 import { StatusDot, UserStatus } from '@/components/ui/StatusDot';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { useChat } from '@/hooks/useChat';
@@ -6,11 +5,43 @@ import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, FlatList, Image, KeyboardAvoidingView,
-  Platform, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Animated, Easing, FlatList, Image,
+  KeyboardAvoidingView, Platform, StyleSheet, Text,
+  TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+// ── Typing indicator — 3 bouncing dots ─────────────────────
+function TypingDots() {
+  const dots = [
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+  ];
+
+  useEffect(() => {
+    const anims = dots.map((dot, i) =>
+      Animated.loop(Animated.sequence([
+        Animated.delay(i * 140),
+        Animated.timing(dot, { toValue: -6, duration: 300, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
+        Animated.timing(dot, { toValue: 0, duration: 300, useNativeDriver: true, easing: Easing.in(Easing.quad) }),
+        Animated.delay(600 - i * 140),
+      ]))
+    );
+    anims.forEach(a => a.start());
+    return () => anims.forEach(a => a.stop());
+  }, []);
+
+  return (
+    <View style={styles.typingBubble}>
+      {dots.map((dot, i) => (
+        <Animated.View key={i} style={[styles.typingDot, { transform: [{ translateY: dot }] }]} />
+      ))}
+    </View>
+  );
+}
+
+// ── Main screen ─────────────────────────────────────────────
 export default function ChatScreen() {
   const { userId: friendId, name, avatar, status } = useLocalSearchParams<{
     userId: string; name: string; avatar: string; status: string;
@@ -19,29 +50,76 @@ export default function ChatScreen() {
   const [myId, setMyId] = useState<string>();
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [friendTyping, setFriendTyping] = useState(false);
   const listRef = useRef<FlatList>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout>>();
+  const typingChannel = useRef<ReturnType<typeof supabase.channel>>();
+  const justSent = useRef(false); // prevents Enter newline staying in input
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setMyId(data.user?.id));
   }, []);
 
+  // ── Typing presence channel ───────────────────────────────
+  useEffect(() => {
+    if (!myId || !friendId) return;
+    const channelName = `typing:${[myId, friendId].sort().join('-')}`;
+    const ch = supabase.channel(channelName);
+    typingChannel.current = ch;
+
+    ch.on('broadcast', { event: 'typing' }, ({ payload }) => {
+      if (payload.userId !== myId) {
+        setFriendTyping(true);
+        clearTimeout(typingTimer.current);
+        typingTimer.current = setTimeout(() => setFriendTyping(false), 3000);
+      }
+    }).subscribe();
+
+    return () => {
+      ch.unsubscribe();
+      clearTimeout(typingTimer.current);
+    };
+  }, [myId, friendId]);
+
   const { messages, loading, send } = useChat(myId, friendId);
-  const [sendError, setSendError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (messages.length) setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
-  }, [messages.length]);
+    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+  }, [messages.length, friendTyping]);
+
+  // Broadcast typing event (throttled)
+  const lastTypingBroadcast = useRef(0);
+  function handleChangeText(val: string) {
+    // Block the newline that fires right after Enter sends
+    if (justSent.current) {
+      justSent.current = false;
+      const cleaned = val.replace(/\n$/, '');
+      setText(cleaned);
+      return;
+    }
+    setText(val);
+
+    if (!myId || !typingChannel.current) return;
+    const now = Date.now();
+    if (now - lastTypingBroadcast.current > 1500) {
+      lastTypingBroadcast.current = now;
+      typingChannel.current.send({ type: 'broadcast', event: 'typing', payload: { userId: myId } });
+    }
+  }
 
   async function handleSend() {
     if (!text.trim()) return;
+    justSent.current = true; // flag to block the trailing newline
     setSending(true);
     setSendError(null);
-    const content = text;
-    setText(''); // Clear immediately for responsiveness
+    const content = text.trim();
+    setText('');
     const { error } = await send(content);
     if (error) {
-      setSendError('Failed to send — are you logged in?');
-      setText(content); // Restore text on failure
+      setSendError('Message failed — make sure you\'re logged in');
+      setText(content);
+      justSent.current = false;
     }
     setSending(false);
   }
@@ -62,9 +140,7 @@ export default function ChatScreen() {
         )}
         <View style={styles.headerInfo}>
           <Text style={styles.headerName}>{name}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <StatusDot status={(status as UserStatus) ?? 'offline'} size={8} showLabel />
-          </View>
+          <StatusDot status={(status as UserStatus) ?? 'offline'} size={8} showLabel />
         </View>
       </View>
 
@@ -81,9 +157,21 @@ export default function ChatScreen() {
             ListEmptyComponent={
               <View style={styles.emptyChat}>
                 <Text style={{ fontSize: 36 }}>💬</Text>
-                <Text style={[Typography.subheading, { textAlign: 'center', marginTop: Spacing.sm }]}>Start the conversation</Text>
-                <Text style={[Typography.body, { textAlign: 'center', marginTop: 4 }]}>Say hi to {name}!</Text>
+                <Text style={[Typography.subheading, { textAlign: 'center', marginTop: Spacing.sm }]}>
+                  Start the conversation
+                </Text>
+                <Text style={[Typography.body, { textAlign: 'center', marginTop: 4 }]}>
+                  Say hi to {name}!
+                </Text>
               </View>
+            }
+            ListFooterComponent={
+              friendTyping ? (
+                <View style={styles.typingRow}>
+                  <Text style={styles.typingName}>{name} is typing</Text>
+                  <TypingDots />
+                </View>
+              ) : null
             }
             renderItem={({ item }) => {
               const isMe = item.sender_id === myId;
@@ -103,9 +191,8 @@ export default function ChatScreen() {
           />
         )}
 
-        {/* Send error */}
         {sendError && (
-          <View style={{ backgroundColor: 'rgba(255,68,68,0.12)', paddingHorizontal: Spacing.md, paddingVertical: 6 }}>
+          <View style={styles.errorBar}>
             <Text style={{ color: Colors.error, fontSize: 11 }}>{sendError}</Text>
           </View>
         )}
@@ -115,7 +202,7 @@ export default function ChatScreen() {
           <TextInput
             style={styles.input}
             value={text}
-            onChangeText={setText}
+            onChangeText={handleChangeText}
             placeholder="Message..."
             placeholderTextColor={Colors.textDim}
             multiline
@@ -124,7 +211,6 @@ export default function ChatScreen() {
             blurOnSubmit={false}
             returnKeyType="send"
             onKeyPress={({ nativeEvent }) => {
-              // Web: Enter sends, Shift+Enter adds newline
               if (nativeEvent.key === 'Enter' && !(nativeEvent as any).shiftKey) {
                 handleSend();
               }
@@ -135,11 +221,10 @@ export default function ChatScreen() {
             onPress={handleSend}
             disabled={!text.trim() || sending}
           >
-            {sending ? (
-              <ActivityIndicator color={Colors.background} size="small" />
-            ) : (
-              <Text style={styles.sendIcon}>➤</Text>
-            )}
+            {sending
+              ? <ActivityIndicator color={Colors.background} size="small" />
+              : <Text style={styles.sendIcon}>➤</Text>
+            }
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -168,26 +253,29 @@ const styles = StyleSheet.create({
   headerName: { fontSize: 15, fontWeight: '800', color: Colors.text },
 
   messageList: { padding: Spacing.md, gap: Spacing.sm, flexGrow: 1 },
-
   emptyChat: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xxl, marginTop: 60 },
 
+  // Typing indicator
+  typingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm },
+  typingName: { fontSize: 11, color: Colors.textMuted, fontStyle: 'italic' },
+  typingBubble: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: Colors.surfaceAlt, borderRadius: 12,
+    paddingHorizontal: 10, paddingVertical: 8,
+    borderWidth: 1, borderColor: Colors.accentBorder,
+  },
+  typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.accent },
+
+  // Messages
   bubbleWrap: { alignItems: 'flex-start', gap: 2 },
   bubbleWrapMe: { alignItems: 'flex-end' },
-  bubble: {
-    maxWidth: '78%', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
-    borderRadius: 14,
-  },
-  bubbleMe: {
-    backgroundColor: Colors.accent,
-    borderBottomRightRadius: 4,
-  },
-  bubbleThem: {
-    backgroundColor: Colors.surfaceAlt,
-    borderWidth: 1, borderColor: Colors.accentBorder,
-    borderBottomLeftRadius: 4,
-  },
+  bubble: { maxWidth: '78%', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: 14 },
+  bubbleMe: { backgroundColor: Colors.accent, borderBottomRightRadius: 4 },
+  bubbleThem: { backgroundColor: Colors.surfaceAlt, borderWidth: 1, borderColor: Colors.accentBorder, borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: 14, color: Colors.text, lineHeight: 20 },
   bubbleTime: { fontSize: 9, color: Colors.textDim, marginHorizontal: 4 },
+
+  errorBar: { backgroundColor: 'rgba(255,68,68,0.12)', paddingHorizontal: Spacing.md, paddingVertical: 6 },
 
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm,
@@ -197,8 +285,8 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1, minHeight: 44, maxHeight: 120,
-    backgroundColor: Colors.surfaceAlt,
-    borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.accentBorder,
+    backgroundColor: Colors.surfaceAlt, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.accentBorder,
     paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
     color: Colors.text, fontSize: 14,
   },
