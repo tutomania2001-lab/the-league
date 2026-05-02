@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/Input';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useFriends } from '@/hooks/useFriends';
 import { supabase } from '@/lib/supabase';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Image, RefreshControl,
@@ -16,6 +17,7 @@ export default function FriendsScreen() {
   const [userId, setUserId] = useState<string>();
   const { friends, incoming, outgoing, loading, sendRequest, accept, decline, remove } = useFriends(userId);
   const [searchRiotId, setSearchRiotId] = useState('');
+  const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [addSuccess, setAddSuccess] = useState(false);
@@ -36,11 +38,16 @@ export default function FriendsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Text style={styles.backText}>‹ Back</Text>
+        </TouchableOpacity>
+        <GlowText style={[Typography.heading, { flex: 1 }]}>👥 Friends</GlowText>
+      </View>
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); setRefreshing(false); }} tintColor={Colors.accent} />}
       >
-        <GlowText style={Typography.title}>👥 Friends</GlowText>
 
         {/* Add friend */}
         <Card style={styles.addCard}>
@@ -155,6 +162,13 @@ function FriendAvatar({ profile }: { profile: any }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
+  header: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
+    borderBottomWidth: 1, borderBottomColor: Colors.accentBorder,
+  },
+  backBtn: { paddingVertical: 4, paddingRight: 4 },
+  backText: { color: Colors.accent, fontSize: 15, fontWeight: '600' },
   scroll: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
 
   addCard: { gap: Spacing.sm },
