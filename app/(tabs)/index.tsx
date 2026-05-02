@@ -86,19 +86,38 @@ export default function HomeScreen() {
           <Badge variant="open" />
         </View>
 
-        {/* Tournament splash strip */}
-        {allActive.length > 0 && (
-          <View style={styles.champStrip}>
+        {/* Tournament splash strip — shows tournaments if any, otherwise champion splashes */}
+        <View style={styles.champStrip}>
+          {allActive.length > 0 ? (
             <TournamentStrip
               tournaments={allActive}
               activeId={activeTournament?.id ?? null}
               onSelect={(t, champ) => { setActiveTournament(t); setActiveSplash(champ); }}
             />
-          </View>
-        )}
+          ) : (
+            <FlatList
+              data={FEATURED_CHAMPIONS}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={c => c.name}
+              contentContainerStyle={{ paddingHorizontal: Spacing.md, gap: Spacing.sm }}
+              renderItem={({ item, index }) => {
+                const isActive = activeSplash.name === item.name;
+                return (
+                  <TouchableOpacity onPress={() => setActiveSplash(item)} activeOpacity={0.8}>
+                    <View style={[styles.champIcon, { borderColor: isActive ? Colors.accent : Colors.accentBorder }]}>
+                      <Image source={{ uri: item.icon }} style={styles.champImg} />
+                    </View>
+                    {isActive && <Text style={styles.champName}>{item.name}</Text>}
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
+        </View>
 
-        {/* Active tournament featured card */}
-        {activeTournament && (
+        {/* Featured banner — tournament if active, else champion splash */}
+        {activeTournament ? (
           <TouchableOpacity onPress={() => router.push(`/tournament/${activeTournament.id}`)} activeOpacity={0.88}>
             <View style={styles.featuredBanner}>
               <Image source={{ uri: activeSplash.splash }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
@@ -118,6 +137,17 @@ export default function HomeScreen() {
               </View>
             </View>
           </TouchableOpacity>
+        ) : (
+          /* No tournament — show champion splash as hero */
+          <View style={styles.featuredBanner}>
+            <Image source={{ uri: activeSplash.splash }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
+            <View style={styles.featuredBannerOverlay} />
+            <View style={styles.featuredBannerContent}>
+              <Text style={styles.featuredBannerType}>◈ THE LEAGUE</Text>
+              <GlowText style={styles.featuredBannerTitle}>No tournaments live</GlowText>
+              <Text style={styles.featuredBannerStat}>Check back soon for upcoming events</Text>
+            </View>
+          </View>
         )}
 
         {/* Live matches banner */}
