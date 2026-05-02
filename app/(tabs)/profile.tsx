@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card';
 import { GlowText } from '@/components/ui/GlowText';
 import { Input } from '@/components/ui/Input';
 import { PulseGlow } from '@/components/ui/PulseGlow';
+import { RankBadge } from '@/components/ui/RankBadge';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
@@ -70,7 +71,9 @@ export default function ProfileScreen() {
             <PulseGlow duration={3000} minOpacity={0.8}>
               <GlowText style={Typography.heading}>{profile?.riot_id ?? profile?.username ?? 'Summoner'}</GlowText>
             </PulseGlow>
-            <Text style={[Typography.body, { marginTop: 2 }]}>Wild Rift Player</Text>
+            <View style={{ marginTop: Spacing.xs }}>
+              <RankBadge wins={0} size="sm" />
+            </View>
           </View>
         </View>
 
@@ -86,10 +89,18 @@ export default function ProfileScreen() {
           />
         </Card>
 
+        {/* Rank card */}
+        <Card>
+          <Text style={Typography.label}>Ranked Standing</Text>
+          <View style={{ marginTop: Spacing.sm }}>
+            <RankBadge wins={0} size="lg" showProgress />
+          </View>
+        </Card>
+
         {/* Stats */}
         <View style={styles.statsRow}>
           {[
-            { label: 'Tournaments', value: '0' },
+            { label: 'Entered', value: '0' },
             { label: 'Wins', value: '0' },
             { label: 'Earnings', value: '$0' },
           ].map(s => (
