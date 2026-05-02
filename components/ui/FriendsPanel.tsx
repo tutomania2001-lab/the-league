@@ -1,5 +1,8 @@
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { useFriends, useRecentPlayers } from '@/hooks/useFriends';
+import { useUnreadCounts } from '@/hooks/useChat';
+import { useTeamInvites } from '@/hooks/useTeamInvites';
+import { useTeam } from '@/hooks/useTeam';
 import { StatusDot, UserStatus, STATUS_CONFIG } from '@/components/ui/StatusDot';
 import { MiniProfile, MiniProfileUser } from '@/components/ui/MiniProfile';
 import { useRef, useState } from 'react';
@@ -9,7 +12,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width } = Dimensions.get('window');
 const PANEL_W = 265;
 
 type Props = { userId: string | undefined };
@@ -18,8 +20,15 @@ export function FriendsPanel({ userId }: Props) {
   const insets = useSafeAreaInsets();
   const { friends, incoming, loading, accept, decline, remove, sendRequest } = useFriends(userId);
   const { recentPlayers } = useRecentPlayers(userId);
+  const { unreadByUser, totalUnread } = useUnreadCounts(userId);
+  const { incoming: teamInvites, sendInvite, accept: acceptInvite, decline: declineInvite } = useTeamInvites(userId);
+  const { team, members } = useTeam(userId);
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'friends' | 'recent' | 'requests'>('friends');
+  const isCaptain = team?.captain_id === userId;
+  const hasTeamSpace = members.length < 5;
+  const canInvite = isCaptain && hasTeamSpace;
+  const totalNotifs = incoming.length + teamInvites.length;
   const [refreshing, setRefreshing] = useState(false);
   const [miniProfile, setMiniProfile] = useState<MiniProfileUser | null>(null);
   const [miniIsFriend, setMiniIsFriend] = useState(false);
@@ -114,8 +123,15 @@ export function FriendsPanel({ userId }: Props) {
             <Text style={styles.addBtnText}>+ Add</Text>
           </TouchableOpacity>
         ) : (
-          <View style={[styles.statusPip, { backgroundColor: statusCfg.color + '22', borderColor: statusCfg.color + '55' }]}>
-            <Text style={{ fontSize: 9, color: statusCfg.color }}>{statusCfg.icon}</Text>
+          <View style={styles.rightBlock}>
+            {(unreadByUser[profile.id] ?? 0) > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadText}>{unreadByUser[profile.id]}</Text>
+              </View>
+            )}
+            <View style={[styles.statusPip, { backgroundColor: statusCfg.color + '22', borderColor: statusCfg.color + '55' }]}>
+              <Text style={{ fontSize: 9, color: statusCfg.color }}>{statusCfg.icon}</Text>
+            </View>
           </View>
         )}
       </TouchableOpacity>
@@ -184,12 +200,37 @@ export function FriendsPanel({ userId }: Props) {
           )}
 
           {tab === 'requests' && (
-            incoming.length === 0 ? (
+            incoming.length === 0 && teamInvites.length === 0 ? (
               <View style={styles.empty}>
                 <Text style={{ fontSize: 28, marginBottom: 6 }}>📭</Text>
                 <Text style={[Typography.body, { textAlign: 'center', fontSize: 12 }]}>No pending requests</Text>
               </View>
-            ) : incoming.map(f => renderFriendRow(f, false, true))
+            ) : (
+              <>
+                {teamInvites.map(inv => (
+                  <View key={inv.id} style={styles.inviteRow}>
+                    <Text style={{ fontSize: 18 }}>⚔️</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.friendName} numberOfLines={1}>
+                        {inv.inviter?.riot_id ?? 'Someone'} invited you
+                      </Text>
+                      <Text style={[styles.friendStatus, { color: Colors.gold }]}>
+                        to join {inv.team?.name}
+                      </Text>
+                    </View>
+                    <View style={styles.reqActions}>
+                      <TouchableOpacity style={styles.acceptBtn} onPress={() => acceptInvite(inv.id, inv.team_id)}>
+                        <Text style={{ color: Colors.success, fontWeight: '900', fontSize: 13 }}>✓</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.declineBtn} onPress={() => declineInvite(inv.id)}>
+                        <Text style={{ color: Colors.error, fontWeight: '900', fontSize: 12 }}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+                {incoming.map(f => renderFriendRow(f, false, true))}
+              </>
+            )
           )}
 
         </ScrollView>
@@ -198,8 +239,10 @@ export function FriendsPanel({ userId }: Props) {
       {/* Floating tab */}
       <TouchableOpacity style={[styles.floatTab, { top: insets.top + 120 }]} onPress={toggle} activeOpacity={0.85}>
         <Text style={styles.floatIcon}>👥</Text>
-        {pendingCount > 0 && (
-          <View style={styles.floatBadge}><Text style={styles.floatBadgeText}>{pendingCount}</Text></View>
+        {(totalNotifs + totalUnread) > 0 && (
+          <View style={styles.floatBadge}>
+            <Text style={styles.floatBadgeText}>{totalNotifs + totalUnread}</Text>
+          </View>
         )}
       </TouchableOpacity>
 
@@ -208,10 +251,16 @@ export function FriendsPanel({ userId }: Props) {
         user={miniProfile}
         onClose={() => setMiniProfile(null)}
         isFriend={miniIsFriend}
+        canInvite={canInvite}
         onAddFriend={() => miniProfile?.riot_id && sendRequest(miniProfile.riot_id)}
         onRemoveFriend={() => {
           const f = friends.find(f => f.profile?.id === miniProfile?.id);
           if (f) remove(f.id);
+        }}
+        onInviteToTeam={() => {
+          if (team && miniProfile && userId) {
+            sendInvite(team.id, miniProfile.id, userId);
+          }
         }}
       />
     </>
@@ -276,6 +325,19 @@ const styles = StyleSheet.create({
   friendName: { fontSize: 12, fontWeight: '700', color: Colors.text },
   friendStatus: { fontSize: 10, fontWeight: '600', marginTop: 1 },
 
+  rightBlock: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  unreadBadge: {
+    backgroundColor: Colors.accent, borderRadius: 8,
+    minWidth: 16, height: 16, paddingHorizontal: 3,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  unreadText: { color: Colors.background, fontSize: 9, fontWeight: '900' },
+  inviteRow: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    paddingVertical: 7, paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.sm, backgroundColor: 'rgba(200,155,60,0.06)',
+    borderWidth: 1, borderColor: Colors.gold + '33', marginBottom: 4,
+  },
   statusPip: {
     width: 22, height: 22, borderRadius: 6,
     borderWidth: 1, alignItems: 'center', justifyContent: 'center',

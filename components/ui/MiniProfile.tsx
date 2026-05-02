@@ -1,8 +1,8 @@
-import { Card } from '@/components/ui/Card';
 import { GlowText } from '@/components/ui/GlowText';
 import { StatusDot, STATUS_CONFIG, UserStatus } from '@/components/ui/StatusDot';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { getRankFromLP, getRankLabel } from '@/constants/ranks';
+import { useRouter } from 'expo-router';
 import { Animated, Image, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useEffect, useRef } from 'react';
 
@@ -23,10 +23,12 @@ type Props = {
   onAddFriend?: () => void;
   isFriend?: boolean;
   onRemoveFriend?: () => void;
-  position?: { x: number; y: number };
+  onInviteToTeam?: () => void;
+  canInvite?: boolean;
 };
 
-export function MiniProfile({ user, onClose, onAddFriend, isFriend, onRemoveFriend }: Props) {
+export function MiniProfile({ user, onClose, onAddFriend, isFriend, onRemoveFriend, onInviteToTeam, canInvite }: Props) {
+  const router = useRouter();
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opAnim = useRef(new Animated.Value(0)).current;
 
@@ -94,16 +96,47 @@ export function MiniProfile({ user, onClose, onAddFriend, isFriend, onRemoveFrie
 
         {/* Action buttons */}
         <View style={styles.actions}>
+          {/* Message — only for friends */}
+          {isFriend && (
+            <TouchableOpacity
+              style={styles.btnPrimary}
+              onPress={() => {
+                onClose();
+                router.push({
+                  pathname: `/chat/${user!.id}`,
+                  params: {
+                    name: user!.riot_id ?? user!.username,
+                    avatar: user!.avatar_url ?? '',
+                    status: user!.status ?? 'offline',
+                  },
+                });
+              }}
+            >
+              <Text style={styles.btnPrimaryText}>💬 Message</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Invite to team */}
+          {isFriend && canInvite && onInviteToTeam && (
+            <TouchableOpacity style={styles.btnInvite} onPress={() => { onInviteToTeam(); onClose(); }}>
+              <Text style={styles.btnInviteText}>⚔️ Invite to Team</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Add friend */}
           {!isFriend && onAddFriend && (
             <TouchableOpacity style={styles.btnPrimary} onPress={() => { onAddFriend(); onClose(); }}>
               <Text style={styles.btnPrimaryText}>+ Add Friend</Text>
             </TouchableOpacity>
           )}
+
+          {/* Remove friend */}
           {isFriend && (
-            <TouchableOpacity style={styles.btnSecondary} onPress={() => { onRemoveFriend?.(); onClose(); }}>
-              <Text style={styles.btnSecondaryText}>Remove Friend</Text>
+            <TouchableOpacity style={styles.btnDanger} onPress={() => { onRemoveFriend?.(); onClose(); }}>
+              <Text style={styles.btnDangerText}>Remove Friend</Text>
             </TouchableOpacity>
           )}
+
           <TouchableOpacity style={styles.btnClose} onPress={onClose}>
             <Text style={styles.btnCloseText}>Close</Text>
           </TouchableOpacity>
@@ -174,11 +207,16 @@ const styles = StyleSheet.create({
     paddingVertical: 9, alignItems: 'center',
   },
   btnPrimaryText: { color: Colors.background, fontWeight: '800', fontSize: 12, letterSpacing: 0.5 },
-  btnSecondary: {
+  btnInvite: {
     borderRadius: 6, paddingVertical: 9, alignItems: 'center',
-    borderWidth: 1, borderColor: Colors.error + '55', backgroundColor: 'rgba(255,68,68,0.06)',
+    borderWidth: 1, borderColor: Colors.gold + '88', backgroundColor: 'rgba(200,155,60,0.1)',
   },
-  btnSecondaryText: { color: Colors.error, fontWeight: '700', fontSize: 12 },
+  btnInviteText: { color: Colors.gold, fontWeight: '700', fontSize: 12 },
+  btnDanger: {
+    borderRadius: 6, paddingVertical: 9, alignItems: 'center',
+    borderWidth: 1, borderColor: Colors.error + '44', backgroundColor: 'rgba(255,68,68,0.06)',
+  },
+  btnDangerText: { color: Colors.error, fontWeight: '600', fontSize: 11 },
   btnClose: {
     borderRadius: 6, paddingVertical: 8, alignItems: 'center',
     borderWidth: 1, borderColor: Colors.accentBorder,
