@@ -74,8 +74,8 @@ export default function InviteScreen() {
           </View>
         )}
 
-        {/* Pending approval state */}
-        {pendingApproval ? (
+        {/* Only show join section if not already in a team */}
+        {!team && (pendingApproval ? (
           <View style={[styles.card, { borderColor: Colors.warning + '66', alignItems: 'center', gap: Spacing.md }]}>
             <Text style={{ fontSize: 40 }}>⏳</Text>
             <Text style={[Typography.subheading, { textAlign: 'center', color: Colors.warning }]}>
@@ -112,7 +112,7 @@ export default function InviteScreen() {
               style={styles.joinBtn}
             />
           </View>
-        )}
+        ) : null)}
 
       </ScrollView>
     </SafeAreaView>
