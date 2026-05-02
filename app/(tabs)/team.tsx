@@ -196,8 +196,7 @@ export default function TeamScreen() {
   const [memberProfiles, setMemberProfiles] = useState<Record<string, any>>({});
   const [activeTab, setActiveTab] = useState<'chat' | 'roster' | 'stats' | 'tournaments'>('chat');
 
-  // Creation flow
-  const [step, setStep] = useState<'room' | 'name'>('room');
+  // Creation flow — just a name now, room code only needed for tournaments
   const [roomCode, setRoomCode] = useState('');
   const [roomPassword, setRoomPassword] = useState('');
   const [teamName, setTeamName] = useState('');
@@ -232,7 +231,7 @@ export default function TeamScreen() {
   async function handleCreate() {
     if (!teamName.trim()) { setError('Team name is required'); return; }
     setCreating(true);
-    const { error } = await createTeam(teamName.trim(), roomCode.trim(), roomPassword.trim() || undefined);
+    const { error } = await createTeam(teamName.trim());
     if (error) { setError(error); setCreating(false); return; }
     await refreshTeam();
     setCreating(false);
@@ -268,46 +267,23 @@ export default function TeamScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <GlowText style={Typography.title}>⚔️ My Team</GlowText>
-          {step === 'room' && (
-            <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-              <Text style={{ color: Colors.textMuted, fontSize: 13 }}>Cancel</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+            <Text style={{ color: Colors.textMuted, fontSize: 13 }}>Cancel</Text>
+          </TouchableOpacity>
         </View>
 
-        {step === 'room' ? (
-          <Card style={{ gap: Spacing.md }}>
-            <View style={styles.stepHeader}>
-              <Text style={styles.stepNum}>Step 1 of 2</Text>
-              <Text style={[Typography.subheading, { color: Colors.text }]}>Wild Rift Room Code</Text>
-            </View>
-            <Text style={[Typography.body, { lineHeight: 20 }]}>Create a Custom Game in Wild Rift and enter the 5-digit room code. All 10 team members use this to join.</Text>
-            <Input label="Room Code * (5 digits)" placeholder="e.g. 48271" value={roomCode} onChangeText={v => setRoomCode(v.replace(/[^0-9]/g, '').slice(0, 5))} keyboardType="numeric" maxLength={5} autoCorrect={false} />
-            {roomCode.length > 0 && roomCode.length < 5 && <Text style={{ color: Colors.warning, fontSize: 11 }}>{5 - roomCode.length} more digit{5 - roomCode.length !== 1 ? 's' : ''} needed</Text>}
-            <Input label="Password (optional)" placeholder="Leave blank if none" value={roomPassword} onChangeText={setRoomPassword} autoCapitalize="none" />
-            {error && <Text style={{ color: Colors.error, fontSize: 12 }}>{error}</Text>}
-            <Button label="Next →" onPress={() => { if (!/^\d{5}$/.test(roomCode)) { setError('5 digits required'); return; } setError(null); setStep('name'); }} />
-          </Card>
-        ) : (
-          <Card style={{ gap: Spacing.md }}>
-            <View style={styles.stepHeader}>
-              <Text style={styles.stepNum}>Step 2 of 2</Text>
-              <Text style={[Typography.subheading, { color: Colors.text }]}>Name Your Team</Text>
-            </View>
-            <View style={styles.codePreview}>
-              <Text style={[Typography.label, { flex: 1 }]}>Room Code</Text>
-              <Text style={[Typography.mono, { color: Colors.accent, letterSpacing: 2 }]}>{roomCode}</Text>
-            </View>
-            <Input label="Team Name *" placeholder="e.g. Dragon Fist" value={teamName} onChangeText={setTeamName} />
-            {error && <Text style={{ color: Colors.error, fontSize: 12 }}>{error}</Text>}
-            <Button label="Create Team" onPress={handleCreate} loading={creating} />
-            <Button label="‹ Back" variant="ghost" onPress={() => { setStep('room'); setError(null); }} />
-            <Button label="Cancel" variant="ghost" onPress={() => { setStep('room'); setRoomCode(''); setRoomPassword(''); setTeamName(''); setError(null); router.back(); }} />
-          </Card>
-        )}
+        <Card style={{ gap: Spacing.md }}>
+          <Text style={[Typography.subheading, { color: Colors.text }]}>Create a Team</Text>
+          <Text style={[Typography.body, { lineHeight: 20 }]}>
+            Assemble up to 10 players. Free to create — you only pay when you enter a tournament.
+          </Text>
+          <Input label="Team Name *" placeholder="e.g. Dragon Fist" value={teamName} onChangeText={setTeamName} autoCorrect={false} />
+          {error && <Text style={{ color: Colors.error, fontSize: 12 }}>{error}</Text>}
+          <Button label="Create Team" onPress={handleCreate} loading={creating} />
+        </Card>
 
         <Card style={{ gap: Spacing.sm }}>
-          <Text style={Typography.label}>Have a room code? Join a team</Text>
+          <Text style={Typography.label}>Already in a team?</Text>
           <Button label="Join with Room Code" variant="secondary" onPress={() => router.push('/team/invite')} />
         </Card>
       </ScrollView>
@@ -480,9 +456,9 @@ export default function TeamScreen() {
                     <GlowText style={{ color: Colors.gold, fontWeight: '900' }}>£{t.entry_fee_per_player * 5}</GlowText>
                   </View>
                   <Button
-                    label={team.room_code ? 'Select 5 Players →' : 'Set room code first'}
-                    onPress={() => { if (!team.room_code) return; setLineupFee(t.entry_fee_per_player); setLineupTournamentId(t.id); }}
-                    disabled={!team.room_code}
+                    label={team.room_code ? 'Select 5 Players →' : '⚠️ Add room code in Roster first'}
+                    onPress={() => { if (!team.room_code) { setActiveTab('roster'); return; } setLineupFee(t.entry_fee_per_player); setLineupTournamentId(t.id); }}
+                    variant={team.room_code ? 'primary' : 'secondary'}
                     loading={joiningTournament && lineupTournamentId === t.id}
                   />
                 </Card>
