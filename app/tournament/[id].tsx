@@ -91,10 +91,10 @@ export default function TournamentDetailScreen() {
                 });
               }
 
-              // Cancel the tournament
+              // Delete the tournament (cascade removes teams, matches, lineups)
               const { error: cancelError } = await supabase
                 .from('tournaments')
-                .update({ status: 'cancelled' })
+                .delete()
                 .eq('id', id);
 
               if (cancelError) throw cancelError;
