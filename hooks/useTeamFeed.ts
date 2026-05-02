@@ -1,6 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import * as FileSystem from 'expo-file-system';
-import { decode } from 'base64-arraybuffer';
 import { useEffect, useState } from 'react';
 
 export type TeamPost = {
@@ -85,12 +83,31 @@ export function useTeamFeed(teamId: string | undefined, myId: string | undefined
       const path = `${userId}/${Date.now()}.${ext}`;
       const contentType = type === 'video' ? 'video/mp4' : 'image/jpeg';
 
-      // Read file as base64 then decode to ArrayBuffer — works reliably in RN
-      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-      const arrayBuffer = decode(base64);
+      // Use FormData REST upload — most reliable approach in React Native
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return null;
 
-      const { error } = await supabase.storage.from('team-media').upload(path, arrayBuffer, { contentType, upsert: false });
-      if (error) { console.log('Upload error:', error.message); return null; }
+      const formData = new FormData();
+      formData.append('file', { uri, type: contentType, name: `upload.${ext}` } as any);
+
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const response = await fetch(
+        `${supabaseUrl}/storage/v1/object/team-media/${path}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'x-upsert': 'false',
+          },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const err = await response.text();
+        console.log('Upload failed:', err);
+        return null;
+      }
 
       const { data } = supabase.storage.from('team-media').getPublicUrl(path);
       return data.publicUrl;
