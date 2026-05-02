@@ -185,8 +185,14 @@ export function useTeamFeed(teamId: string | undefined, myId: string | undefined
     await supabase.from('team_notifications').update({ read: true }).eq('user_id', userId).eq('read', false);
   }
 
-  async function deleteComment(commentId: string) {
+  async function deleteComment(commentId: string, postId?: string) {
     await supabase.from('team_post_comments').delete().eq('id', commentId);
+    if (postId) {
+      setPosts(prev => prev.map(p => p.id === postId
+        ? { ...p, comments_count: Math.max(0, (p.comments_count ?? 1) - 1) }
+        : p
+      ));
+    }
   }
 
   return { posts, loading, toggleLike, createPost, deletePost, uploadMedia, fetchComments, addComment, deleteComment, fetchNotifications, markNotificationsRead, refresh: fetchPosts };

@@ -949,7 +949,11 @@ export default function TeamScreen() {
                         }
                       }}>
                         <Text style={styles.likeIcon}>💬</Text>
-                        <Text style={styles.likeCount}>{expandedComments[post.id]?.length ?? post.comments_count ?? 0}</Text>
+                        <Text style={styles.likeCount}>
+                          {expandedComments[post.id] != null
+                            ? expandedComments[post.id].length
+                            : (post.comments_count ?? 0)}
+                        </Text>
                       </TouchableOpacity>
                     </View>
 
@@ -970,7 +974,7 @@ export default function TeamScreen() {
                             <Text style={styles.commentText}>{c.content}</Text>
                             {c.user_id === userId && (
                               <TouchableOpacity onPress={async () => {
-                                await deleteComment(c.id);
+                                await deleteComment(c.id, post.id);
                                 setExpandedComments(prev => ({ ...prev, [post.id]: prev[post.id].filter(x => x.id !== c.id) }));
                               }}>
                                 <Text style={{ color: Colors.error, fontSize: 10, marginLeft: 4 }}>✕</Text>
