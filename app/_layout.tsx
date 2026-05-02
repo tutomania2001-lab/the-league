@@ -3,6 +3,7 @@ import { DEV_BYPASS } from '@/lib/dev';
 import { RootBackground } from '@/components/ui/RootBackground';
 import { FriendsPanel } from '@/components/ui/FriendsPanel';
 import { usePresence } from '@/hooks/usePresence';
+import { NewsTicker } from '@/components/ui/NewsTicker';
 import { Colors } from '@/constants/theme';
 import { Session } from '@supabase/supabase-js';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
@@ -81,6 +82,8 @@ export default function RootLayout() {
     <ThemeProvider value={AppTheme}>
       <View style={styles.root}>
         <RootBackground />
+        {/* News ticker — visible on every screen */}
+        {(session || DEV_BYPASS.enabled) && <NewsTicker />}
         <Stack
           screenOptions={{
             headerShown: false,
