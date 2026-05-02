@@ -422,6 +422,23 @@ export default function TeamScreen() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [targetPostId, setTargetPostId] = useState<string | null>(null);
   const feedListRef = useRef<FlatList>(null);
+
+  // Scroll to targeted post from notification
+  useEffect(() => {
+    if (!targetPostId || !posts.length || activeTab !== 'feed') return;
+    const idx = posts.findIndex(p => p.id === targetPostId);
+    if (idx < 0) return;
+    // Small delay to ensure list is rendered
+    const t = setTimeout(() => {
+      try {
+        feedListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.2 });
+      } catch {}
+      fetchComments(targetPostId).then(comments => {
+        setExpandedComments(prev => ({ ...prev, [targetPostId!]: comments }));
+      });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [targetPostId, posts.length, activeTab]);
   const [postCaption, setPostCaption] = useState('');
   const [postMedia, setPostMedia] = useState<{ uri: string; type: 'image' | 'video' } | null>(null);
   const [posting, setPosting] = useState(false);
@@ -990,19 +1007,6 @@ export default function TeamScreen() {
                 contentContainerStyle={{ gap: 2, paddingBottom: 80 }}
                 refreshing={false}
                 onRefresh={refreshFeed}
-                onLayout={() => {
-                  if (targetPostId && posts.length > 0) {
-                    const idx = posts.findIndex(p => p.id === targetPostId);
-                    if (idx >= 0) {
-                      feedListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0 });
-                      // Expand comments for that post
-                      fetchComments(targetPostId).then(comments => {
-                        setExpandedComments(prev => ({ ...prev, [targetPostId]: comments }));
-                      });
-                      setTargetPostId(null);
-                    }
-                  }
-                }}
                 renderItem={({ item: post }) => (
                   <View style={[styles.postCard, post.id === targetPostId && { borderColor: Colors.gold, borderWidth: 1 }]}>
                     {/* Post header */}
