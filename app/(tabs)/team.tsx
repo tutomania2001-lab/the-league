@@ -358,13 +358,10 @@ export default function TeamScreen() {
     supabase.from('team_bank_transactions').select('*, user:users(riot_id,username,avatar_url)')
       .eq('team_id', team.id).order('created_at', { ascending: false }).limit(10)
       .then(({ data }) => { if (data) setBankTxns(data); });
-    // MVP — member with most tournament wins in this team's lineups
+    // MVP — only shows when someone has actual wins
     supabase.rpc('get_team_mvp', { p_team_id: team.id })
-      .then(({ data }) => { if (data?.[0]) setMvp(data[0]); })
-      .catch(() => {
-        // Fallback: just pick first active member
-        if (members[0]) setMvp({ userId: members[0].user_id, wins: 0 });
-      });
+      .then(({ data }) => { if (data?.[0]?.wins > 0) setMvp(data[0]); else setMvp(null); })
+      .catch(() => setMvp(null));
   }, [team?.id, members]);
 
   useEffect(() => {
