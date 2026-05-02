@@ -238,17 +238,19 @@ export function FriendsPanel({ userId }: Props) {
         </ScrollView>
       </Animated.View>
 
-      {/* Floating tab */}
-      <TouchableOpacity style={[styles.floatTab, { top: insets.top + 120 }]} onPress={toggle} activeOpacity={0.85}>
-        <Text style={styles.floatIcon}>👥</Text>
-        {(totalNotifs + totalUnread) > 0 && (
-          <View style={styles.floatBadge}>
-            <Text style={styles.floatBadgeText}>
-              {totalNotifs + totalUnread > 99 ? '99+' : totalNotifs + totalUnread}
-            </Text>
-          </View>
-        )}
-      </TouchableOpacity>
+      {/* Floating tab — only visible when panel is closed */}
+      {!open && (
+        <TouchableOpacity style={[styles.floatTab, { top: insets.top + 120 }]} onPress={toggle} activeOpacity={0.85}>
+          <Text style={styles.floatIcon}>👥</Text>
+          {(totalNotifs + totalUnread) > 0 && (
+            <View style={styles.floatBadge}>
+              <Text style={styles.floatBadgeText}>
+                {totalNotifs + totalUnread > 99 ? '99+' : totalNotifs + totalUnread}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      )}
 
       {/* Mini profile popup */}
       <MiniProfile
@@ -376,7 +378,7 @@ const styles = StyleSheet.create({
   },
   floatIcon: { fontSize: 18 },
   floatBadge: {
-    position: 'absolute', top: -6, right: -6,
+    position: 'absolute', top: -5, left: -8,
     backgroundColor: Colors.accent, borderRadius: 10,
     minWidth: 18, height: 18, paddingHorizontal: 4,
     alignItems: 'center', justifyContent: 'center',
