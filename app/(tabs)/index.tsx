@@ -5,6 +5,7 @@ import { PulseGlow } from '@/components/ui/PulseGlow';
 import { TournamentCard } from '@/components/tournament/TournamentCard';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { FEATURED_CHAMPIONS } from '@/constants/champions';
+import { RIFT_IMAGES, getRiftImage } from '@/constants/rift';
 import { useTournamentList } from '@/hooks/useTournament';
 import { useLiveMatches } from '@/hooks/useMatch';
 import { useEffect, useRef, useState } from 'react';
@@ -19,8 +20,8 @@ function getTournamentSplash(index: number) {
   return FEATURED_CHAMPIONS[index % FEATURED_CHAMPIONS.length];
 }
 
-// Each thumb is its own component so hooks are valid
 function TourneyThumb({ item, index, isActive, onSelect }: { item: any; index: number; isActive: boolean; onSelect: (t: any, champ: any) => void }) {
+  const riftImg = getRiftImage(index);
   const champ = getTournamentSplash(index);
   const scale = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -29,9 +30,14 @@ function TourneyThumb({ item, index, isActive, onSelect }: { item: any; index: n
   return (
     <TouchableOpacity onPress={() => onSelect(item, champ)} activeOpacity={0.8}>
       <Animated.View style={[styles.tourneyThumb, { transform: [{ scale }], borderColor: isActive ? Colors.gold : Colors.accentBorder }]}>
-        <Image source={{ uri: champ.splash }} style={styles.tourneyThumbBg} resizeMode="cover" />
+        <Image source={{ uri: riftImg }} style={styles.tourneyThumbBg} resizeMode="cover" />
         <View style={styles.tourneyThumbOverlay} />
-        <Text style={styles.tourneyThumbName} numberOfLines={2}>{item.name}</Text>
+        <View style={{ flex: 1, justifyContent: 'flex-end', padding: 6 }}>
+          <Text style={styles.tourneyThumbName} numberOfLines={2}>{item.name}</Text>
+          <Text style={styles.tourneyThumbType}>
+            {item.tournament_type === 'tournament' ? '🏟️ Official' : '⚔️ Battle'}
+          </Text>
+        </View>
         {item.status === 'active' && (
           <View style={styles.liveChip}><Text style={styles.liveChipText}>LIVE</Text></View>
         )}
@@ -95,20 +101,28 @@ export default function HomeScreen() {
               onSelect={(t, champ) => { setActiveTournament(t); setActiveSplash(champ); }}
             />
           ) : (
+            // No tournaments — show rift image placeholders
             <FlatList
-              data={FEATURED_CHAMPIONS}
+              data={RIFT_IMAGES.slice(0, 5)}
               horizontal
               showsHorizontalScrollIndicator={false}
-              keyExtractor={c => c.name}
+              keyExtractor={(_, i) => String(i)}
               contentContainerStyle={{ paddingHorizontal: Spacing.md, gap: Spacing.sm }}
               renderItem={({ item, index }) => {
-                const isActive = activeSplash.name === item.name;
+                const isActive = index === 0;
                 return (
-                  <TouchableOpacity onPress={() => setActiveSplash(item)} activeOpacity={0.8}>
-                    <View style={[styles.champIcon, { borderColor: isActive ? Colors.accent : Colors.accentBorder }]}>
-                      <Image source={{ uri: item.icon }} style={styles.champImg} />
+                  <TouchableOpacity onPress={() => {
+                    const champ = getTournamentSplash(index);
+                    setActiveSplash(champ);
+                  }} activeOpacity={0.8}>
+                    <View style={[styles.tourneyThumb, { borderColor: isActive ? Colors.accent + '88' : Colors.accentBorder }]}>
+                      <Image source={{ uri: item }} style={styles.tourneyThumbBg} resizeMode="cover" />
+                      <View style={[styles.tourneyThumbOverlay, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
+                      <View style={{ flex: 1, justifyContent: 'flex-end', padding: 6 }}>
+                        <Text style={styles.tourneyThumbName}>Coming Soon</Text>
+                        <Text style={styles.tourneyThumbType}>🏟️ Stay tuned</Text>
+                      </View>
                     </View>
-                    {isActive && <Text style={styles.champName}>{item.name}</Text>}
                   </TouchableOpacity>
                 );
               }}
@@ -235,7 +249,8 @@ const styles = StyleSheet.create({
   },
   tourneyThumbBg: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   tourneyThumbOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
-  tourneyThumbName: { fontSize: 10, fontWeight: '800', color: '#fff', padding: 5, lineHeight: 13 },
+  tourneyThumbName: { fontSize: 10, fontWeight: '800', color: '#fff', lineHeight: 13 },
+  tourneyThumbType: { fontSize: 8, color: 'rgba(255,255,255,0.65)', fontWeight: '600', marginTop: 2 },
   liveChip: { position: 'absolute', top: 5, right: 5, backgroundColor: Colors.live, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 },
   liveChipText: { fontSize: 8, fontWeight: '900', color: '#fff' },
 
