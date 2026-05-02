@@ -19,6 +19,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import * as ImagePicker from 'expo-image-picker';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useTeamFeed } from '@/hooks/useTeamFeed';
 
 const { width } = Dimensions.get('window');
 
@@ -319,6 +322,28 @@ function TeamChat({ teamId, myId, memberProfiles }: { teamId: string; myId: stri
   );
 }
 
+function timeAgo(date: string): string {
+  const diff = Date.now() - new Date(date).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function FeedVideo({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
+  return (
+    <VideoView
+      player={player}
+      style={{ width: '100%', aspectRatio: 9 / 16, maxHeight: 500 }}
+      contentFit="cover"
+      nativeControls
+    />
+  );
+}
+
 // ── Main ───────────────────────────────────────────────────
 export default function TeamScreen() {
   const router = useRouter();
@@ -327,13 +352,19 @@ export default function TeamScreen() {
   const { teamBattles } = useTournamentList();
   const openTournaments = teamBattles.filter(t => t.status === 'open');
   const [memberProfiles, setMemberProfiles] = useState<Record<string, any>>({});
-  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'chat' | 'play'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'chat' | 'play' | 'feed'>('overview');
   const [teamName, setTeamName] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingCode, setEditingCode] = useState(false);
   const [newCode, setNewCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const { posts, loading: feedLoading, toggleLike, createPost, deletePost, uploadMedia, refresh: refreshFeed } = useTeamFeed(team?.id, userId);
+  const [showNewPost, setShowNewPost] = useState(false);
+  const [postCaption, setPostCaption] = useState('');
+  const [postMedia, setPostMedia] = useState<{ uri: string; type: 'image' | 'video' } | null>(null);
+  const [posting, setPosting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const [lineupTournamentId, setLineupTournamentId] = useState<string | null>(null);
   const [lineupFee, setLineupFee] = useState(0);
   const [joiningTournament, setJoiningTournament] = useState(false);
@@ -506,7 +537,7 @@ export default function TeamScreen() {
 
       {/* Tab bar */}
       <View style={styles.tabBar}>
-        {([['overview','🏰','Overview'],['members','👥','Members'],['chat','💬','Chat'],['play','⚔️','Battle']] as const).map(([t, emoji, label]) => (
+        {([['overview','🏰','Overview'],['members','👥','Members'],['chat','💬','Chat'],['feed','📸','Feed'],['play','⚔️','Battle']] as const).map(([t, emoji, label]) => (
           <TouchableOpacity key={t} style={[styles.tab, activeTab === t && styles.tabActive]} onPress={() => setActiveTab(t)}>
             <Text style={[styles.tabLabel, activeTab === t && styles.tabLabelActive]}>{emoji} {label}</Text>
           </TouchableOpacity>
@@ -790,6 +821,166 @@ export default function TeamScreen() {
           />
         )}
 
+        {/* FEED */}
+        {activeTab === 'feed' && userId && team && (
+          <View style={{ flex: 1 }}>
+            {/* New post button */}
+            <TouchableOpacity style={styles.newPostBtn} onPress={() => setShowNewPost(true)}>
+              <Text style={styles.newPostBtnText}>📸  Share a highlight...</Text>
+            </TouchableOpacity>
+
+            {feedLoading ? (
+              <ActivityIndicator color={Colors.gold} style={{ flex: 1 }} />
+            ) : posts.length === 0 ? (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xxl }}>
+                <Text style={{ fontSize: 48, marginBottom: 12 }}>📸</Text>
+                <Text style={[Typography.subheading, { textAlign: 'center', color: Colors.gold }]}>No highlights yet</Text>
+                <Text style={[Typography.body, { textAlign: 'center', marginTop: 6 }]}>Share your best plays with the clan</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={posts}
+                keyExtractor={p => p.id}
+                contentContainerStyle={{ gap: 2, paddingBottom: 80 }}
+                refreshing={false}
+                onRefresh={refreshFeed}
+                renderItem={({ item: post }) => (
+                  <View style={styles.postCard}>
+                    {/* Post header */}
+                    <View style={styles.postHeader}>
+                      {post.author?.avatar_url
+                        ? <Image source={{ uri: post.author.avatar_url }} style={styles.postAvatar} />
+                        : <View style={[styles.postAvatar, { backgroundColor: 'rgba(200,155,60,0.2)', alignItems: 'center', justifyContent: 'center' }]}>
+                            <Text style={{ color: Colors.gold, fontWeight: '800' }}>{(post.author?.riot_id ?? post.author?.username ?? '?')[0]}</Text>
+                          </View>
+                      }
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.postAuthor}>{post.author?.riot_id ?? post.author?.username ?? 'Member'}</Text>
+                        <Text style={styles.postTime}>{timeAgo(post.created_at)}</Text>
+                      </View>
+                      {post.user_id === userId && (
+                        <TouchableOpacity onPress={() => deletePost(post.id)} style={{ padding: 8 }}>
+                          <Text style={{ color: Colors.error, fontSize: 12 }}>🗑</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {/* Media */}
+                    {post.media_url && post.media_type === 'image' && (
+                      <Image source={{ uri: post.media_url }} style={styles.postMedia} resizeMode="cover" />
+                    )}
+                    {post.media_url && post.media_type === 'video' && (
+                      <FeedVideo uri={post.media_url} />
+                    )}
+
+                    {/* Actions + caption */}
+                    <View style={styles.postFooter}>
+                      <TouchableOpacity style={styles.likeBtn} onPress={() => toggleLike(post.id)}>
+                        <Text style={[styles.likeIcon, post.liked && { color: Colors.error }]}>
+                          {post.liked ? '❤️' : '🤍'}
+                        </Text>
+                        <Text style={[styles.likeCount, post.liked && { color: Colors.error }]}>{post.likes_count}</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {post.caption && (
+                      <View style={styles.captionRow}>
+                        <Text style={styles.captionAuthor}>{post.author?.riot_id ?? post.author?.username} </Text>
+                        <Text style={styles.captionText}>{post.caption}</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              />
+            )}
+
+            {/* New post modal */}
+            <Modal visible={showNewPost} animationType="slide" transparent onRequestClose={() => setShowNewPost(false)}>
+              <View style={styles.newPostBackdrop}>
+                <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={() => setShowNewPost(false)} />
+              </View>
+              <View style={styles.newPostSheet}>
+                <View style={styles.newPostHeader}>
+                  <Text style={styles.newPostTitle}>📸 New Highlight</Text>
+                  <TouchableOpacity onPress={() => { setShowNewPost(false); setPostMedia(null); setPostCaption(''); }}>
+                    <Text style={{ color: Colors.textMuted, fontSize: 16 }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Media preview */}
+                {postMedia ? (
+                  <View style={{ position: 'relative' }}>
+                    {postMedia.type === 'image'
+                      ? <Image source={{ uri: postMedia.uri }} style={styles.newPostPreview} resizeMode="cover" />
+                      : <View style={[styles.newPostPreview, { backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }]}>
+                          <Text style={{ color: '#fff', fontSize: 40 }}>🎬</Text>
+                          <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 4 }}>Video selected</Text>
+                        </View>
+                    }
+                    <TouchableOpacity style={styles.removeMedia} onPress={() => setPostMedia(null)}>
+                      <Text style={{ color: '#fff', fontWeight: '900' }}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.mediaPicker}>
+                    <TouchableOpacity style={styles.mediaPickBtn} onPress={async () => {
+                      const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+                      if (!r.canceled && r.assets[0]) setPostMedia({ uri: r.assets[0].uri, type: 'image' });
+                    }}>
+                      <Text style={{ fontSize: 28 }}>🖼️</Text>
+                      <Text style={styles.mediaPickLabel}>Photo</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.mediaPickBtn} onPress={async () => {
+                      const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Videos, videoMaxDuration: 30, quality: 0.8 });
+                      if (!r.canceled && r.assets[0]) setPostMedia({ uri: r.assets[0].uri, type: 'video' });
+                    }}>
+                      <Text style={{ fontSize: 28 }}>🎬</Text>
+                      <Text style={styles.mediaPickLabel}>Clip (30s)</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                <TextInput
+                  style={styles.captionInput}
+                  value={postCaption}
+                  onChangeText={setPostCaption}
+                  placeholder="Add a caption..."
+                  placeholderTextColor={Colors.textDim}
+                  multiline maxLength={200}
+                />
+
+                {uploadProgress ? <Text style={{ color: Colors.accent, fontSize: 12, textAlign: 'center' }}>{uploadProgress}</Text> : null}
+
+                <TouchableOpacity
+                  style={[styles.postSubmitBtn, (!postMedia && !postCaption.trim()) && { opacity: 0.4 }]}
+                  disabled={(!postMedia && !postCaption.trim()) || posting}
+                  onPress={async () => {
+                    if (!userId || !team) return;
+                    setPosting(true);
+                    let mediaUrl: string | null = null;
+                    let mediaType: 'image' | 'video' | null = null;
+                    if (postMedia) {
+                      setUploadProgress('Uploading media...');
+                      mediaUrl = await uploadMedia(postMedia.uri, postMedia.type, userId);
+                      mediaType = postMedia.type;
+                      setUploadProgress('');
+                    }
+                    await createPost(team.id, userId, mediaUrl, mediaType, postCaption);
+                    setPosting(false);
+                    setShowNewPost(false);
+                    setPostMedia(null);
+                    setPostCaption('');
+                  }}
+                >
+                  {posting
+                    ? <ActivityIndicator color={Colors.background} size="small" />
+                    : <Text style={styles.postSubmitText}>Share to Clan 🏆</Text>
+                  }
+                </TouchableOpacity>
+              </View>
+            </Modal>
+          </View>
+        )}
+
         {/* PLAY */}
         {activeTab === 'play' && (
           <ScrollView contentContainerStyle={styles.tabContent}>
@@ -909,6 +1100,36 @@ const styles = StyleSheet.create({
   bannerStatVal: { fontSize: 16, fontWeight: '900', color: Colors.gold },
   bannerStatLabel: { fontSize: 9, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
   bannerStatDiv: { width: 1, height: 24, backgroundColor: Colors.gold + '33' },
+  // Feed styles
+  newPostBtn: { margin: Spacing.sm, padding: Spacing.md, backgroundColor: 'rgba(10,8,3,0.8)', borderRadius: 10, borderWidth: 1, borderColor: Colors.gold + '44', flexDirection: 'row', alignItems: 'center' },
+  newPostBtnText: { color: Colors.textMuted, fontSize: 13 },
+  postCard: { backgroundColor: 'rgba(10,8,3,0.85)', borderBottomWidth: 1, borderBottomColor: Colors.gold + '22' },
+  postHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.sm },
+  postAvatar: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: Colors.gold + '44' },
+  postAuthor: { fontSize: 13, fontWeight: '800', color: Colors.gold },
+  postTime: { fontSize: 10, color: Colors.textMuted },
+  postMedia: { width: '100%', aspectRatio: 1 },
+  postFooter: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.sm, paddingVertical: 6 },
+  likeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  likeIcon: { fontSize: 22 },
+  likeCount: { fontSize: 13, fontWeight: '700', color: Colors.textMuted },
+  captionRow: { flexDirection: 'row', paddingHorizontal: Spacing.sm, paddingBottom: Spacing.sm, flexWrap: 'wrap' },
+  captionAuthor: { fontSize: 12, fontWeight: '800', color: Colors.gold },
+  captionText: { fontSize: 12, color: Colors.text, flex: 1 },
+  // New post modal
+  newPostBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 99 },
+  newPostSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(10,8,3,0.99)', borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 2, borderTopColor: Colors.gold + '55', paddingBottom: 32, zIndex: 100 },
+  newPostHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.gold + '33' },
+  newPostTitle: { fontSize: 16, fontWeight: '800', color: Colors.gold },
+  newPostPreview: { width: '100%', height: 240 },
+  removeMedia: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 14, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  mediaPicker: { flexDirection: 'row', gap: Spacing.md, padding: Spacing.lg, justifyContent: 'center' },
+  mediaPickBtn: { alignItems: 'center', gap: 6, backgroundColor: 'rgba(200,155,60,0.1)', borderRadius: 12, borderWidth: 1, borderColor: Colors.gold + '44', padding: Spacing.lg, width: 120 },
+  mediaPickLabel: { fontSize: 12, fontWeight: '700', color: Colors.gold },
+  captionInput: { margin: Spacing.md, backgroundColor: 'rgba(20,14,0,0.8)', borderRadius: 10, borderWidth: 1, borderColor: Colors.gold + '44', padding: Spacing.md, color: Colors.text, fontSize: 14, minHeight: 60 },
+  postSubmitBtn: { margin: Spacing.md, marginTop: 0, backgroundColor: Colors.gold, borderRadius: 10, padding: 14, alignItems: 'center' },
+  postSubmitText: { color: '#0a0800', fontWeight: '900', fontSize: 14 },
+
   inviteBtn: { position: 'absolute', top: Spacing.md, right: Spacing.md, backgroundColor: 'rgba(200,155,60,0.15)', borderRadius: 8, borderWidth: 1, borderColor: Colors.gold + '66', paddingHorizontal: 10, paddingVertical: 5 },
   inviteBtnText: { color: Colors.gold, fontSize: 12, fontWeight: '700' },
 
