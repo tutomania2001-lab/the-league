@@ -2,7 +2,6 @@ import { Colors } from '@/constants/theme';
 import { LeagueEmblem } from '@/components/ui/LeagueEmblem';
 import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useFonts, CinzelDecorative_400Regular, CinzelDecorative_700Bold, CinzelDecorative_900Black } from '@expo-google-fonts/cinzel-decorative';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,7 +10,6 @@ const VIDEO_URI = 'https://res.cloudinary.com/dfneopzdb/video/upload/q_100,e_sha
 
 export default function LandingScreen() {
   const router = useRouter();
-  const [fontsLoaded] = useFonts({ CinzelDecorative_400Regular, CinzelDecorative_700Bold, CinzelDecorative_900Black });
 
   const player = useVideoPlayer(VIDEO_URI, p => {
     p.loop = true;
@@ -52,16 +50,12 @@ export default function LandingScreen() {
       <SafeAreaView style={styles.safe} pointerEvents="box-none">
         <Animated.View style={[styles.ui, { opacity: uiOp, transform: [{ translateY: uiY }] }]}>
 
-          {/* Logo — animated emblem left, elegant font right */}
+          {/* Logo */}
           <View style={styles.logoBlock}>
-            <LeagueEmblem size={90} color={Colors.gold} animate />
+            <LeagueEmblem size={90} color="#ffffff" />
             <View style={styles.logoText}>
-              <Text style={[styles.title, fontsLoaded && { fontFamily: 'CinzelDecorative_900Black' }]}>
-                The League
-              </Text>
-              <Text style={[styles.rift, fontsLoaded && { fontFamily: 'CinzelDecorative_400Regular', letterSpacing: 2 }]}>
-                Wild Rift
-              </Text>
+              <Text style={styles.title}>THE LEAGUE</Text>
+              <Text style={styles.rift}>WILD RIFT TOURNAMENTS</Text>
             </View>
           </View>
 
@@ -119,11 +113,11 @@ const styles = StyleSheet.create({
   },
   logoText: { flexDirection: 'column', gap: 5, justifyContent: 'center' },
   title: {
-    fontSize: 24, fontWeight: '900', letterSpacing: 1, color: Colors.gold,
-    textShadowColor: Colors.gold, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 14,
+    fontSize: 26, fontWeight: '900', letterSpacing: 3, color: '#fff',
+    textShadowColor: 'rgba(255,255,255,0.4)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12,
   },
   rift: {
-    fontSize: 10, fontWeight: '400', letterSpacing: 4, color: 'rgba(200,155,60,0.7)',
+    fontSize: 9, fontWeight: '700', letterSpacing: 3, color: 'rgba(255,255,255,0.55)',
     textTransform: 'uppercase',
   },
 
