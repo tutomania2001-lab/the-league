@@ -327,8 +327,8 @@ export default function TeamScreen() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>();
   const { team, members, loading, createTeam, leaveTeam, refreshTeam } = useTeam(userId);
-  const { tournaments } = useTournamentList();
-  const openTournaments = tournaments.filter(t => t.status === 'open');
+  const { teamBattles } = useTournamentList();
+  const openTournaments = teamBattles.filter(t => t.status === 'open');
   const [memberProfiles, setMemberProfiles] = useState<Record<string, any>>({});
   const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'chat' | 'play'>('overview');
   const [teamName, setTeamName] = useState('');
@@ -364,7 +364,7 @@ export default function TeamScreen() {
     if (!team || !lineupTournamentId || !userId) return;
     setJoiningTournament(true);
 
-    // Register team in tournament
+    // Register team — force team_battle type for player-created matches
     const { error: regError } = await supabase.from('tournament_teams')
       .insert({ tournament_id: lineupTournamentId, team_id: team.id });
 
@@ -447,7 +447,7 @@ export default function TeamScreen() {
 
       {/* Tab bar */}
       <View style={styles.tabBar}>
-        {([['overview','🏰','Overview'],['members','👥','Members'],['chat','💬','Chat'],['play','⚔️','Play']] as const).map(([t, emoji, label]) => (
+        {([['overview','🏰','Overview'],['members','👥','Members'],['chat','💬','Chat'],['play','⚔️','Battle']] as const).map(([t, emoji, label]) => (
           <TouchableOpacity key={t} style={[styles.tab, activeTab === t && styles.tabActive]} onPress={() => setActiveTab(t)}>
             <Text style={[styles.tabLabel, activeTab === t && styles.tabLabelActive]}>{emoji} {label}</Text>
           </TouchableOpacity>
@@ -595,9 +595,9 @@ export default function TeamScreen() {
         {activeTab === 'play' && (
           <ScrollView contentContainerStyle={styles.tabContent}>
             <View style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>⚔️ Enter Tournament</Text>
+              <Text style={styles.sectionTitle}>⚔️ Team Battle</Text>
               <Text style={[Typography.body, { fontSize: 12, marginBottom: Spacing.sm }]}>
-                Select 5 of your {members.length} clan members to compete. Each player pays the entry fee.
+                Challenge other teams. Select 5 of your {members.length} clan members — split the fee or captain pays all.
               </Text>
               {!team.room_code && (
                 <View style={styles.warningBox}>

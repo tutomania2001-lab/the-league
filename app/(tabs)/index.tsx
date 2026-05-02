@@ -9,6 +9,7 @@ import { useTournamentList } from '@/hooks/useTournament';
 import { useLiveMatches } from '@/hooks/useMatch';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -34,9 +35,10 @@ function AnimatedChampIcon({ item, isActive, onPress }: { item: typeof FEATURED_
 export default function HomeScreen() {
   const router = useRouter();
   const [activeChamp, setActiveChamp] = useState(FEATURED_CHAMPIONS[0]);
-  const { tournaments } = useTournamentList();
+  const { majorTournaments, teamBattles } = useTournamentList();
   const { matches: liveMatches } = useLiveMatches();
-  const activeTournaments = tournaments.filter(t => t.status !== 'completed').slice(0, 3);
+  const featuredTournaments = majorTournaments.filter(t => t.status !== 'completed').slice(0, 2);
+  const activeBattles = teamBattles.filter(t => t.status === 'active' || t.status === 'open').slice(0, 2);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -107,10 +109,34 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {activeTournaments.length > 0 && (
+        {/* Featured major tournaments */}
+        {featuredTournaments.length > 0 && (
           <View style={{ gap: Spacing.sm }}>
-            <Text style={Typography.label}>Active Tournaments</Text>
-            {activeTournaments.map(t => (
+            <Text style={[Typography.label, { color: Colors.gold }]}>🏟️ OFFICIAL TOURNAMENTS</Text>
+            {featuredTournaments.map(t => (
+              <TouchableOpacity key={t.id} onPress={() => router.push(`/tournament/${t.id}`)} activeOpacity={0.85}>
+                <View style={{ borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: Colors.gold + '55' }}>
+                  <View style={{ height: 2, backgroundColor: Colors.gold }} />
+                  <View style={{ backgroundColor: 'rgba(20,14,0,0.85)', padding: Spacing.md, gap: 6 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 15, fontWeight: '900', color: '#fff' }}>{t.name}</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '900', color: Colors.gold }}>🏆 £{t.prize_pool > 0 ? t.prize_pool.toFixed(0) : (t.entry_fee_per_player * 36).toFixed(0)}</Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                      {t.prize_format === 'top_two' ? '🥈 Top 2 Prize' : '👑 Winner Takes All'} · £{t.entry_fee_per_player}/player · 8 teams
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Active team battles */}
+        {activeBattles.length > 0 && (
+          <View style={{ gap: Spacing.sm }}>
+            <Text style={Typography.label}>⚔️ TEAM BATTLES</Text>
+            {activeBattles.map(t => (
               <TournamentCard key={t.id} tournament={t} onPress={() => router.push(`/tournament/${t.id}`)} />
             ))}
           </View>

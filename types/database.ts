@@ -43,6 +43,8 @@ export type TournamentRow = {
   start_time: string | null;
   created_by: string;
   created_at: string;
+  tournament_type: 'team_battle' | 'tournament';
+  prize_format: 'winner_takes_all' | 'top_two';
 };
 
 export type TournamentTeamRow = {

@@ -9,14 +9,18 @@ export function refreshTournamentList() {
 }
 
 export function useTournamentList() {
-  const [tournaments, setTournaments] = useState<TournamentRow[]>([]);
+  const [teamBattles, setTeamBattles] = useState<TournamentRow[]>([]);
+  const [majorTournaments, setMajorTournaments] = useState<TournamentRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function fetch() {
     const { data } = await supabase.from('tournaments').select('*')
       .neq('status', 'cancelled')
       .order('created_at', { ascending: false });
-    if (data) setTournaments(data);
+    if (data) {
+      setTeamBattles(data.filter(t => (t as any).tournament_type !== 'tournament'));
+      setMajorTournaments(data.filter(t => (t as any).tournament_type === 'tournament'));
+    }
     setLoading(false);
   }
 
@@ -26,7 +30,9 @@ export function useTournamentList() {
     return () => { refreshListeners.delete(fetch); };
   }, []);
 
-  return { tournaments, loading, refresh: fetch };
+  // Keep backward compat
+  const tournaments = [...majorTournaments, ...teamBattles];
+  return { tournaments, teamBattles, majorTournaments, loading, refresh: fetch };
 }
 
 export function useTournament(id: string | undefined) {
