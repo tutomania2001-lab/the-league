@@ -210,9 +210,51 @@ export default function TeamScreen() {
           {members.length}/5 players{isCaptain ? ' · Captain' : ''}
         </Text>
 
-        {/* Room code — always visible to all team members */}
-        {(team as any).room_code && (
+        {/* Room code — required to enter tournaments */}
+        {(team as any).room_code ? (
           <RoomCodeCard code={(team as any).room_code} password={(team as any).room_password} />
+        ) : isCaptain ? (
+          <Card style={{ gap: Spacing.sm, borderColor: Colors.error + '55' }}>
+            <Text style={{ color: Colors.error, fontWeight: '700', fontSize: 13 }}>
+              ⚠️ No Wild Rift Room Code Set
+            </Text>
+            <Text style={[Typography.body, { fontSize: 12 }]}>
+              You must set a room code before entering any tournament.
+            </Text>
+            <Input
+              label="Wild Rift Room Code *"
+              placeholder="e.g. ABC123XY"
+              value={roomCode}
+              onChangeText={v => setRoomCode(v.toUpperCase())}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+            <Input
+              label="Password (optional)"
+              placeholder="Leave blank if none"
+              value={roomPassword}
+              onChangeText={setRoomPassword}
+              autoCapitalize="none"
+            />
+            <Button
+              label="Save Room Code"
+              onPress={async () => {
+                if (!roomCode.trim()) return;
+                await supabase.from('teams').update({
+                  room_code: roomCode.trim().toUpperCase(),
+                  room_password: roomPassword.trim() || null,
+                }).eq('id', team.id);
+                setRoomCode('');
+                setRoomPassword('');
+              }}
+            />
+          </Card>
+        ) : (
+          <Card style={{ borderColor: Colors.error + '44' }}>
+            <Text style={[Typography.body, { color: Colors.error, fontSize: 12 }]}>
+              ⚠️ Captain hasn't set a Wild Rift room code yet. Tournament entry is blocked.
+            </Text>
+          </Card>
         )}
 
         {/* App invite code */}

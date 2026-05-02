@@ -105,6 +105,21 @@ export default function TournamentDetailScreen() {
               <Card style={{ alignItems: 'center' }}>
                 <Text style={Typography.body}>Tournament is full</Text>
               </Card>
+            ) : !(team as any).room_code ? (
+              <Card style={{ gap: Spacing.sm, borderColor: Colors.error + '55' }}>
+                <Text style={{ color: Colors.error, fontWeight: '700', fontSize: 13 }}>
+                  🎮 Wild Rift Room Code Required
+                </Text>
+                <Text style={[Typography.body, { fontSize: 12 }]}>
+                  Your team must have a Wild Rift room code set before entering a tournament. Set one in your team settings.
+                </Text>
+                <Button
+                  label="Set Room Code →"
+                  variant="secondary"
+                  onPress={() => router.push('/(tabs)/team')}
+                  style={{ borderColor: Colors.accent }}
+                />
+              </Card>
             ) : (
               <>
                 <Button
