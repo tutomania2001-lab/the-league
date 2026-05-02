@@ -6,7 +6,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const VIDEO_URI = 'https://res.cloudinary.com/dfneopzdb/video/upload/v1777689772/All_ranked_promotion_animations_Iron_-_Challenger_with_sound_effects_-_LoL_Season_14_15_16_b89e5x.mp4';
+const VIDEO_URI = 'https://res.cloudinary.com/dfneopzdb/video/upload/q_auto:best,e_sharpen:100,w_1080,c_scale/v1777689772/All_ranked_promotion_animations_Iron_-_Challenger_with_sound_effects_-_LoL_Season_14_15_16_b89e5x.mp4';
 
 export default function LandingScreen() {
   const router = useRouter();
