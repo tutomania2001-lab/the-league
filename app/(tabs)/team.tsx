@@ -366,13 +366,24 @@ export default function TeamScreen() {
       .then(({ data }) => {
         if (data) setMemberProfiles(Object.fromEntries(data.map(u => [u.id, u])));
       });
-    // Fetch MVP after profiles — ensures name/avatar are available
+    // Fetch MVP — show player with most wins, or captain as placeholder
     supabase.rpc('get_team_mvp', { p_team_id: team.id })
       .then(({ data }) => {
-        if (data?.[0]?.wins > 0) setMvp(data[0]);
-        else setMvp(null);
+        console.log('MVP data:', JSON.stringify(data));
+        if (data?.[0]) {
+          setMvp({ userId: String(data[0].user_id), wins: Number(data[0].wins) });
+        } else {
+          // No wins yet — show captain
+          const captain = members.find(m => m.user_id === team.captain_id) ?? members[0];
+          if (captain) setMvp({ userId: captain.user_id, wins: 0 });
+        }
       })
-      .catch(() => setMvp(null));
+      .catch((err) => {
+        console.log('MVP error:', err?.message);
+        // Fallback to captain
+        const captain = members.find(m => m.user_id === team.captain_id) ?? members[0];
+        if (captain) setMvp({ userId: captain.user_id, wins: 0 });
+      });
   }, [members, team?.id]);
 
   async function handleCreate() {
