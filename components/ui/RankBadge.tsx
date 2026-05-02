@@ -5,12 +5,14 @@ import { Animated, Image, StyleSheet, Text, View } from 'react-native';
 
 type Props = {
   lp: number;
+  peakLP?: number;
   showProgress?: boolean;
   size?: 'sm' | 'md' | 'lg';
 };
 
-export function RankBadge({ lp, showProgress = false, size = 'md' }: Props) {
+export function RankBadge({ lp, peakLP, showProgress = false, size = 'md' }: Props) {
   const rank = getRankFromLP(lp);
+  const peakRank = getRankFromLP(peakLP ?? lp);
   const label = getRankLabel(lp);
   const progress = getLPProgress(lp);
 
@@ -94,13 +96,15 @@ export function RankBadge({ lp, showProgress = false, size = 'md' }: Props) {
             </Text>
           </View>
 
-          {/* Total LP — stylish panel */}
-          <View style={[styles.totalPanel, { borderColor: rank.color + '55' }]}>
+          {/* Top Rank + Total LP panel */}
+          <View style={[styles.totalPanel, { borderColor: peakRank.color + '55' }]}>
             <View style={styles.totalLeft}>
-              <Image source={{ uri: rank.icon }} style={styles.totalIcon} resizeMode="contain" />
+              <Image source={{ uri: peakRank.icon }} style={styles.totalIcon} resizeMode="contain" />
               <View>
-                <Text style={[styles.totalTier, { color: rank.color }]}>{rank.tier.toUpperCase()}</Text>
-                <Text style={[styles.totalSub, { color: Colors.textMuted }]}>SEASON STANDING</Text>
+                <Text style={[styles.totalTier, { color: peakRank.color }]}>
+                  {peakRank.tier.toUpperCase()}{peakRank.division ? ` ${peakRank.division}` : ''}
+                </Text>
+                <Text style={[styles.totalSub, { color: Colors.textMuted }]}>TOP RANK</Text>
               </View>
             </View>
             <View style={styles.totalRight}>
