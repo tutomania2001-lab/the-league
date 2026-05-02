@@ -144,13 +144,19 @@ export default function TeamScreen() {
               Open Wild Rift, create a Custom Game room, and paste your room code here. Your team will use this to join your private match.
             </Text>
             <Input
-              label="Room Code *"
-              placeholder="e.g. ABC123XY"
+              label="Room Code * (5 digits)"
+              placeholder="e.g. 48271"
               value={roomCode}
-              onChangeText={v => setRoomCode(v.toUpperCase())}
-              autoCapitalize="characters"
+              onChangeText={v => setRoomCode(v.replace(/[^0-9]/g, '').slice(0, 5))}
+              keyboardType="numeric"
+              maxLength={5}
               autoCorrect={false}
             />
+            {roomCode.length > 0 && roomCode.length < 5 && (
+              <Text style={{ color: Colors.warning, fontSize: 11 }}>
+                {5 - roomCode.length} more digit{5 - roomCode.length !== 1 ? 's' : ''} needed
+              </Text>
+            )}
             <Input
               label="Room Password (optional)"
               placeholder="Leave blank if none"
@@ -162,6 +168,7 @@ export default function TeamScreen() {
               label="Next →"
               onPress={() => {
                 if (!roomCode.trim()) { setError('Room code is required'); return; }
+                if (!/^\d{5}$/.test(roomCode)) { setError('Room code must be exactly 5 digits (0–9)'); return; }
                 setError(null);
                 setStep('name');
               }}
@@ -222,11 +229,12 @@ export default function TeamScreen() {
               You must set a room code before entering any tournament.
             </Text>
             <Input
-              label="Wild Rift Room Code *"
-              placeholder="e.g. ABC123XY"
+              label="Wild Rift Room Code * (5 digits)"
+              placeholder="e.g. 48271"
               value={roomCode}
-              onChangeText={v => setRoomCode(v.toUpperCase())}
-              autoCapitalize="characters"
+              onChangeText={v => setRoomCode(v.replace(/[^0-9]/g, '').slice(0, 5))}
+              keyboardType="numeric"
+              maxLength={5}
               autoCorrect={false}
             />
             <Input
@@ -236,10 +244,16 @@ export default function TeamScreen() {
               onChangeText={setRoomPassword}
               autoCapitalize="none"
             />
+            {roomCode.length > 0 && roomCode.length < 5 && (
+              <Text style={{ color: Colors.warning, fontSize: 11 }}>
+                {5 - roomCode.length} more digit{5 - roomCode.length !== 1 ? 's' : ''} needed
+              </Text>
+            )}
             <Button
               label="Save Room Code"
+              disabled={roomCode.length !== 5}
               onPress={async () => {
-                if (!roomCode.trim()) return;
+                if (!/^\d{5}$/.test(roomCode)) return;
                 await supabase.from('teams').update({
                   room_code: roomCode.trim().toUpperCase(),
                   room_password: roomPassword.trim() || null,
