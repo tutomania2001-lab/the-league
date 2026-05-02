@@ -126,7 +126,9 @@ export function FriendsPanel({ userId }: Props) {
           <View style={styles.rightBlock}>
             {(unreadByUser[profile.id] ?? 0) > 0 && (
               <View style={styles.unreadBadge}>
-                <Text style={styles.unreadText}>{unreadByUser[profile.id]}</Text>
+                <Text style={styles.unreadText}>
+                  {unreadByUser[profile.id] > 9 ? '9+' : unreadByUser[profile.id]}
+                </Text>
               </View>
             )}
             <View style={[styles.statusPip, { backgroundColor: statusCfg.color + '22', borderColor: statusCfg.color + '55' }]}>
@@ -241,7 +243,9 @@ export function FriendsPanel({ userId }: Props) {
         <Text style={styles.floatIcon}>👥</Text>
         {(totalNotifs + totalUnread) > 0 && (
           <View style={styles.floatBadge}>
-            <Text style={styles.floatBadgeText}>{totalNotifs + totalUnread}</Text>
+            <Text style={styles.floatBadgeText}>
+              {totalNotifs + totalUnread > 99 ? '99+' : totalNotifs + totalUnread}
+            </Text>
           </View>
         )}
       </TouchableOpacity>
@@ -293,12 +297,12 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 10, fontWeight: '600', color: Colors.textMuted },
   tabTextActive: { color: Colors.accent },
   tabBadge: {
-    position: 'absolute', top: 4, right: 4,
+    position: 'absolute', top: 2, right: 2,
     backgroundColor: Colors.accent, borderRadius: 8,
-    minWidth: 14, height: 14, paddingHorizontal: 2,
+    minWidth: 16, height: 16, paddingHorizontal: 3,
     alignItems: 'center', justifyContent: 'center',
   },
-  tabBadgeText: { color: Colors.background, fontSize: 8, fontWeight: '900' },
+  tabBadgeText: { color: Colors.background, fontSize: 9, fontWeight: '900' },
 
   list: { padding: Spacing.xs, paddingBottom: 120 },
   empty: { alignItems: 'center', paddingTop: Spacing.xxl, paddingHorizontal: Spacing.md },
@@ -328,10 +332,10 @@ const styles = StyleSheet.create({
   rightBlock: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   unreadBadge: {
     backgroundColor: Colors.accent, borderRadius: 8,
-    minWidth: 16, height: 16, paddingHorizontal: 3,
+    minWidth: 18, height: 18, paddingHorizontal: 4,
     alignItems: 'center', justifyContent: 'center',
   },
-  unreadText: { color: Colors.background, fontSize: 9, fontWeight: '900' },
+  unreadText: { color: Colors.background, fontSize: 10, fontWeight: '900' },
   inviteRow: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
     paddingVertical: 7, paddingHorizontal: Spacing.sm,
@@ -372,10 +376,10 @@ const styles = StyleSheet.create({
   },
   floatIcon: { fontSize: 18 },
   floatBadge: {
-    position: 'absolute', top: -4, right: -4,
-    backgroundColor: Colors.accent, borderRadius: 8,
-    minWidth: 16, height: 16, paddingHorizontal: 3,
+    position: 'absolute', top: -6, right: -6,
+    backgroundColor: Colors.accent, borderRadius: 10,
+    minWidth: 18, height: 18, paddingHorizontal: 4,
     alignItems: 'center', justifyContent: 'center',
   },
-  floatBadgeText: { color: Colors.background, fontSize: 9, fontWeight: '900' },
+  floatBadgeText: { color: Colors.background, fontSize: 10, fontWeight: '900' },
 });
