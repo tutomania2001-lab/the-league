@@ -50,11 +50,13 @@ export default function LandingScreen() {
       <SafeAreaView style={styles.safe} pointerEvents="box-none">
         <Animated.View style={[styles.ui, { opacity: uiOp, transform: [{ translateY: uiY }] }]}>
 
-          {/* Logo */}
+          {/* Logo — emblem left, text right */}
           <View style={styles.logoBlock}>
-            <LeagueEmblem size={140} color="#ffffff" />
-            <Text style={styles.title}>THE LEAGUE</Text>
-            <Text style={styles.rift}>WILD RIFT TOURNAMENTS</Text>
+            <LeagueEmblem size={72} color="#ffffff" />
+            <View style={styles.logoText}>
+              <Text style={styles.title}>THE LEAGUE</Text>
+              <Text style={styles.rift}>WILD RIFT TOURNAMENTS</Text>
+            </View>
           </View>
 
           {/* CTAs */}
@@ -106,13 +108,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
   },
 
-  logoBlock: { alignItems: 'center', gap: 6 },
+  logoBlock: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+  },
+  logoText: { flexDirection: 'column', gap: 4 },
   title: {
-    fontSize: 28, fontWeight: '900', letterSpacing: 4, color: '#fff',
+    fontSize: 26, fontWeight: '900', letterSpacing: 3, color: '#fff',
     textShadowColor: 'rgba(255,255,255,0.4)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12,
   },
   rift: {
-    fontSize: 9, fontWeight: '700', letterSpacing: 4, color: 'rgba(255,255,255,0.55)',
+    fontSize: 9, fontWeight: '700', letterSpacing: 3, color: 'rgba(255,255,255,0.55)',
     textTransform: 'uppercase',
   },
 
