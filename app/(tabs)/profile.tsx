@@ -72,7 +72,7 @@ export default function ProfileScreen() {
               <GlowText style={Typography.heading}>{profile?.riot_id ?? profile?.username ?? 'Summoner'}</GlowText>
             </PulseGlow>
             <View style={{ marginTop: Spacing.xs }}>
-              <RankBadge wins={24} size="sm" />
+              <RankBadge lp={2465} size="sm" />
             </View>
           </View>
         </View>
@@ -93,7 +93,7 @@ export default function ProfileScreen() {
         <Card>
           <Text style={Typography.label}>Ranked Standing</Text>
           <View style={{ marginTop: Spacing.sm }}>
-            <RankBadge wins={24} size="lg" showProgress />
+            <RankBadge lp={2465} size="lg" showProgress />
           </View>
         </Card>
 
