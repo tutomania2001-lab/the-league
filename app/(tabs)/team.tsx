@@ -339,8 +339,33 @@ export default function TeamScreen() {
   const [showInfo, setShowInfo] = useState(false);
   const [showInviteInfo, setShowInviteInfo] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [mvp, setMvp] = useState<{ userId: string; wins: number } | null>(null);
+  const [bankBalance, setBankBalance] = useState(0);
+  const [bankTxns, setBankTxns] = useState<any[]>([]);
+  const [contributeAmount, setContributeAmount] = useState('');
+  const [contributing, setContributing] = useState(false);
+  const [contributeError, setContributeError] = useState<string | null>(null);
+  const [contributeSuccess, setContributeSuccess] = useState(false);
 
   useEffect(() => { supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id)); }, []);
+
+  // Fetch MVP and bank data when team loads
+  useEffect(() => {
+    if (!team?.id) return;
+    // Bank balance + recent transactions
+    supabase.from('teams').select('bank_balance').eq('id', team.id).single()
+      .then(({ data }) => { if (data) setBankBalance(data.bank_balance ?? 0); });
+    supabase.from('team_bank_transactions').select('*, user:users(riot_id,username,avatar_url)')
+      .eq('team_id', team.id).order('created_at', { ascending: false }).limit(10)
+      .then(({ data }) => { if (data) setBankTxns(data); });
+    // MVP — member with most tournament wins in this team's lineups
+    supabase.rpc('get_team_mvp', { p_team_id: team.id })
+      .then(({ data }) => { if (data?.[0]) setMvp(data[0]); })
+      .catch(() => {
+        // Fallback: just pick first active member
+        if (members[0]) setMvp({ userId: members[0].user_id, wins: 0 });
+      });
+  }, [team?.id, members]);
 
   useEffect(() => {
     if (!members.length) return;
@@ -355,6 +380,29 @@ export default function TeamScreen() {
     if (error) { setError(error); setCreating(false); return; }
     await refreshTeam();
     setCreating(false);
+  }
+
+  async function handleContribute() {
+    const amt = parseFloat(contributeAmount);
+    if (!amt || amt < 1 || !team || !userId) { setContributeError('Enter a valid amount (min £1)'); return; }
+    setContributing(true); setContributeError(null);
+    const { error } = await supabase.rpc('contribute_to_team_bank', {
+      p_team_id: team.id, p_user_id: userId, p_amount: amt,
+    });
+    if (error) { setContributeError(error.message.includes('Insufficient') ? 'Insufficient wallet balance' : error.message); }
+    else {
+      setContributeAmount('');
+      setContributeSuccess(true);
+      setTimeout(() => setContributeSuccess(false), 2000);
+      // Refresh bank balance
+      const { data } = await supabase.from('teams').select('bank_balance').eq('id', team.id).single();
+      if (data) setBankBalance(data.bank_balance);
+      const { data: txns } = await supabase.from('team_bank_transactions')
+        .select('*, user:users(riot_id,username,avatar_url)').eq('team_id', team.id)
+        .order('created_at', { ascending: false }).limit(10);
+      if (txns) setBankTxns(txns);
+    }
+    setContributing(false);
   }
 
   async function handleEnterTournament(ids: string[], captainPaysAll: boolean) {
@@ -539,6 +587,78 @@ export default function TeamScreen() {
                   </View>
                 ))}
               </View>
+            </View>
+
+            {/* ── MVP Banner ── */}
+            {mvp && memberProfiles[mvp.userId] && (
+              <View style={styles.mvpBanner}>
+                <View style={styles.mvpGlow} />
+                <View style={styles.mvpLeft}>
+                  <Text style={styles.mvpCrown}>👑</Text>
+                  <Text style={styles.mvpLabel}>CLAN MVP</Text>
+                </View>
+                <View style={styles.mvpCenter}>
+                  {memberProfiles[mvp.userId]?.avatar_url
+                    ? <Image source={{ uri: memberProfiles[mvp.userId].avatar_url }} style={styles.mvpAvatar} />
+                    : <View style={[styles.mvpAvatar, { backgroundColor: 'rgba(200,155,60,0.3)', alignItems: 'center', justifyContent: 'center' }]}>
+                        <Text style={{ color: Colors.gold, fontSize: 22, fontWeight: '900' }}>
+                          {(memberProfiles[mvp.userId]?.riot_id ?? memberProfiles[mvp.userId]?.username ?? '?')[0]}
+                        </Text>
+                      </View>
+                  }
+                  <Text style={styles.mvpName} numberOfLines={1}>
+                    {memberProfiles[mvp.userId]?.riot_id ?? memberProfiles[mvp.userId]?.username}
+                  </Text>
+                </View>
+                <View style={styles.mvpRight}>
+                  <Text style={styles.mvpWins}>{mvp.wins}</Text>
+                  <Text style={styles.mvpWinsLabel}>WINS</Text>
+                </View>
+              </View>
+            )}
+
+            {/* ── Team Bank ── */}
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>🏦 Clan Bank</Text>
+              {/* Balance */}
+              <View style={styles.bankBalance}>
+                <Text style={styles.bankBalanceLabel}>Available Funds</Text>
+                <Text style={styles.bankBalanceValue}>£{bankBalance.toFixed(2)}</Text>
+              </View>
+              {/* Contribute */}
+              <View style={styles.bankContribute}>
+                <TextInput
+                  style={styles.bankInput}
+                  value={contributeAmount}
+                  onChangeText={setContributeAmount}
+                  placeholder="£ Amount"
+                  placeholderTextColor={Colors.textDim}
+                  keyboardType="decimal-pad"
+                />
+                <TouchableOpacity
+                  style={[styles.bankBtn, contributing && { opacity: 0.5 }]}
+                  onPress={handleContribute}
+                  disabled={contributing}
+                >
+                  <Text style={styles.bankBtnText}>{contributing ? '...' : contributeSuccess ? '✓' : 'Contribute'}</Text>
+                </TouchableOpacity>
+              </View>
+              {contributeError && <Text style={{ color: Colors.error, fontSize: 11, marginTop: 4 }}>{contributeError}</Text>}
+              {contributeSuccess && <Text style={{ color: Colors.success, fontSize: 11, marginTop: 4 }}>✓ Contribution added!</Text>}
+              {/* Recent transactions */}
+              {bankTxns.length > 0 && (
+                <View style={{ marginTop: Spacing.sm, gap: 4 }}>
+                  <Text style={[Typography.label, { marginBottom: 2 }]}>Recent Contributions</Text>
+                  {bankTxns.slice(0, 4).map(t => (
+                    <View key={t.id} style={styles.bankTxn}>
+                      <Text style={styles.bankTxnName} numberOfLines={1}>
+                        {t.user?.riot_id ?? t.user?.username ?? 'Member'}
+                      </Text>
+                      <Text style={styles.bankTxnAmt}>+£{t.amount.toFixed(2)}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
 
             {/* Quick actions */}
@@ -771,6 +891,35 @@ const styles = StyleSheet.create({
   bannerStatDiv: { width: 1, height: 24, backgroundColor: Colors.gold + '33' },
   inviteBtn: { position: 'absolute', top: Spacing.md, right: Spacing.md, backgroundColor: 'rgba(200,155,60,0.15)', borderRadius: 8, borderWidth: 1, borderColor: Colors.gold + '66', paddingHorizontal: 10, paddingVertical: 5 },
   inviteBtnText: { color: Colors.gold, fontSize: 12, fontWeight: '700' },
+
+  // MVP Banner
+  mvpBanner: {
+    borderRadius: 14, overflow: 'hidden', borderWidth: 1.5, borderColor: Colors.gold + '88',
+    flexDirection: 'row', alignItems: 'center', padding: Spacing.md, gap: Spacing.md,
+    backgroundColor: 'rgba(15,10,0,0.9)',
+  },
+  mvpGlow: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(200,155,60,0.06)' },
+  mvpLeft: { alignItems: 'center', gap: 2 },
+  mvpCrown: { fontSize: 22 },
+  mvpLabel: { fontSize: 8, fontWeight: '900', color: Colors.gold, letterSpacing: 1.5 },
+  mvpCenter: { flex: 1, alignItems: 'center', gap: 6 },
+  mvpAvatar: { width: 52, height: 52, borderRadius: 10, borderWidth: 2, borderColor: Colors.gold },
+  mvpName: { fontSize: 13, fontWeight: '800', color: Colors.gold, textAlign: 'center' },
+  mvpRight: { alignItems: 'center' },
+  mvpWins: { fontSize: 28, fontWeight: '900', color: Colors.gold, textShadowColor: Colors.gold, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 },
+  mvpWinsLabel: { fontSize: 8, fontWeight: '700', color: Colors.gold + '88', letterSpacing: 1 },
+
+  // Team Bank
+  bankBalance: { backgroundColor: 'rgba(200,155,60,0.08)', borderRadius: 10, borderWidth: 1, borderColor: Colors.gold + '33', padding: Spacing.sm, alignItems: 'center', gap: 2, marginBottom: Spacing.sm },
+  bankBalanceLabel: { fontSize: 9, fontWeight: '700', color: Colors.gold + '88', letterSpacing: 1.5, textTransform: 'uppercase' },
+  bankBalanceValue: { fontSize: 28, fontWeight: '900', color: Colors.gold, textShadowColor: Colors.gold, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 },
+  bankContribute: { flexDirection: 'row', gap: Spacing.sm },
+  bankInput: { flex: 1, height: 40, backgroundColor: 'rgba(20,14,0,0.8)', borderRadius: 8, borderWidth: 1, borderColor: Colors.gold + '44', paddingHorizontal: Spacing.sm, color: Colors.text, fontSize: 14 },
+  bankBtn: { paddingHorizontal: 14, paddingVertical: 10, backgroundColor: Colors.gold, borderRadius: 8 },
+  bankBtnText: { color: '#0a0800', fontWeight: '900', fontSize: 12 },
+  bankTxn: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: Colors.gold + '15' },
+  bankTxnName: { fontSize: 11, color: Colors.textMuted, flex: 1 },
+  bankTxnAmt: { fontSize: 11, fontWeight: '700', color: Colors.success },
 
   // Tab bar
   tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.gold + '33', backgroundColor: 'rgba(8,6,0,0.8)' },
