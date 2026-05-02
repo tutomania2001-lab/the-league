@@ -30,21 +30,36 @@ export function useTeamFeed(teamId: string | undefined, myId: string | undefined
 
   async function fetchPosts() {
     if (!teamId) return;
-    const { data } = await supabase
+
+    // Fetch posts without join first (more reliable)
+    const { data: postsData, error } = await supabase
       .from('team_posts')
-      .select('*, author:users(riot_id, username, avatar_url)')
+      .select('*')
       .eq('team_id', teamId)
       .order('created_at', { ascending: false })
       .limit(50);
 
-    if (!data) { setLoading(false); return; }
+    if (error) { console.log('fetchPosts error:', error.message); setLoading(false); return; }
+    if (!postsData?.length) { setPosts([]); setLoading(false); return; }
 
+    // Fetch authors separately
+    const authorIds = [...new Set(postsData.map(p => p.user_id))];
+    const { data: authors } = await supabase
+      .from('users').select('id, riot_id, username, avatar_url')
+      .in('id', authorIds);
+    const authorMap = Object.fromEntries((authors ?? []).map((a: any) => [a.id, a]));
+
+    // Fetch likes
     const { data: likes } = await supabase
       .from('team_post_likes').select('post_id')
       .eq('user_id', myId ?? '00000000-0000-0000-0000-000000000000');
-
     const likedSet = new Set((likes ?? []).map((l: any) => l.post_id));
-    setPosts(data.map((p: any) => ({ ...p, liked: likedSet.has(p.id) })));
+
+    setPosts(postsData.map(p => ({
+      ...p,
+      author: authorMap[p.user_id],
+      liked: likedSet.has(p.id),
+    })));
     setLoading(false);
   }
 
