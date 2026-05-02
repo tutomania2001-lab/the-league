@@ -5,6 +5,7 @@ import { useTeamInvites } from '@/hooks/useTeamInvites';
 import { useTeam } from '@/hooks/useTeam';
 import { StatusDot, UserStatus, STATUS_CONFIG } from '@/components/ui/StatusDot';
 import { MiniProfile, MiniProfileUser } from '@/components/ui/MiniProfile';
+import { getStatusFromLastSeen } from '@/hooks/usePresence';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Animated, Dimensions, Easing, Image,
@@ -101,7 +102,8 @@ export function FriendsPanel({ userId: userIdProp }: Props) {
 
   function renderFriendRow(f: any, isFriend: boolean, showActions = false) {
     const profile = f.profile ?? f;
-    const status = (profile.status ?? 'offline') as UserStatus;
+    // Compute status from last_seen for accuracy
+    const status = getStatusFromLastSeen(profile.last_seen, profile.status ?? 'offline') as UserStatus;
     const statusCfg = STATUS_CONFIG[status];
 
     return (
