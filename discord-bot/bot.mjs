@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, REST, Routes, SlashCommandBuilder } from 'discord.js';
+import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, REST, Routes, SlashCommandBuilder, ChannelType } from 'discord.js';
 import { createClient } from '@supabase/supabase-js';
 
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -116,15 +116,16 @@ client.once('clientReady', async () => {
   if (!commandsChannel) {
     commandsChannel = await guild.channels.create({
       name: 'commands',
+      type: ChannelType.GuildText,
       topic: 'Use bot slash commands here',
       permissionOverwrites: [
-        { id: roles.everyone, deny: [PermissionFlagsBits.SendMessages] },
+        { id: roles.everyone, allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.SendMessages] },
         { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
       ],
-    });
-    console.log('✅ #commands channel created');
+    }).catch(e => { console.error('❌ Failed to create #commands:', e.message); return null; });
+    if (commandsChannel) console.log('✅ #commands channel created');
   }
-  client.commandsChannelId = commandsChannel.id;
+  client.commandsChannelId = commandsChannel?.id ?? null;
 
   // Post role selector in #get-roles
   const getRolesChannel = guildChannels.find(c => c.name === 'get-roles');
