@@ -490,9 +490,10 @@ client.on('interactionCreate', async interaction => {
     new ButtonBuilder().setCustomId(`game_dec_${gid}`).setLabel('❌ Decline').setStyle(ButtonStyle.Danger),
   );
   await interaction.update({ content: `📨 Challenge sent to ${opp}!`, components: [] });
-  await interaction.channel.send({
+  await interaction.followUp({
     content: `🎮 ${opp}, **${interaction.user.displayName}** challenges you to **${names[type]}**!`,
     components: [row],
+    ephemeral: false,
   });
   games.set(gid, { type, p1: interaction.user.id, p2: opponent, status: 'pending' });
 });
@@ -537,24 +538,24 @@ client.on('interactionCreate', async interaction => {
         new ButtonBuilder().setCustomId(`rps_${gid}_p`).setLabel('✋ Paper').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId(`rps_${gid}_s`).setLabel('✌️ Scissors').setStyle(ButtonStyle.Secondary),
       );
-      return interaction.channel.send({ content: `✊ **Rock Paper Scissors vs 🤖 Bot**\n${freshMember} — Pick your move!`, components: [row] });
+      return interaction.followUp({ ephemeral: false, content: `✊ **Rock Paper Scissors vs 🤖 Bot**\n${freshMember} — Pick your move!`, components: [row] });
     }
     if (type === 'ttt') {
       g.board = Array(9).fill(''); g.turn = g.p1;
       const rows = buildTttRows(g.board, gid, false);
       rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('_').setLabel(`❌ ${freshMember.displayName}'s turn`).setStyle(ButtonStyle.Secondary).setDisabled(true)));
-      return interaction.channel.send({ content: `❌⭕ **Tic Tac Toe vs 🤖 Bot** — ${freshMember} you go first (❌)`, components: rows });
+      return interaction.followUp({ ephemeral: false, content: `❌⭕ **Tic Tac Toe vs 🤖 Bot** — ${freshMember} you go first (❌)`, components: rows });
     }
     if (type === 'c4') {
       g.board = newC4(); g.turn = g.p1;
       const embed = new EmbedBuilder().setTitle('🟡 Connect 4 vs 🤖 Bot').setDescription(renderC4(g.board)).setColor(0x00c8ff).setFooter({text:`🔴 ${freshMember.displayName} vs 🟡 Bot — 🔴 you go first`});
-      return interaction.channel.send({ embeds: [embed], components: [c4Buttons(gid, g.board, false)] });
+      return interaction.followUp({ ephemeral: false, embeds: [embed], components: [c4Buttons(gid, g.board, false)] });
     }
     if (type === 'hl') {
       g.number = Math.floor(Math.random()*100)+1; g.p1guess = null;
       g.p2guess = Math.floor(Math.random()*100)+1; // bot guesses immediately
       const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`hl_${gid}`).setLabel('🔢 Make Your Guess (1–100)').setStyle(ButtonStyle.Primary));
-      return interaction.channel.send({ content: `🔢 **Higher or Lower vs 🤖 Bot**\n${freshMember} — I've picked a number 1–100. The bot already guessed. Can you get closer?`, components: [row] });
+      return interaction.followUp({ ephemeral: false, content: `🔢 **Higher or Lower vs 🤖 Bot**\n${freshMember} — I've picked a number 1–100. The bot already guessed. Can you get closer?`, components: [row] });
     }
   }
 
