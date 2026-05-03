@@ -34,13 +34,17 @@ client.once('clientReady', async () => {
 
   try {
   // Register slash commands
-  const rest = new REST().setToken(TOKEN);
-  await rest.put(Routes.applicationGuildCommands(client.user.id, GUILD_ID), {
-    body: [
-      new SlashCommandBuilder().setName('testwelcome').setDescription('Test the welcome message (admin only)').toJSON(),
-    ],
-  }).catch(console.error);
-  console.log('✅ Slash commands registered');
+  try {
+    const rest = new REST().setToken(TOKEN.trim());
+    await rest.put(Routes.applicationGuildCommands(client.user.id, GUILD_ID), {
+      body: [
+        new SlashCommandBuilder().setName('testwelcome').setDescription('Test the welcome message (admin only)').toJSON(),
+      ],
+    });
+    console.log('✅ Slash commands registered');
+  } catch (e) {
+    console.error('⚠️ Slash command registration failed (non-fatal):', e.message);
+  }
 
   const guild = await client.guilds.fetch(GUILD_ID);
   const guildRoles = await guild.roles.fetch();
