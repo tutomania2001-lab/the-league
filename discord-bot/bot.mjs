@@ -100,6 +100,48 @@ const LANES = [
   { key: 'support', name: '🛡️ Support',       emoji: '🛡️' },
 ];
 
+// ── ECONOMY ───────────────────────────────────────────────────────
+const msgCooldowns  = new Map(); // userId → last XP timestamp
+const voiceJoins    = new Map(); // userId → voice join timestamp
+
+const STORE_ITEMS = [
+  { id: 'red',    name: '🔴 Red',    desc: 'Red username color',    price: 200, color: 0xFF4444 },
+  { id: 'blue',   name: '🔵 Blue',   desc: 'Blue username color',   price: 200, color: 0x4488FF },
+  { id: 'purple', name: '🟣 Purple', desc: 'Purple username color', price: 250, color: 0x9B59B6 },
+  { id: 'gold',   name: '🟡 Gold',   desc: 'Gold username color',   price: 300, color: 0xF1C40F },
+  { id: 'vip',    name: '💎 VIP',    desc: 'Exclusive VIP lounge',  price: 500, color: 0x00C8FF },
+];
+
+function xpToNextLevel(n) { return 100 * (n + 1); }
+function totalXpForLevel(n) { return n * (n + 1) / 2 * 100; }
+function levelFromXP(xp) { let l = 0; while (totalXpForLevel(l + 1) <= xp) l++; return l; }
+function xpBar(xp, level) {
+  const current = xp - totalXpForLevel(level);
+  const needed   = xpToNextLevel(level);
+  const filled   = Math.round((current / needed) * 10);
+  return `[${'█'.repeat(filled)}${'░'.repeat(10 - filled)}] ${current}/${needed}`;
+}
+
+async function getEconomy(discordId) {
+  const { data } = await supabase.from('discord_economy').select('*').eq('discord_id', discordId).maybeSingle();
+  return data ?? { discord_id: discordId, xp: 0, level: 0, coins: 0 };
+}
+async function addActivity(discordId, username, xpGain, coinGain) {
+  const cur = await getEconomy(discordId);
+  const newXp    = (cur.xp    ?? 0) + xpGain;
+  const newCoins = (cur.coins ?? 0) + coinGain;
+  const oldLevel = cur.level ?? 0;
+  const newLevel = levelFromXP(newXp);
+  await supabase.from('discord_economy').upsert({ discord_id: discordId, username, xp: newXp, coins: newCoins, level: newLevel, updated_at: new Date().toISOString() });
+  return { newLevel, leveledUp: newLevel > oldLevel, newXp, newCoins };
+}
+async function deductCoins(discordId, amount) {
+  const cur = await getEconomy(discordId);
+  if ((cur.coins ?? 0) < amount) return false;
+  await supabase.from('discord_economy').upsert({ discord_id: discordId, coins: cur.coins - amount, updated_at: new Date().toISOString() });
+  return true;
+}
+
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildPresences, GatewayIntentBits.GuildVoiceStates],
 });
@@ -493,10 +535,121 @@ client.once('clientReady', async () => {
     console.log('✅ Wild Rift news feed active');
   }
 
+  // ── ECONOMY SETUP ────────────────────────────────────────────────
+  const allChEco = await guild.channels.fetch();
+
+  // Create store roles if missing
+  const allRoles = await guild.roles.fetch();
+  for (const item of STORE_ITEMS) {
+    const existing = allRoles.find(r => r.name === item.name);
+    if (!existing) {
+      const r = await guild.roles.create({ name: item.name, color: item.color, reason: 'Store role' }).catch(() => null);
+      if (r) roles[`store_${item.id}`] = r.id;
+    } else {
+      roles[`store_${item.id}`] = existing.id;
+    }
+  }
+
+  // Economy category
+  let ecoCat = allChEco.find(c => c?.name === '◈ Economy' && c.type === ChannelType.GuildCategory);
+  if (!ecoCat) {
+    ecoCat = await guild.channels.create({ name: '◈ Economy', type: ChannelType.GuildCategory,
+      permissionOverwrites: [{ id: roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
+                             { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel] }],
+    }).catch(() => null);
+  }
+
+  if (ecoCat) {
+    const ecoChannels = await guild.channels.fetch();
+
+    // #leaderboard
+    let lbCh = ecoChannels.find(c => c?.name === 'leaderboard' && c?.parentId === ecoCat.id);
+    if (!lbCh) lbCh = await guild.channels.create({ name: 'leaderboard', type: ChannelType.GuildText, parent: ecoCat.id,
+      permissionOverwrites: [{ id: roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
+                             { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.SendMessages] }],
+    }).catch(() => null);
+
+    // #store
+    let storeCh = ecoChannels.find(c => c?.name === 'store' && c?.parentId === ecoCat.id);
+    if (!storeCh) storeCh = await guild.channels.create({ name: 'store', type: ChannelType.GuildText, parent: ecoCat.id,
+      permissionOverwrites: [{ id: roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
+                             { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.SendMessages] }],
+    }).catch(() => null);
+
+    // Post profile button in #commands
+    const cmdCh = ecoChannels.find(c => c?.name === 'commands');
+    if (cmdCh) {
+      const profileBtn = new ButtonBuilder().setCustomId('eco_profile').setLabel('💰 My Balance & XP').setStyle(ButtonStyle.Success);
+      const existingCmd = await cmdCh.messages.fetch({ limit: 10 });
+      const hasProfBtn = existingCmd.some(m => m.author.id === client.user.id && m.components?.some(r => r.components?.some(b => b.customId === 'eco_profile')));
+      if (!hasProfBtn) await cmdCh.send({ components: [new ActionRowBuilder().addComponents(profileBtn)] }).catch(() => {});
+    }
+
+    client.lbChannelId    = lbCh?.id ?? null;
+    client.storeChannelId = storeCh?.id ?? null;
+    client.ecoRoles       = roles;
+
+    // Post/refresh store
+    async function refreshStore() {
+      if (!storeCh) return;
+      const existing = await storeCh.messages.fetch({ limit: 20 });
+      for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
+      const embed = new EmbedBuilder().setTitle('◈ THE LEAGUE STORE').setDescription(
+        STORE_ITEMS.map(i => `${i.name} **${i.desc}** — 🪙 **${i.price} coins**`).join('\n')
+      ).setColor(0x00c8ff).setFooter({ text: 'Earn coins by chatting and spending time in voice channels' });
+      const rows = [];
+      for (let i = 0; i < STORE_ITEMS.length; i += 3) {
+        const row = new ActionRowBuilder();
+        for (const item of STORE_ITEMS.slice(i, i + 3)) {
+          row.addComponents(new ButtonBuilder().setCustomId(`buy_${item.id}`).setLabel(`${item.name} — ${item.price}🪙`).setStyle(ButtonStyle.Primary));
+        }
+        rows.push(row);
+      }
+      await storeCh.send({ embeds: [embed], components: rows }).catch(() => {});
+    }
+
+    // Post/refresh leaderboard
+    async function refreshLeaderboard() {
+      if (!lbCh) return;
+      const { data } = await supabase.from('discord_economy').select('username,xp,level,coins').order('xp', { ascending: false }).limit(10);
+      if (!data?.length) return;
+      const existing = await lbCh.messages.fetch({ limit: 10 });
+      for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
+      const medals = ['🥇','🥈','🥉'];
+      const embed = new EmbedBuilder().setTitle('◈ XP LEADERBOARD').setDescription(
+        data.map((u, i) => `${medals[i] ?? `**${i+1}.**`} **${u.username ?? 'Unknown'}** — Lv.${u.level} • ${u.xp} XP • 🪙 ${u.coins}`).join('\n')
+      ).setColor(0x00c8ff).setTimestamp();
+      await lbCh.send({ embeds: [embed] }).catch(() => {});
+    }
+
+    await refreshStore();
+    await refreshLeaderboard();
+    setInterval(refreshLeaderboard, 10 * 60 * 1000);
+    console.log('✅ Economy system ready');
+  }
+
   } catch (e) {
     console.error('❌ clientReady error:', e);
   }
 });
+
+// ── MESSAGE XP/COINS ─────────────────────────────────────────────
+client.on('messageCreate', async msg => {
+  if (msg.author.bot || !msg.guild) return;
+  const uid = msg.author.id;
+  const now = Date.now();
+  if (msgCooldowns.has(uid) && now - msgCooldowns.get(uid) < 60_000) return;
+  msgCooldowns.set(uid, now);
+  const xp    = Math.floor(Math.random() * 11) + 10; // 10–20
+  const coins = Math.floor(Math.random() * 6)  + 5;  // 5–10
+  const { leveledUp, newLevel } = await addActivity(uid, msg.author.username, xp, coins).catch(() => ({}));
+  if (leveledUp && client.announcementsChannel) {
+    client.announcementsChannel.send(`🎉 <@${uid}> leveled up to **Level ${newLevel}**! Keep it up! 🚀`).catch(() => {});
+  }
+});
+
+// ── VOICE XP/COINS ───────────────────────────────────────────────
+// (voice joins tracked in voiceStateUpdate below — search for voiceJoins.set)
 
 // New member → New Arrival + public welcome
 client.on('guildMemberAdd', async member => {
@@ -540,6 +693,25 @@ client.on('presenceUpdate', async (oldPresence, newPresence) => {
 
 // ── PRIVATE ROOMS — VOICE STATE ──────────────────────────────────
 client.on('voiceStateUpdate', async (oldState, newState) => {
+  const member = newState.member ?? oldState.member;
+
+  // Voice XP: track join time, award on leave
+  if (!member?.user?.bot) {
+    if (!oldState.channelId && newState.channelId) {
+      voiceJoins.set(member.id, Date.now()); // joined voice
+    } else if (oldState.channelId && !newState.channelId && voiceJoins.has(member.id)) {
+      const mins = Math.floor((Date.now() - voiceJoins.get(member.id)) / 60_000);
+      voiceJoins.delete(member.id);
+      if (mins >= 1) {
+        const xp = mins * 5, coins = mins * 2;
+        const { leveledUp, newLevel } = await addActivity(member.id, member.user.username, xp, coins).catch(() => ({}));
+        if (leveledUp && client.announcementsChannel) {
+          client.announcementsChannel.send(`🎉 <@${member.id}> leveled up to **Level ${newLevel}**! 🚀`).catch(() => {});
+        }
+      }
+    }
+  }
+
   const guild = newState.guild;
   const allChannels = await guild.channels.fetch();
   const createChannel = allChannels.find(c => c?.name === '🔒 Create Private Room');
@@ -630,6 +802,38 @@ client.on('interactionCreate', async interaction => {
 
   try {
   const freshMember = await interaction.guild.members.fetch(interaction.user.id);
+
+  // ── ECONOMY PROFILE ──────────────────────────────────────────────
+  if (interaction.customId === 'eco_profile') {
+    const eco = await getEconomy(interaction.user.id);
+    const level = eco.level ?? 0;
+    const embed = new EmbedBuilder()
+      .setTitle(`💰 ${freshMember.displayName}'s Profile`)
+      .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
+      .addFields(
+        { name: '🏅 Level', value: String(level), inline: true },
+        { name: '⭐ XP',    value: `${eco.xp ?? 0} XP`, inline: true },
+        { name: '🪙 Coins', value: String(eco.coins ?? 0), inline: true },
+        { name: '📊 Progress', value: xpBar(eco.xp ?? 0, level), inline: false },
+      )
+      .setColor(0x00c8ff);
+    return interaction.reply({ embeds: [embed], ephemeral: true });
+  }
+
+  // ── STORE PURCHASE ───────────────────────────────────────────────
+  if (interaction.customId.startsWith('buy_')) {
+    const itemId = interaction.customId.replace('buy_', '');
+    const item = STORE_ITEMS.find(i => i.id === itemId);
+    if (!item) return interaction.reply({ content: '❌ Item not found.', ephemeral: true });
+    const roleId = client.ecoRoles?.[`store_${itemId}`];
+    if (roleId && freshMember.roles.cache.has(roleId)) {
+      return interaction.reply({ content: `✅ You already own **${item.name}**!`, ephemeral: true });
+    }
+    const ok = await deductCoins(interaction.user.id, item.price);
+    if (!ok) return interaction.reply({ content: `❌ Not enough coins! You need **${item.price}🪙** to buy **${item.name}**.`, ephemeral: true });
+    if (roleId) await freshMember.roles.add(roleId).catch(() => {});
+    return interaction.reply({ content: `✅ Purchased **${item.name}**! 🎉 ${roleId ? 'Role applied.' : ''}`, ephemeral: true });
+  }
 
   // ── GAME LOBBY BUTTONS ──────────────────────────────────────────
   const gameTypes = ['rps','ttt','c4','hl'];
