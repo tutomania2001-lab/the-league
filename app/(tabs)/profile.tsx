@@ -118,10 +118,9 @@ export default function ProfileScreen() {
               {team ? (
                 <>
                   <Text style={styles.teamChipIcon}>⚔️</Text>
-                  {team.clan_tag && (
-                    <Text style={styles.teamChipTag}>[{team.clan_tag.toUpperCase()}]</Text>
-                  )}
-                  <Text style={styles.teamChipName}>{team.name}</Text>
+                  <Text style={styles.teamChipTag}>
+                    #{(team.clan_tag ?? team.name.slice(0, 4)).toUpperCase()}
+                  </Text>
                 </>
               ) : (
                 <Text style={styles.teamChipNone}>⚔️ No Clan</Text>
