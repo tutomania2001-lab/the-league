@@ -3,6 +3,7 @@ import { DEV_BYPASS } from '@/lib/dev';
 import { RootBackground } from '@/components/ui/RootBackground';
 import { FriendsPanel } from '@/components/ui/FriendsPanel';
 import { FloatingMiniChat } from '@/components/ui/FloatingMiniChat';
+import { FloatingChatPanel } from '@/components/ui/FloatingChatPanel';
 import { usePresence } from '@/hooks/usePresence';
 import { NewsTicker } from '@/components/ui/NewsTicker';
 import { Colors } from '@/constants/theme';
@@ -114,6 +115,8 @@ export default function RootLayout() {
         {(session || DEV_BYPASS.enabled) && segments[0] === '(tabs)' && <FriendsPanel userId={userId} />}
         {/* Floating mini chat — available on every screen */}
         {(session || DEV_BYPASS.enabled) && <FloatingMiniChat myId={userId} />}
+        {/* Floating chat panel — left side tab with unread badge */}
+        {(session || DEV_BYPASS.enabled) && <FloatingChatPanel myId={userId} />}
         <StatusBar style="light" />
       </View>
     </ThemeProvider>
