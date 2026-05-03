@@ -87,20 +87,20 @@ export default function RootLayout() {
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: 'transparent' },
+            contentStyle: { backgroundColor: Colors.background },
             animation: 'slide_from_right',
             gestureEnabled: true,
             fullScreenGestureEnabled: true,
           }}
         >
-          {/* Landing & auth — fade */}
-          <Stack.Screen name="index" options={{ animation: 'fade' }} />
-          <Stack.Screen name="auth/log-in" options={{ animation: 'fade' }} />
-          <Stack.Screen name="auth/sign-up" options={{ animation: 'fade' }} />
+          {/* Landing & auth — transparent + fade */}
+          <Stack.Screen name="index" options={{ animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }} />
+          <Stack.Screen name="auth/log-in" options={{ animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }} />
+          <Stack.Screen name="auth/sign-up" options={{ animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }} />
           <Stack.Screen name="auth/callback" options={{ animation: 'none' }} />
 
-          {/* Main tabs — fade */}
-          <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+          {/* Main tabs — transparent so RootBackground shows through */}
+          <Stack.Screen name="(tabs)" options={{ animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }} />
 
           {/* Modal screens — slide up from bottom */}
           <Stack.Screen name="profile/settings" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
