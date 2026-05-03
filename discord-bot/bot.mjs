@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } from 'discord.js';
+import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, UserSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } from 'discord.js';
 import { createClient } from '@supabase/supabase-js';
 
 const TOKEN = process.env.DISCORD_TOKEN?.replace(/\s/g, '');
@@ -39,6 +39,55 @@ const client = new Client({
 
 // In-memory store for private rooms: channelId → { ownerId, password, lobbyMessageId }
 const privateRooms = new Map();
+
+// ── MINI GAMES ────────────────────────────────────────────────────
+const games = new Map();
+let gCount = 0;
+const newGid = () => String(++gCount);
+
+// TTT
+const TTT_WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+function tttWinner(b) {
+  for (const [a,b2,c] of TTT_WINS) if (b[a] && b[a]===b[b2] && b[a]===b[c]) return b[a];
+  return b.every(Boolean) ? 'draw' : null;
+}
+function buildTttRows(board, gid, done) {
+  const rows = [];
+  for (let r = 0; r < 3; r++) {
+    const row = new ActionRowBuilder();
+    for (let c = 0; c < 3; c++) {
+      const i = r*3+c, v = board[i];
+      row.addComponents(new ButtonBuilder()
+        .setCustomId(`ttt_${gid}_${i}`)
+        .setLabel(v || String(i+1))
+        .setStyle(v==='X'?ButtonStyle.Danger:v==='O'?ButtonStyle.Primary:ButtonStyle.Secondary)
+        .setDisabled(done || !!v));
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+// Connect 4
+const C4R=6, C4C=7;
+function newC4() { return Array.from({length:C4R},()=>Array(C4C).fill(0)); }
+function dropC4(b,col,p) { for(let r=C4R-1;r>=0;r--) if(!b[r][col]){b[r][col]=p;return true;} return false; }
+function checkC4(b,p) {
+  const ok=(r,c,dr,dc)=>[0,1,2,3].every(i=>b[r+i*dr]?.[c+i*dc]===p);
+  for(let r=0;r<C4R;r++) for(let c=0;c<C4C;c++)
+    if(ok(r,c,0,1)||ok(r,c,1,0)||ok(r,c,1,1)||ok(r,c,1,-1)) return true;
+  return false;
+}
+function renderC4(b) {
+  return b.map(r=>r.map(c=>c===1?'🔴':c===2?'🟡':'⚫').join('')).join('\n')+'\n1️⃣2️⃣3️⃣4️⃣5️⃣6️⃣7️⃣';
+}
+function c4Buttons(gid,b,done) {
+  return new ActionRowBuilder().addComponents(
+    Array.from({length:C4C},(_,c)=>new ButtonBuilder()
+      .setCustomId(`c4_${gid}_${c}`).setLabel(String(c+1))
+      .setStyle(ButtonStyle.Primary).setDisabled(done||b[0][c]!==0))
+  );
+}
 
 client.once('clientReady', async () => {
   console.log(`✅ Bot online: ${client.user.tag}`);
@@ -273,6 +322,36 @@ client.once('clientReady', async () => {
     console.log('✅ Private rooms setup done');
   }
 
+  // ── GAMES CHANNEL ────────────────────────────────────────────────
+  const allCh2 = await guild.channels.fetch();
+  let gamesCh = allCh2.find(c => c?.name === 'games' && c.type === ChannelType.GuildText);
+  if (!gamesCh) {
+    gamesCh = await guild.channels.create({
+      name: 'games', type: ChannelType.GuildText,
+      permissionOverwrites: [
+        { id: roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
+        { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+      ],
+    }).catch(() => null);
+  }
+  if (gamesCh) {
+    const existingMsgs = await gamesCh.messages.fetch({ limit: 10 });
+    for (const [, m] of existingMsgs.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
+    const gameRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('game_rps').setLabel('✊ Rock Paper Scissors').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('game_ttt').setLabel('❌ Tic Tac Toe').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('game_c4').setLabel('🟡 Connect 4').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('game_hl').setLabel('🔢 Higher or Lower').setStyle(ButtonStyle.Primary),
+    );
+    const gameEmbed = new EmbedBuilder()
+      .setTitle('◈ MINI GAMES')
+      .setDescription('Challenge a member to a 1v1 game!\n\n**✊ Rock Paper Scissors** — Pick your move, may the best hand win\n**❌ Tic Tac Toe** — Classic 3x3 grid\n**🟡 Connect 4** — Drop pieces, get 4 in a row\n**🔢 Higher or Lower** — Guess the number closest to win')
+      .setColor(0x00c8ff)
+      .setFooter({ text: 'Click a game to challenge someone' });
+    await gamesCh.send({ embeds: [gameEmbed], components: [gameRow] }).catch(() => {});
+    console.log('✅ Games channel ready');
+  }
+
   } catch (e) {
     console.error('❌ clientReady error:', e);
   }
@@ -374,12 +453,185 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
   }
 });
 
+// ── GAME OPPONENT SELECTION ──────────────────────────────────────
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isUserSelectMenu()) return;
+  if (!interaction.customId.startsWith('game_sel_')) return;
+  const type = interaction.customId.replace('game_sel_', '');
+  const opponent = interaction.values[0];
+  if (opponent === interaction.user.id) return interaction.update({ content: '❌ You can\'t challenge yourself!', components: [] });
+  const opp = await interaction.guild.members.fetch(opponent).catch(() => null);
+  if (!opp || opp.user.bot) return interaction.update({ content: '❌ Invalid opponent.', components: [] });
+
+  const gid = newGid();
+  const names = { rps:'✊ Rock Paper Scissors', ttt:'❌ Tic Tac Toe', c4:'🟡 Connect 4', hl:'🔢 Higher or Lower' };
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`game_acc_${gid}_${type}`).setLabel('✅ Accept').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`game_dec_${gid}`).setLabel('❌ Decline').setStyle(ButtonStyle.Danger),
+  );
+  await interaction.update({ content: `📨 Challenge sent to ${opp}!`, components: [] });
+  await interaction.channel.send({
+    content: `🎮 ${opp}, **${interaction.user.displayName}** challenges you to **${names[type]}**!`,
+    components: [row],
+  });
+  games.set(gid, { type, p1: interaction.user.id, p2: opponent, status: 'pending' });
+});
+
 // ── BUTTON INTERACTIONS ──────────────────────────────────────────
 client.on('interactionCreate', async interaction => {
   if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
   try {
   const freshMember = await interaction.guild.members.fetch(interaction.user.id);
+
+  // ── GAME LOBBY BUTTONS ──────────────────────────────────────────
+  const gameTypes = ['rps','ttt','c4','hl'];
+  if (gameTypes.some(t => interaction.customId === `game_${t}`)) {
+    const type = interaction.customId.replace('game_', '');
+    const sel = new UserSelectMenuBuilder().setCustomId(`game_sel_${type}`).setPlaceholder('Select your opponent').setMaxValues(1);
+    return interaction.reply({ content: '👇 Who do you want to challenge?', components: [new ActionRowBuilder().addComponents(sel)], ephemeral: true });
+  }
+
+  // ACCEPT CHALLENGE
+  if (interaction.customId.startsWith('game_acc_')) {
+    const [,,,gid,...rest] = interaction.customId.split('_');
+    const type = rest.join('_');
+    const g = games.get(gid);
+    if (!g) return interaction.update({ content: '❌ Challenge expired.', components: [] });
+    if (interaction.user.id !== g.p2) return interaction.reply({ content: '❌ This challenge isn\'t for you.', ephemeral: true });
+    g.status = 'active';
+    g.channelId = interaction.channelId;
+
+    if (type === 'rps') {
+      g.p1pick = null; g.p2pick = null;
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`rps_${gid}_r`).setLabel('✊ Rock').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`rps_${gid}_p`).setLabel('✋ Paper').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`rps_${gid}_s`).setLabel('✌️ Scissors').setStyle(ButtonStyle.Secondary),
+      );
+      const p1 = await interaction.guild.members.fetch(g.p1);
+      return interaction.update({ content: `✊ **Rock Paper Scissors**\n${p1} vs ${freshMember}\n\nBoth pick your move!`, components: [row] });
+    }
+    if (type === 'ttt') {
+      g.board = Array(9).fill(''); g.turn = g.p1;
+      const p1 = await interaction.guild.members.fetch(g.p1);
+      const rows = buildTttRows(g.board, gid, false);
+      rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('_').setLabel(`❌ ${p1.displayName}'s turn`).setStyle(ButtonStyle.Secondary).setDisabled(true)));
+      return interaction.update({ content: `❌⭕ **Tic Tac Toe** — ${p1} vs ${freshMember}`, components: rows });
+    }
+    if (type === 'c4') {
+      g.board = newC4(); g.turn = g.p1;
+      const p1 = await interaction.guild.members.fetch(g.p1);
+      const embed = new EmbedBuilder().setTitle('🟡 Connect 4').setDescription(renderC4(g.board)).setColor(0x00c8ff).setFooter({text:`🔴 ${p1.displayName} vs 🟡 ${freshMember.displayName} — 🔴 goes first`});
+      return interaction.update({ content: '', embeds: [embed], components: [c4Buttons(gid, g.board, false)] });
+    }
+    if (type === 'hl') {
+      g.number = Math.floor(Math.random()*100)+1; g.p1guess = null; g.p2guess = null;
+      const p1 = await interaction.guild.members.fetch(g.p1);
+      const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`hl_${gid}`).setLabel('🔢 Make Your Guess (1–100)').setStyle(ButtonStyle.Primary));
+      return interaction.update({ content: `🔢 **Higher or Lower**\n${p1} vs ${freshMember}\n\nI've picked a number 1–100. Both guess — closest wins!`, components: [row] });
+    }
+  }
+
+  // DECLINE CHALLENGE
+  if (interaction.customId.startsWith('game_dec_')) {
+    const gid = interaction.customId.replace('game_dec_', '');
+    const g = games.get(gid);
+    if (g) games.delete(gid);
+    return interaction.update({ content: '❌ Challenge declined.', components: [] });
+  }
+
+  // RPS PICK
+  if (interaction.customId.startsWith('rps_')) {
+    const [,gid,pick] = interaction.customId.split('_');
+    const g = games.get(gid);
+    if (!g || g.status !== 'active') return interaction.reply({ content: '❌ Game not found.', ephemeral: true });
+    if (interaction.user.id !== g.p1 && interaction.user.id !== g.p2) return interaction.reply({ content: '❌ You\'re not in this game.', ephemeral: true });
+    const isP1 = interaction.user.id === g.p1;
+    if (isP1 && g.p1pick) return interaction.reply({ content: '✅ Already picked!', ephemeral: true });
+    if (!isP1 && g.p2pick) return interaction.reply({ content: '✅ Already picked!', ephemeral: true });
+    if (isP1) g.p1pick = pick; else g.p2pick = pick;
+    if (!g.p1pick || !g.p2pick) return interaction.reply({ content: '✅ Locked in! Waiting for opponent...', ephemeral: true });
+    // Both picked — reveal
+    const names = { r:'✊ Rock', p:'✋ Paper', s:'✌️ Scissors' };
+    const beats = { r:'s', p:'r', s:'p' };
+    const [p1m, p2m] = await Promise.all([interaction.guild.members.fetch(g.p1), interaction.guild.members.fetch(g.p2)]);
+    let result;
+    if (g.p1pick === g.p2pick) result = "It's a **draw**!";
+    else if (beats[g.p1pick] === g.p2pick) result = `🏆 **${p1m.displayName}** wins!`;
+    else result = `🏆 **${p2m.displayName}** wins!`;
+    games.delete(gid);
+    return interaction.update({ content: `✊ **Rock Paper Scissors Result**\n${p1m}: ${names[g.p1pick]}\n${p2m}: ${names[g.p2pick]}\n\n${result}`, components: [] });
+  }
+
+  // TTT MOVE
+  if (interaction.customId.startsWith('ttt_')) {
+    const parts = interaction.customId.split('_');
+    const gid = parts[1], cell = parseInt(parts[2]);
+    const g = games.get(gid);
+    if (!g || g.status !== 'active') return interaction.reply({ content: '❌ Game not found.', ephemeral: true });
+    if (interaction.user.id !== g.turn) return interaction.reply({ content: '❌ Not your turn!', ephemeral: true });
+    if (g.board[cell]) return interaction.reply({ content: '❌ Cell taken.', ephemeral: true });
+    const symbol = interaction.user.id === g.p1 ? 'X' : 'O';
+    g.board[cell] = symbol;
+    const winner = tttWinner(g.board);
+    const [p1m, p2m] = await Promise.all([interaction.guild.members.fetch(g.p1), interaction.guild.members.fetch(g.p2)]);
+    if (winner) {
+      games.delete(gid);
+      const rows = buildTttRows(g.board, gid, true);
+      const msg = winner === 'draw' ? "It's a **draw**!" : `🏆 **${winner === 'X' ? p1m.displayName : p2m.displayName}** wins!`;
+      rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('_done').setLabel(msg).setStyle(ButtonStyle.Secondary).setDisabled(true)));
+      return interaction.update({ components: rows });
+    }
+    g.turn = g.turn === g.p1 ? g.p2 : g.p1;
+    const nextMember = await interaction.guild.members.fetch(g.turn);
+    const rows = buildTttRows(g.board, gid, false);
+    rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('_').setLabel(`${symbol === 'X' ? '⭕' : '❌'} ${nextMember.displayName}'s turn`).setStyle(ButtonStyle.Secondary).setDisabled(true)));
+    return interaction.update({ components: rows });
+  }
+
+  // CONNECT 4 DROP
+  if (interaction.customId.startsWith('c4_')) {
+    const parts = interaction.customId.split('_');
+    const gid = parts[1], col = parseInt(parts[2]);
+    const g = games.get(gid);
+    if (!g || g.status !== 'active') return interaction.reply({ content: '❌ Game not found.', ephemeral: true });
+    if (interaction.user.id !== g.turn) return interaction.reply({ content: '❌ Not your turn!', ephemeral: true });
+    const player = interaction.user.id === g.p1 ? 1 : 2;
+    if (!dropC4(g.board, col, player)) return interaction.reply({ content: '❌ Column full!', ephemeral: true });
+    const [p1m, p2m] = await Promise.all([interaction.guild.members.fetch(g.p1), interaction.guild.members.fetch(g.p2)]);
+    if (checkC4(g.board, player)) {
+      games.delete(gid);
+      const winner = player === 1 ? p1m : p2m;
+      const embed = new EmbedBuilder().setTitle('🟡 Connect 4').setDescription(renderC4(g.board)).setColor(0x00c8ff).setFooter({text:`🏆 ${winner.displayName} wins!`});
+      return interaction.update({ embeds: [embed], components: [] });
+    }
+    if (g.board[0].every(c=>c!==0)) {
+      games.delete(gid);
+      const embed = new EmbedBuilder().setTitle('🟡 Connect 4').setDescription(renderC4(g.board)).setColor(0x00c8ff).setFooter({text:"It's a draw!"});
+      return interaction.update({ embeds: [embed], components: [] });
+    }
+    g.turn = g.turn === g.p1 ? g.p2 : g.p1;
+    const next = player === 1 ? p2m : p1m;
+    const embed = new EmbedBuilder().setTitle('🟡 Connect 4').setDescription(renderC4(g.board)).setColor(0x00c8ff).setFooter({text:`🔴 ${p1m.displayName} vs 🟡 ${p2m.displayName} — ${player===1?'🟡':'🔴'} ${next.displayName}'s turn`});
+    return interaction.update({ embeds: [embed], components: [c4Buttons(gid, g.board, false)] });
+  }
+
+  // HIGHER OR LOWER GUESS
+  if (interaction.customId.startsWith('hl_')) {
+    const gid = interaction.customId.replace('hl_', '');
+    const g = games.get(gid);
+    if (!g || g.status !== 'active') return interaction.reply({ content: '❌ Game not found.', ephemeral: true });
+    if (interaction.user.id !== g.p1 && interaction.user.id !== g.p2) return interaction.reply({ content: '❌ You\'re not in this game.', ephemeral: true });
+    const isP1 = interaction.user.id === g.p1;
+    if (isP1 && g.p1guess !== null) return interaction.reply({ content: '✅ Already guessed!', ephemeral: true });
+    if (!isP1 && g.p2guess !== null) return interaction.reply({ content: '✅ Already guessed!', ephemeral: true });
+    const modal = new ModalBuilder().setCustomId(`hl_modal_${gid}`).setTitle('Guess the Number (1–100)');
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('hl_guess').setLabel('Your guess (1–100)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(3)
+    ));
+    return interaction.showModal(modal);
+  }
 
   // TEST WELCOME (admin only)
   if (interaction.customId === 'test_welcome') {
@@ -509,6 +761,30 @@ client.on('interactionCreate', async interaction => {
 // ── MODAL SUBMISSIONS ────────────────────────────────────────────
 client.on('interactionCreate', async interaction => {
   if (!interaction.isModalSubmit()) return;
+
+  // H/L guess modal (needs to edit the game message, not defer)
+  if (interaction.customId.startsWith('hl_modal_')) {
+    const gid = interaction.customId.replace('hl_modal_', '');
+    const g = games.get(gid);
+    if (!g) return interaction.reply({ content: '❌ Game not found.', ephemeral: true });
+    const raw = interaction.fields.getTextInputValue('hl_guess');
+    const guess = parseInt(raw);
+    if (isNaN(guess) || guess < 1 || guess > 100) return interaction.reply({ content: '❌ Enter a number between 1 and 100.', ephemeral: true });
+    const isP1 = interaction.user.id === g.p1;
+    if (isP1) g.p1guess = guess; else g.p2guess = guess;
+    if (g.p1guess === null || g.p2guess === null) return interaction.reply({ content: `✅ Guessed **${guess}**! Waiting for opponent...`, ephemeral: true });
+    // Both guessed
+    const [p1m, p2m] = await Promise.all([interaction.guild.members.fetch(g.p1), interaction.guild.members.fetch(g.p2)]);
+    const d1 = Math.abs(g.p1guess - g.number), d2 = Math.abs(g.p2guess - g.number);
+    let result;
+    if (d1 === d2) result = "It's a **draw**!";
+    else if (d1 < d2) result = `🏆 **${p1m.displayName}** wins!`;
+    else result = `🏆 **${p2m.displayName}** wins!`;
+    games.delete(gid);
+    const ch = interaction.guild.channels.cache.get(g.channelId);
+    await ch?.send({ content: `🔢 **Higher or Lower Result**\nThe number was **${g.number}**!\n${p1m}: guessed **${g.p1guess}**\n${p2m}: guessed **${g.p2guess}**\n\n${result}` }).catch(() => {});
+    return interaction.reply({ content: `✅ Guessed **${guess}**! Results posted.`, ephemeral: true });
+  }
 
   await interaction.deferReply({ ephemeral: true });
   const guild = interaction.guild;
