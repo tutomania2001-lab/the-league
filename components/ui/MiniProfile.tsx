@@ -1,4 +1,5 @@
 import { GlowText } from '@/components/ui/GlowText';
+import { DefaultAvatar } from '@/components/ui/DefaultAvatar';
 import { StatusDot, STATUS_CONFIG, UserStatus } from '@/components/ui/StatusDot';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { getRankFromLP, getRankLabel } from '@/constants/ranks';
@@ -59,13 +60,10 @@ export function MiniProfile({ user, onClose, onAddFriend, isFriend, onRemoveFrie
         {/* Header — avatar + name + status */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => { onClose(); router.push(`/profile/${user!.id}`); }} activeOpacity={0.75}>
-            {user.avatar_url ? (
-              <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
-            ) : (
-              <View style={styles.avatarFallback}>
-                <Text style={styles.avatarLetter}>{(user.riot_id ?? user.username ?? 'S')[0].toUpperCase()}</Text>
-              </View>
-            )}
+            {user.avatar_url
+              ? <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+              : <DefaultAvatar size={48} />
+            }
           </TouchableOpacity>
 
           {/* Status dot overlay on avatar */}

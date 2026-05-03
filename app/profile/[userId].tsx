@@ -6,6 +6,7 @@ import { RankBadge } from '@/components/ui/RankBadge';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { withClanTag } from '@/lib/clanTag';
+import { DefaultAvatar } from '@/components/ui/DefaultAvatar';
 import { useProfile } from '@/hooks/useProfile';
 import { useFriends } from '@/hooks/useFriends';
 import { usePlayerStats } from '@/hooks/usePlayerStats';
@@ -89,9 +90,7 @@ export default function PlayerProfileScreen() {
           <View style={styles.avatarWrap}>
             {profile?.avatar_url
               ? <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-              : <View style={[styles.avatar, styles.avatarFallback]}>
-                  <Text style={styles.avatarLetter}>{displayName[0].toUpperCase()}</Text>
-                </View>
+              : <DefaultAvatar size={72} />
             }
             <View style={styles.statusDot}>
               <StatusDot status={profile?.status ?? 'offline'} size={10} />

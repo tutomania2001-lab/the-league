@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card';
 import { GlowText } from '@/components/ui/GlowText';
 import { Input } from '@/components/ui/Input';
 import { PulseGlow } from '@/components/ui/PulseGlow';
+import { DefaultAvatar } from '@/components/ui/DefaultAvatar';
 import { RankBadge } from '@/components/ui/RankBadge';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useProfile } from '@/hooks/useProfile';
@@ -98,13 +99,10 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.push('/profile/icon-picker')} activeOpacity={0.8}>
             <View style={styles.avatar}>
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
-              ) : (
-                <Text style={styles.avatarText}>
-                  {(profile?.username ?? 'S')[0].toUpperCase()}
-                </Text>
-              )}
+              {profile?.avatar_url
+                ? <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
+                : <DefaultAvatar size={60} />
+              }
               <View style={styles.editBadge}>
                 <Text style={{ fontSize: 10 }}>✏️</Text>
               </View>

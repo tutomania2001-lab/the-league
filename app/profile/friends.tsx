@@ -175,16 +175,6 @@ export default function FriendsScreen() {
   );
 }
 
-function FriendAvatar({ profile }: { profile: any }) {
-  if (profile.avatar_url) {
-    return <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />;
-  }
-  return (
-    <View style={styles.avatarFallback}>
-      <Text style={styles.avatarLetter}>{(profile.riot_id ?? profile.username ?? 'S')[0].toUpperCase()}</Text>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
