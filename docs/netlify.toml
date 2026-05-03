@@ -1,3 +1,9 @@
 [build]
   publish = "."
   command = ""
+
+[[headers]]
+  for = "/riot.txt"
+  [headers.values]
+    Content-Type = "text/plain"
+    Cache-Control = "no-cache"
