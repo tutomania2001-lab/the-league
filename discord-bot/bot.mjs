@@ -1,5 +1,10 @@
 import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, UserSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } from 'discord.js';
 import { createClient } from '@supabase/supabase-js';
+import RSSParser from 'rss-parser';
+
+const rssParser = new RSSParser();
+const WILDRIFT_FEED = 'https://wildrift.leagueoflegends.com/en-us/news/rss.xml';
+const seenArticles = new Set();
 
 const TOKEN = process.env.DISCORD_TOKEN?.replace(/\s/g, '');
 const GUILD_ID = process.env.GUILD_ID?.trim();
@@ -370,6 +375,50 @@ client.once('clientReady', async () => {
       .setFooter({ text: 'Click a game to challenge someone' });
     await gamesCh.send({ embeds: [gameEmbed], components: [gameRow] }).catch(() => {});
     console.log('✅ Games channel ready');
+  }
+
+  // ── WILD RIFT NEWS FEED ──────────────────────────────────────────
+  const allChFeed = await guild.channels.fetch();
+  let newsChannel = allChFeed.find(c => c?.name === 'wild-rift-news' && c.type === ChannelType.GuildText);
+  if (!newsChannel) {
+    newsChannel = await guild.channels.create({
+      name: 'wild-rift-news',
+      type: ChannelType.GuildText,
+      topic: '📰 Official Wild Rift patch notes & news — auto-updated',
+      permissionOverwrites: [
+        { id: roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
+        { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.SendMessages] },
+      ],
+    }).catch(() => null);
+  }
+
+  async function checkWildRiftNews(channel, firstRun = false) {
+    try {
+      const feed = await rssParser.parseURL(WILDRIFT_FEED);
+      for (const item of feed.items.slice(0, 10)) {
+        const id = item.guid || item.link;
+        if (seenArticles.has(id)) continue;
+        seenArticles.add(id);
+        if (firstRun) continue; // on first run just seed the seen list, don't post
+        const embed = new EmbedBuilder()
+          .setTitle(item.title ?? 'Wild Rift News')
+          .setURL(item.link ?? 'https://wildrift.leagueoflegends.com/en-us/news/')
+          .setDescription(item.contentSnippet?.slice(0, 300) ?? '')
+          .setColor(0x00c8ff)
+          .setFooter({ text: '📰 Wild Rift Official News' })
+          .setTimestamp(item.pubDate ? new Date(item.pubDate) : new Date());
+        await channel.send({ embeds: [embed] }).catch(() => {});
+        console.log(`📰 Posted news: ${item.title}`);
+      }
+    } catch (e) {
+      console.error('RSS feed error:', e.message);
+    }
+  }
+
+  if (newsChannel) {
+    await checkWildRiftNews(newsChannel, true); // seed seen articles on startup
+    setInterval(() => checkWildRiftNews(newsChannel), 30 * 60 * 1000); // check every 30 min
+    console.log('✅ Wild Rift news feed active');
   }
 
   } catch (e) {
