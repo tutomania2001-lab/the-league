@@ -9,6 +9,8 @@ import { withClanTag } from '@/lib/clanTag';
 import { useProfile } from '@/hooks/useProfile';
 import { useFriends } from '@/hooks/useFriends';
 import { usePlayerStats } from '@/hooks/usePlayerStats';
+import { useTeam } from '@/hooks/useTeam';
+import { useTeamInvites } from '@/hooks/useTeamInvites';
 import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -22,6 +24,9 @@ export default function PlayerProfileScreen() {
   const { profile, loading } = useProfile(targetId);
   const { friends, incoming, outgoing, sendRequest, remove } = useFriends(myId);
   const { stats } = usePlayerStats(targetId);
+  const { team, members } = useTeam(myId);
+  const { sendInvite } = useTeamInvites(myId);
+  const [inviteSent, setInviteSent] = useState(false);
   const [team, setTeam] = useState<{ name: string; clan_tag: string | null } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -46,6 +51,8 @@ export default function PlayerProfileScreen() {
   const friendEntry = friends.find(f => f.profile.id === targetId);
   const isFriend = !!friendEntry;
   const isPending = outgoing.some(f => f.profile.id === targetId) || incoming.some(f => f.profile.id === targetId);
+  const isCaptain = team?.captain_id === myId;
+  const canInvite = isCaptain && myId && targetId && members.length < 10 && !isMe;
 
   const displayName = withClanTag(profile?.riot_id ?? profile?.username ?? 'Player', (profile as any)?.clan_tag ?? team?.clan_tag);
 
@@ -119,6 +126,18 @@ export default function PlayerProfileScreen() {
               style={{ flex: 1 }}
             />
           </View>
+        )}
+        {canInvite && (
+          <Button
+            label={inviteSent ? '✓ Invite Sent!' : '⚔️ Invite to Team'}
+            variant="secondary"
+            style={{ borderColor: '#c89b3c88' }}
+            onPress={async () => {
+              if (!team || !myId || !targetId || inviteSent) return;
+              await sendInvite(team.id, targetId, myId);
+              setInviteSent(true);
+            }}
+          />
         )}
 
         {/* Riot ID */}

@@ -42,7 +42,7 @@ export function useTeamInvites(userId: string | undefined) {
   async function accept(inviteId: string, teamId: string) {
     if (!userId) return;
     await supabase.from('team_invites').update({ status: 'accepted' }).eq('id', inviteId);
-    await supabase.from('team_members').insert({ team_id: teamId, user_id: userId });
+    await supabase.from('team_members').insert({ team_id: teamId, user_id: userId, status: 'active' });
     fetchInvites();
   }
 
