@@ -28,7 +28,7 @@ export default function PlayerProfileScreen() {
   const { team, members } = useTeam(myId);
   const { sendInvite } = useTeamInvites(myId);
   const [inviteSent, setInviteSent] = useState(false);
-  const [targetTeam, setTargetTeam] = useState<{ name: string; clan_tag: string | null } | null>(null);
+  const [targetTeam, setTargetTeam] = useState<{ id: string; name: string; clan_tag: string | null } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
@@ -39,9 +39,9 @@ export default function PlayerProfileScreen() {
     if (!targetId) return;
     supabase
       .from('team_members')
-      .select('team:teams(name, clan_tag)')
+      .select('team:teams(id, name, clan_tag)')
       .eq('user_id', targetId)
-      .eq('status', 'active')
+      .neq('status', 'pending')
       .maybeSingle()
       .then(({ data }) => {
         if (data?.team) setTargetTeam(data.team as any);
