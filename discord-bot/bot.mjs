@@ -26,7 +26,7 @@ function getRankForLP(lp) {
 }
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildPresences],
 });
 
 client.once('clientReady', async () => {
@@ -179,6 +179,23 @@ client.on('guildMemberAdd', async member => {
     .setTimestamp();
 
   await welcomeChannel.send({ content: `👋 ${member}`, embeds: [embed] }).catch(() => {});
+});
+
+// Member comes back online → notify announcements
+client.on('presenceUpdate', async (oldPresence, newPresence) => {
+  if (newPresence.user?.bot) return;
+  const wasOffline = !oldPresence || oldPresence.status === 'offline';
+  const isOnline = newPresence.status !== 'offline';
+  if (!wasOffline || !isOnline) return;
+
+  const guild = newPresence.guild;
+  if (!guild) return;
+  const channels = await guild.channels.fetch();
+  const announcementsChannel = channels.find(c => c?.name === 'announcements');
+  if (!announcementsChannel) return;
+
+  const name = newPresence.member?.displayName ?? newPresence.user?.username ?? 'Someone';
+  await announcementsChannel.send(`👋 **${name}** is back online!`).catch(() => {});
 });
 
 // ── BUTTON INTERACTIONS ──────────────────────────────────────────
