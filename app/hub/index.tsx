@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
 
   header: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
+    paddingLeft: Spacing.md, paddingRight: 52, paddingVertical: Spacing.sm,
     borderBottomWidth: 1, borderBottomColor: Colors.accentBorder,
   },
   backBtn: { paddingRight: 4 },
