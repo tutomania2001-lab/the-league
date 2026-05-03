@@ -111,12 +111,14 @@ export default function RootLayout() {
           <Stack.Screen name="wallet/withdraw" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
           <Stack.Screen name="team/invite" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
         </Stack>
-        {/* Friends panel — only inside the app, never on auth/landing screens */}
-        {(session || DEV_BYPASS.enabled) && segments[0] === '(tabs)' && <FriendsPanel userId={userId} />}
-        {/* Floating mini chat — available on every screen */}
-        {(session || DEV_BYPASS.enabled) && <FloatingMiniChat myId={userId} />}
-        {/* Floating chat panel — left side tab with unread badge */}
-        {(session || DEV_BYPASS.enabled) && <FloatingChatPanel myId={userId} />}
+        {/* Only show overlays when inside the app (not on auth/landing) */}
+        {(session || DEV_BYPASS.enabled) && segments[0] !== 'auth' && segments.length > 0 && (
+          <>
+            {segments[0] === '(tabs)' && <FriendsPanel userId={userId} />}
+            <FloatingMiniChat myId={userId} />
+            <FloatingChatPanel myId={userId} />
+          </>
+        )}
         <StatusBar style="light" />
       </View>
     </ThemeProvider>
