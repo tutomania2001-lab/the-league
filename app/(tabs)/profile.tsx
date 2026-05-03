@@ -111,11 +111,14 @@ export default function ProfileScreen() {
           <View style={{ flex: 1 }}>
             <PulseGlow duration={3000} minOpacity={0.8}>
               <GlowText style={Typography.heading}>
-                {team?.clan_tag ? (
-                  <Text style={{ color: Colors.gold }}>[{team.clan_tag.toUpperCase()}] </Text>
-                ) : null}{profile?.riot_id ?? profile?.username ?? 'Summoner'}
+                {profile?.riot_id ?? profile?.username ?? 'Summoner'}
               </GlowText>
             </PulseGlow>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: team ? Colors.gold : Colors.textMuted, marginTop: 2 }}>
+              ⚔️ {team
+                ? `${team.clan_tag ? `[${team.clan_tag.toUpperCase()}] ` : ''}${team.name}`
+                : '#TEAM'}
+            </Text>
             <View style={{ marginTop: Spacing.xs }}>
               <RankBadge lp={profile?.lp ?? 0} peakLP={profile?.peak_lp ?? 0} size="sm" />
             </View>
