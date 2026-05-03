@@ -25,7 +25,7 @@ export function FloatingChatPanel({ myId }: { myId: string | undefined }) {
   const insets = useSafeAreaInsets();
   const [resolvedMyId, setResolvedMyId] = useState(myId);
   const [open, setOpen] = useState(false);
-  const slideX = useRef(new Animated.Value(-PANEL_W)).current;
+  const slideX = useRef(new Animated.Value(PANEL_W)).current;
   const backdropOp = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export function FloatingChatPanel({ myId }: { myId: string | undefined }) {
     setOpen(opening);
     Animated.parallel([
       Animated.timing(slideX, {
-        toValue: opening ? 0 : -PANEL_W,
+        toValue: opening ? 0 : PANEL_W,
         duration: 280, useNativeDriver: true,
         easing: opening ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       }),
@@ -52,12 +52,12 @@ export function FloatingChatPanel({ myId }: { myId: string | undefined }) {
   function close() {
     setOpen(false);
     Animated.parallel([
-      Animated.timing(slideX, { toValue: -PANEL_W, duration: 250, useNativeDriver: true, easing: Easing.in(Easing.cubic) }),
+      Animated.timing(slideX, { toValue: PANEL_W, duration: 250, useNativeDriver: true, easing: Easing.in(Easing.cubic) }),
       Animated.timing(backdropOp, { toValue: 0, duration: 250, useNativeDriver: true }),
     ]).start();
   }
 
-  const tabTop = insets.top + 120;
+  const tabTop = insets.top + 64;
 
   return (
     <>
@@ -68,7 +68,7 @@ export function FloatingChatPanel({ myId }: { myId: string | undefined }) {
         </Animated.View>
       )}
 
-      {/* Sliding panel */}
+      {/* Sliding panel — from right */}
       <Animated.View style={[styles.panel, { transform: [{ translateX: slideX }], top: 0, bottom: 0 }]}>
         <View style={[styles.panelHeader, { paddingTop: insets.top + 12 }]}>
           <Text style={styles.panelTitle}>💬 Messages</Text>
@@ -146,9 +146,9 @@ const styles = StyleSheet.create({
     zIndex: 90,
   },
   panel: {
-    position: 'absolute', left: 0, width: PANEL_W,
+    position: 'absolute', right: 0, width: PANEL_W,
     backgroundColor: 'rgba(8,14,26,0.98)',
-    borderRightWidth: 1, borderRightColor: Colors.accentBorder,
+    borderLeftWidth: 1, borderLeftColor: Colors.accentBorder,
     zIndex: 95,
   },
   panelHeader: {
@@ -183,11 +183,11 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 40 },
 
   tab: {
-    position: 'absolute', left: 0, zIndex: 96,
+    position: 'absolute', right: 0, zIndex: 96,
     width: 36, height: 44,
     backgroundColor: 'rgba(8,14,26,0.95)',
-    borderTopRightRadius: 10, borderBottomRightRadius: 10,
-    borderWidth: 1, borderLeftWidth: 0, borderColor: Colors.accentBorder,
+    borderTopLeftRadius: 10, borderBottomLeftRadius: 10,
+    borderWidth: 1, borderRightWidth: 0, borderColor: Colors.accentBorder,
     alignItems: 'center', justifyContent: 'center',
   },
   tabIcon: { fontSize: 16 },
