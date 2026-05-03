@@ -1,6 +1,9 @@
 [build]
 builder = "nixpacks"
 
+[build.nixpacksPlan.variables]
+NIXPACKS_NODE_VERSION = "20"
+
 [deploy]
 startCommand = "node bot.mjs"
 restartPolicyType = "always"
