@@ -10,12 +10,11 @@ export function useTeam(userId: string | undefined) {
   const [loading, setLoading] = useState(true);
 
   async function fetchTeam(uid: string) {
-    // Find membership (active only — pending members haven't been approved yet)
+    // Find any membership — null status rows are old captain rows before status column was added
     const { data: membership } = await supabase
       .from('team_members')
       .select('team_id')
       .eq('user_id', uid)
-      .in('status', ['active', 'pending'])
       .maybeSingle();
 
     if (!membership) {
