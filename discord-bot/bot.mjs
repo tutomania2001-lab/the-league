@@ -32,6 +32,7 @@ const client = new Client({
 client.once('clientReady', async () => {
   console.log(`✅ Bot online: ${client.user.tag}`);
 
+  try {
   // Register slash commands
   const rest = new REST().setToken(TOKEN);
   await rest.put(Routes.applicationGuildCommands(client.user.id, GUILD_ID), {
@@ -44,6 +45,10 @@ client.once('clientReady', async () => {
   const guild = await client.guilds.fetch(GUILD_ID);
   const guildRoles = await guild.roles.fetch();
   const guildChannels = await guild.channels.fetch();
+
+  // Startup ping — fires before anything else so we know the bot is running new code
+  const announcementsCh = guildChannels.find(c => c?.name === 'announcements');
+  if (announcementsCh) await announcementsCh.send('🤖 Bot restarted (v501f8b0)').catch(() => {});
 
   // Map all roles
   const roles = {};
@@ -111,12 +116,6 @@ client.once('clientReady', async () => {
     console.log('✅ Register button posted');
   }
 
-  // Post startup confirmation to #announcements
-  const announcementsChannel = guildChannels.find(c => c?.name === 'announcements');
-  if (announcementsChannel) {
-    announcementsChannel.send('🤖 Bot online — v65c02a8').catch(() => {});
-  }
-
   // Ensure #commands channel exists
   let commandsChannel = guildChannels.find(c => c?.name === 'commands');
   if (!commandsChannel) {
@@ -164,6 +163,10 @@ client.once('clientReady', async () => {
 
     await getRolesChannel.send({ embeds: [embed], components: [verifiedRow, rankRow] });
     console.log('✅ Role selector with rank dropdown posted');
+  }
+
+  } catch (e) {
+    console.error('❌ clientReady error:', e);
   }
 });
 
