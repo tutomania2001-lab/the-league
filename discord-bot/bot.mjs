@@ -628,6 +628,69 @@ client.once('clientReady', async () => {
     console.log('✅ Economy system ready');
   }
 
+  // ── FAQ CHANNEL ───────────────────────────────────────────────────
+  const allChFaq = await guild.channels.fetch();
+  let faqCh = allChFaq.find(c => c?.name === 'faq' && c.type === ChannelType.GuildText);
+  if (!faqCh) {
+    faqCh = await guild.channels.create({
+      name: 'faq', type: ChannelType.GuildText,
+      topic: '❓ Frequently asked questions about The League app & Discord server',
+      permissionOverwrites: [
+        { id: roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
+        { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.SendMessages] },
+      ],
+    }).catch(() => null);
+  }
+
+  if (faqCh) {
+    const existing = await faqCh.messages.fetch({ limit: 20 });
+    for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
+
+    const faqs = [
+      {
+        title: '◈ THE LEAGUE — FAQ',
+        description: 'Everything you need to know about the app and this Discord server.',
+        color: 0x00c8ff,
+        fields: [],
+      },
+      {
+        title: '📱 APP — Frequently Asked Questions',
+        color: 0x00c8ff,
+        fields: [
+          { name: '❓ How do I download The League app?', value: 'Visit **https://the-leagueapp.netlify.app** to register and access the app. Available on mobile and web.' },
+          { name: '❓ How do I create an account?', value: 'Go to the app, sign up with your email, and enter your **Riot ID** (e.g. `LeftRightSleep#2735`) to link your Wild Rift account.' },
+          { name: '❓ How is my LP tracked?', value: 'Your LP is pulled from your linked Riot ID inside the app. Keep your profile up to date to reflect your current rank.' },
+          { name: '❓ How do I join a tournament?', value: 'Open the app, navigate to the **Tournaments** section, and register for any open event. Make sure your account is verified first.' },
+          { name: '❓ How do I form a team?', value: 'Go to **Teams** in the app and create or join a team. You can invite friends via their username or Riot ID.' },
+          { name: '❓ I have an issue with the app — who do I contact?', value: 'Post in **#dispute-a-result** for match issues, or DM a staff member for account problems.' },
+        ],
+      },
+      {
+        title: '🖥️ DISCORD — Frequently Asked Questions',
+        color: 0x00c8ff,
+        fields: [
+          { name: '❓ How do I get access to the server?', value: 'Go to **#rules**, read the rules, and click **✅ I have read the rules — Register** to unlock all channels.' },
+          { name: '❓ How do I get my Verified Player role?', value: 'Go to **#get-roles** and click **✅ Verified Player**. Enter your app username or Riot ID — the bot checks it against the database.' },
+          { name: '❓ How do I claim my rank role?', value: 'Go to **#get-roles** and select your rank from the dropdown. Your LP in the app must match the rank you\'re claiming.' },
+          { name: '❓ How do I earn XP and coins?', value: 'Send messages in the server (10–20 XP + 5–10 coins, once per minute) and spend time in voice channels (5 XP + 2 coins per minute).' },
+          { name: '❓ How do I level up?', value: 'XP accumulates automatically. Each level requires more XP than the last. The bot announces your level up in **#announcements**.' },
+          { name: '❓ What can I buy in the store?', value: 'Go to **#store** in the Economy section. You can buy colour roles and VIP access using your coins. Click a button to purchase instantly.' },
+          { name: '❓ How do I create a private voice room?', value: 'Join the **🔒 Create Private Room** voice channel. The bot moves you to a locked room and posts a control panel in **#🚪-room-lobby** where you can set a password.' },
+          { name: '❓ How do I play mini games?', value: 'Go to **#games** and click a game. You can challenge another player or play against the bot. Games include RPS, Tic Tac Toe, Connect 4, and Higher or Lower.' },
+          { name: '❓ How do I pick my lane?', value: 'Go to **#get-roles** and select your main lane from the dropdown (Baron, Jungle, Mid, Dragon Lane, Support).' },
+        ],
+      },
+    ];
+
+    for (const faq of faqs) {
+      const embed = new EmbedBuilder().setTitle(faq.title).setColor(faq.color).setFooter({ text: 'The League — Wild Rift Tournament Platform' });
+      if (faq.description) embed.setDescription(faq.description);
+      if (faq.fields?.length) embed.addFields(faq.fields);
+      await faqCh.send({ embeds: [embed] }).catch(() => {});
+    }
+    console.log('✅ FAQ channel posted');
+  }
+
   } catch (e) {
     console.error('❌ clientReady error:', e);
   }
