@@ -1,10 +1,56 @@
 import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, UserSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } from 'discord.js';
 import { createClient } from '@supabase/supabase-js';
-import RSSParser from 'rss-parser';
-
-const rssParser = new RSSParser();
-const WILDRIFT_FEED = 'https://wildrift.leagueoflegends.com/en-gb/news/rss.xml';
+const WILDRIFT_NEWS_URL = 'https://wildrift.leagueoflegends.com/en-sg/news/tags/patch-notes/';
+const WILDRIFT_BASE = 'https://wildrift.leagueoflegends.com';
 const seenArticles = new Set();
+
+async function fetchWildRiftArticles() {
+  // Try Gatsby page-data endpoint first
+  const pageDataUrl = 'https://wildrift.leagueoflegends.com/page-data/en-sg/news/tags/patch-notes/page-data.json';
+  let res = await fetch(pageDataUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }).catch(() => null);
+
+  if (res?.ok) {
+    const json = await res.json().catch(() => null);
+    if (json) {
+      // Search recursively for articles array
+      const articles = [];
+      function dig(obj) {
+        if (!obj || typeof obj !== 'object') return;
+        if (Array.isArray(obj)) { obj.forEach(dig); return; }
+        if (obj.title && obj.url && (obj.description || obj.summary || obj.excerpt)) {
+          articles.push(obj); return;
+        }
+        Object.values(obj).forEach(dig);
+      }
+      dig(json);
+      if (articles.length) { console.log(`📰 Found ${articles.length} articles via page-data`); return articles.slice(0, 10); }
+    }
+  }
+
+  // Fallback: fetch HTML and extract __NEXT_DATA__
+  res = await fetch(WILDRIFT_NEWS_URL, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }).catch(() => null);
+  if (!res?.ok) throw new Error(`HTTP ${res?.status}`);
+  const html = await res.text();
+
+  const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (nextMatch) {
+    const data = JSON.parse(nextMatch[1]);
+    const articles = [];
+    function dig2(obj) {
+      if (!obj || typeof obj !== 'object') return;
+      if (Array.isArray(obj)) { obj.forEach(dig2); return; }
+      if (obj.title && (obj.link || obj.url || obj.slug) && (obj.description || obj.summary || obj.excerpt || obj.image)) {
+        articles.push(obj); return;
+      }
+      Object.values(obj).forEach(dig2);
+    }
+    dig2(data);
+    if (articles.length) { console.log(`📰 Found ${articles.length} articles via __NEXT_DATA__`); return articles.slice(0, 10); }
+  }
+
+  console.error('📰 Could not parse articles from page. HTML length:', html.length);
+  return [];
+}
 
 const TOKEN = process.env.DISCORD_TOKEN?.replace(/\s/g, '');
 const GUILD_ID = process.env.GUILD_ID?.trim();
@@ -392,32 +438,42 @@ client.once('clientReady', async () => {
     }).catch(() => null);
   }
 
-  async function checkWildRiftNews(channel) {
+  async function refreshNewsChannel(channel) {
     try {
-      const feed = await rssParser.parseURL(WILDRIFT_FEED);
-      console.log(`📰 Feed fetched: ${feed.items.length} items`);
-      for (const item of feed.items.slice(0, 5)) {
-        const id = item.guid || item.link;
-        if (seenArticles.has(id)) continue;
-        seenArticles.add(id);
+      const articles = await fetchWildRiftArticles();
+      if (!articles.length) { console.log('📰 No articles found'); return; }
+
+      // Clear old bot messages and repost latest 10
+      const existing = await channel.messages.fetch({ limit: 20 });
+      for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
+
+      for (const item of articles) {
+        const title = item.title ?? item.header ?? 'Wild Rift Update';
+        const url = item.link ?? item.url ?? (item.slug ? `${WILDRIFT_BASE}/en-sg/news/${item.slug}/` : WILDRIFT_NEWS_URL);
+        const desc = (item.description ?? item.summary ?? item.excerpt ?? '').slice(0, 400);
+        const image = item.image?.url ?? item.banner?.url ?? item.thumbnail?.url ?? item.headerImage?.url ?? null;
+        const date = item.date ?? item.publishedAt ?? item.updatedAt ?? null;
+
         const embed = new EmbedBuilder()
-          .setTitle(item.title ?? 'Wild Rift News')
-          .setURL(item.link ?? 'https://wildrift.leagueoflegends.com/en-gb/news/')
-          .setDescription(item.contentSnippet?.slice(0, 400) ?? '')
+          .setTitle(title)
+          .setURL(url.startsWith('http') ? url : `${WILDRIFT_BASE}${url}`)
+          .setDescription(desc || 'Click to read more.')
           .setColor(0x00c8ff)
-          .setFooter({ text: '📰 Wild Rift Official News' })
-          .setTimestamp(item.pubDate ? new Date(item.pubDate) : new Date());
+          .setFooter({ text: '📰 Wild Rift Patch Notes & News' });
+        if (image) embed.setImage(image.startsWith('http') ? image : `${WILDRIFT_BASE}${image}`);
+        if (date) embed.setTimestamp(new Date(date));
+
         await channel.send({ embeds: [embed] }).catch(() => {});
-        console.log(`📰 Posted: ${item.title}`);
       }
+      console.log(`📰 News channel refreshed with ${articles.length} articles`);
     } catch (e) {
-      console.error('RSS feed error:', e.message);
+      console.error('News refresh error:', e.message);
     }
   }
 
   if (newsChannel) {
-    await checkWildRiftNews(newsChannel); // post latest on startup
-    setInterval(() => checkWildRiftNews(newsChannel), 30 * 60 * 1000);
+    await refreshNewsChannel(newsChannel);
+    setInterval(() => refreshNewsChannel(newsChannel), 30 * 60 * 1000);
     console.log('✅ Wild Rift news feed active');
   }
 
