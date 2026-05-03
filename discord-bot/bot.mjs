@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, REST, Routes, SlashCommandBuilder, ChannelType } from 'discord.js';
+import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } from 'discord.js';
 import { createClient } from '@supabase/supabase-js';
 
 const TOKEN = process.env.DISCORD_TOKEN?.replace(/\s/g, '');
@@ -33,19 +33,9 @@ client.once('clientReady', async () => {
   console.log(`✅ Bot online: ${client.user.tag}`);
 
   try {
-  // Register slash commands via guild (uses existing ws connection, no separate REST auth)
   const guild = await client.guilds.fetch(GUILD_ID);
-  await guild.commands.set([
-    new SlashCommandBuilder().setName('testwelcome').setDescription('Test the welcome message (admin only)'),
-  ]).catch(e => console.error('⚠️ Slash command registration failed:', e.message));
-  console.log('✅ Slash commands registered');
-
   const guildRoles = await guild.roles.fetch();
   const guildChannels = await guild.channels.fetch();
-
-  // Startup ping — fires before anything else so we know the bot is running new code
-  const announcementsCh = guildChannels.find(c => c?.name === 'announcements');
-  if (announcementsCh) await announcementsCh.send('🤖 Bot restarted (v501f8b0)').catch(() => {});
 
   // Map all roles
   const roles = {};
@@ -113,20 +103,17 @@ client.once('clientReady', async () => {
     console.log('✅ Register button posted');
   }
 
-  // Ensure #commands channel exists
-  let commandsChannel = guildChannels.find(c => c?.name === 'commands');
-  if (!commandsChannel) {
-    console.log('Creating #commands channel...');
-    commandsChannel = await guild.channels.create({
-      name: 'commands',
-      type: ChannelType.GuildText,
-      topic: 'Use bot slash commands here',
-    }).catch(e => { console.error('❌ Failed to create #commands:', e.message); return null; });
-    console.log(commandsChannel ? '✅ #commands channel created: ' + commandsChannel.id : '❌ #commands not created');
-  } else {
-    console.log('✅ #commands already exists: ' + commandsChannel.id);
+  // Post Test Welcome button in #commands (admin only)
+  const commandsChannel = guildChannels.find(c => c?.name === 'commands');
+  if (commandsChannel) {
+    const existing = await commandsChannel.messages.fetch({ limit: 20 });
+    for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('test_welcome').setLabel('🎉 Test Welcome Message').setStyle(ButtonStyle.Primary),
+    );
+    await commandsChannel.send({ content: '**Admin Commands**', components: [row] }).catch(() => {});
+    console.log('✅ Test welcome button posted in #commands');
   }
-  client.commandsChannelId = commandsChannel?.id ?? null;
 
   // Post role selector in #get-roles
   const getRolesChannel = guildChannels.find(c => c.name === 'get-roles');
@@ -194,16 +181,15 @@ client.on('guildMemberAdd', async member => {
   await welcomeChannel.send({ content: `👋 ${member}`, embeds: [embed] }).catch(() => {});
 });
 
-// ── SLASH COMMANDS ───────────────────────────────────────────────
+// ── BUTTON INTERACTIONS ──────────────────────────────────────────
 client.on('interactionCreate', async interaction => {
-  if (!interaction.isChatInputCommand()) return;
+  if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
-  if (client.commandsChannelId && interaction.channelId !== client.commandsChannelId) {
-    return interaction.reply({ content: `❌ Use slash commands in <#${client.commandsChannelId}> only.`, ephemeral: true });
-  }
+  const freshMember = await interaction.guild.members.fetch(interaction.user.id);
 
-  if (interaction.commandName === 'testwelcome') {
-    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
+  // TEST WELCOME (admin only)
+  if (interaction.customId === 'test_welcome') {
+    if (!freshMember.permissions.has(PermissionFlagsBits.Administrator)) {
       return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
     }
     const channels = await interaction.guild.channels.fetch();
@@ -214,11 +200,10 @@ client.on('interactionCreate', async interaction => {
     if (!welcomeChannel) {
       return interaction.reply({ content: '❌ No welcome/announcements/general channel found.', ephemeral: true });
     }
-    const member = interaction.member;
     const embed = new EmbedBuilder()
       .setTitle('◈ A NEW CHALLENGER APPROACHES')
       .setDescription(
-        `Welcome ${member}, to **The League**! 🎉\n\n` +
+        `Welcome ${freshMember}, to **The League**! 🎉\n\n` +
         `→ Read the rules and register in <#${channels.find(c => c?.name === 'rules')?.id ?? ''}>\n` +
         `→ Pick your roles in <#${channels.find(c => c?.name === 'get-roles')?.id ?? ''}>`
       )
@@ -226,16 +211,9 @@ client.on('interactionCreate', async interaction => {
       .setColor(0x00c8ff)
       .setFooter({ text: `Member #${interaction.guild.memberCount}` })
       .setTimestamp();
-    await welcomeChannel.send({ content: `👋 ${member}`, embeds: [embed] });
+    await welcomeChannel.send({ content: `👋 ${freshMember}`, embeds: [embed] }).catch(() => {});
     return interaction.reply({ content: `✅ Welcome message sent to ${welcomeChannel}`, ephemeral: true });
   }
-});
-
-// ── BUTTON INTERACTIONS ──────────────────────────────────────────
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
-
-  const freshMember = await interaction.guild.members.fetch(interaction.user.id);
 
   // REGISTER
   if (interaction.customId === 'register') {
