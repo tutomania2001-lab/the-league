@@ -238,23 +238,25 @@ client.on('interactionCreate', async interaction => {
 
   const riotId = interaction.fields.getTextInputValue('challenger_riot_id').trim();
 
-  const { data, error } = await supabase
-    .from('users')
-    .select('id, riot_id, lp')
-    .ilike('riot_id', riotId)
-    .maybeSingle();
+  // Search by riot_id OR username
+  let { data } = await supabase.from('users').select('id, riot_id, username, lp').ilike('riot_id', riotId).maybeSingle();
+  if (!data) {
+    const res = await supabase.from('users').select('id, riot_id, username, lp').ilike('username', riotId).maybeSingle();
+    data = res.data;
+  }
 
-  if (error || !data) {
+  if (!data) {
     return interaction.editReply({
-      content: `❌ No account found with Riot ID **${riotId}**.\nRegister on The League app first: https://the-leagueapp.netlify.app`
+      content: `❌ No account found for **${riotId}**.\nMake sure you've registered on The League app: https://the-leagueapp.netlify.app`
     });
   }
 
-  const ABOVE_DIAMOND_LP = 2800; // Master and above
-  if ((data.lp ?? 0) < ABOVE_DIAMOND_LP) {
-    const currentTier = data.lp >= 2400 ? 'Diamond' : data.lp >= 2000 ? 'Emerald' : data.lp >= 1600 ? 'Platinum' : 'below Platinum';
+  const lp = data.lp ?? 0;
+  const ABOVE_DIAMOND_LP = 2800;
+  if (lp < ABOVE_DIAMOND_LP) {
+    const currentTier = lp >= 2400 ? 'Diamond' : lp >= 2000 ? 'Emerald' : lp >= 1600 ? 'Platinum' : lp >= 1200 ? 'Gold' : 'below Gold';
     return interaction.editReply({
-      content: `❌ Your current rank is **${currentTier}** (${data.lp ?? 0} LP).\nYou need to be **Master or above** (2800+ LP) to claim the Challenger role.`
+      content: `❌ Your rank is **${currentTier}** (${lp} LP).\nYou need **Master or above** (2800+ LP) to claim the Challenger role.`
     });
   }
 
@@ -262,7 +264,7 @@ client.on('interactionCreate', async interaction => {
     const member = await interaction.guild.members.fetch(interaction.user.id);
     await member.roles.add(client.roles.challenger);
     return interaction.editReply({
-      content: `💎 Verified! Your account **${data.riot_id}** is ranked at **${data.lp} LP**.\nYou now have the **💎 Challenger** role 🎉`
+      content: `💎 Verified! Account **${data.riot_id ?? data.username}** is at **${lp} LP**.\nYou now have the **💎 Challenger** role 🎉`
     });
   } catch (e) {
     return interaction.editReply({ content: '❌ Could not assign role — contact staff.' });
@@ -278,16 +280,16 @@ client.on('interactionCreate', async interaction => {
 
   const riotId = interaction.fields.getTextInputValue('riot_id_input').trim();
 
-  // Check against Supabase users table
-  const { data, error } = await supabase
-    .from('users')
-    .select('id, riot_id, email')
-    .ilike('riot_id', riotId)
-    .maybeSingle();
+  // Search by riot_id OR username
+  let { data } = await supabase.from('users').select('id, riot_id, username').ilike('riot_id', riotId).maybeSingle();
+  if (!data) {
+    const res = await supabase.from('users').select('id, riot_id, username').ilike('username', riotId).maybeSingle();
+    data = res.data;
+  }
 
-  if (error || !data) {
+  if (!data) {
     return interaction.editReply({
-      content: `❌ No account found with Riot ID **${riotId}**.\nMake sure you\'ve registered on The League app first: https://the-leagueapp.netlify.app`
+      content: `❌ No account found for **${riotId}**.\nMake sure you've registered on The League app: https://the-leagueapp.netlify.app`
     });
   }
 
@@ -296,7 +298,7 @@ client.on('interactionCreate', async interaction => {
     const member = await interaction.guild.members.fetch(interaction.user.id);
     await member.roles.add(client.roles.verified);
     return interaction.editReply({
-      content: `✅ Verified! Your account **${data.riot_id}** is linked to The League.\nYou now have the **✅ Verified Player** role 🎉`
+      content: `✅ Verified! Your account **${data.riot_id ?? data.username}** is linked to The League.\nYou now have the **✅ Verified Player** role 🎉`
     });
   } catch (e) {
     console.error('Verify role error:', e.message);
