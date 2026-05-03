@@ -62,7 +62,7 @@ client.once('clientReady', async () => {
   console.log('Roles mapped:', Object.keys(roles));
 
   // Lock all channels except public ones
-  const publicChannels = ['rules', 'announcements', 'app-download'];
+  const publicChannels = ['rules', 'announcements', 'app-download', 'commands'];
   for (const [, channel] of guildChannels) {
     if (!channel.permissionsFor || channel.type === 4) continue;
     if (!publicChannels.includes(channel.name)) {
@@ -109,6 +109,12 @@ client.once('clientReady', async () => {
       .setFooter({ text: 'The League — Wild Rift Tournament Platform' });
     await rulesChannel.send({ embeds: [embed], components: [row] });
     console.log('✅ Register button posted');
+  }
+
+  // Post startup confirmation to #announcements
+  const announcementsChannel = guildChannels.find(c => c?.name === 'announcements');
+  if (announcementsChannel) {
+    announcementsChannel.send('🤖 Bot online — v65c02a8').catch(() => {});
   }
 
   // Ensure #commands channel exists
