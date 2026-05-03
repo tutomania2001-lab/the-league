@@ -473,6 +473,11 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
   }
 });
 
+// Log ALL interactions for debugging
+client.on('interactionCreate', interaction => {
+  console.log(`🔔 Interaction: type=${interaction.type} id=${interaction.customId ?? interaction.commandName ?? 'n/a'}`);
+});
+
 // ── GAME OPPONENT SELECTION ──────────────────────────────────────
 client.on('interactionCreate', async interaction => {
   if (!interaction.isUserSelectMenu()) return;
