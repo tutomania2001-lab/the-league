@@ -94,9 +94,11 @@ export function useUnreadCounts(userId: string | undefined) {
     fetchUnread();
 
     const sub = supabase.channel(`unread:${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'direct_messages',
-        filter: `receiver_id=eq.${userId}` },
-        () => fetchUnread()
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' },
+        (payload) => {
+          const msg = payload.new as any;
+          if (msg.receiver_id === userId || msg.sender_id === userId) fetchUnread();
+        }
       ).subscribe();
 
     return () => { sub.unsubscribe(); };
