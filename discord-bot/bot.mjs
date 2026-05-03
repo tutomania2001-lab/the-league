@@ -89,6 +89,26 @@ function c4Buttons(gid,b,done) {
   );
 }
 
+// ── BOT AI ────────────────────────────────────────────────────────
+const BOT_ID = 'BOT';
+function botRPS() { return ['r','p','s'][Math.floor(Math.random()*3)]; }
+function botTTT(board) {
+  const try_ = (sym) => { for(let i=0;i<9;i++) { if(!board[i]) { board[i]=sym; if(tttWinner(board)){board[i]='';return i;} board[i]=''; } } return -1; };
+  let m = try_('O'); if(m>=0) return m;
+  m = try_('X'); if(m>=0) return m;
+  if(!board[4]) return 4;
+  const corners=[0,2,6,8].filter(i=>!board[i]);
+  if(corners.length) return corners[Math.floor(Math.random()*corners.length)];
+  const avail=[...Array(9).keys()].filter(i=>!board[i]);
+  return avail[Math.floor(Math.random()*avail.length)] ?? -1;
+}
+function botC4(board) {
+  for(let c=0;c<C4C;c++) { if(board[0][c]) continue; const t=board.map(r=>[...r]); dropC4(t,c,2); if(checkC4(t,2)) return c; }
+  for(let c=0;c<C4C;c++) { if(board[0][c]) continue; const t=board.map(r=>[...r]); dropC4(t,c,1); if(checkC4(t,1)) return c; }
+  const pref=[3,2,4,1,5,0,6].filter(c=>!board[0][c]);
+  return pref[0]??0;
+}
+
 client.once('clientReady', async () => {
   console.log(`✅ Bot online: ${client.user.tag}`);
 
@@ -488,8 +508,54 @@ client.on('interactionCreate', async interaction => {
   const gameTypes = ['rps','ttt','c4','hl'];
   if (gameTypes.some(t => interaction.customId === `game_${t}`)) {
     const type = interaction.customId.replace('game_', '');
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`game_vsp_${type}`).setLabel('👤 Challenge a Player').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`game_vsb_${type}`).setLabel('🤖 Play vs Bot').setStyle(ButtonStyle.Secondary),
+    );
+    return interaction.reply({ content: '🎮 Who do you want to play against?', components: [row], ephemeral: true });
+  }
+
+  // vs Player — show opponent selector
+  if (interaction.customId.startsWith('game_vsp_')) {
+    const type = interaction.customId.replace('game_vsp_', '');
     const sel = new UserSelectMenuBuilder().setCustomId(`game_sel_${type}`).setPlaceholder('Select your opponent').setMaxValues(1);
-    return interaction.reply({ content: '👇 Who do you want to challenge?', components: [new ActionRowBuilder().addComponents(sel)], ephemeral: true });
+    return interaction.update({ content: '👇 Who do you want to challenge?', components: [new ActionRowBuilder().addComponents(sel)] });
+  }
+
+  // vs Bot — start immediately
+  if (interaction.customId.startsWith('game_vsb_')) {
+    const type = interaction.customId.replace('game_vsb_', '');
+    const gid = newGid();
+    const g = { type, p1: interaction.user.id, p2: BOT_ID, status: 'active', channelId: interaction.channelId };
+    games.set(gid, g);
+    await interaction.update({ content: '🤖 Starting game vs Bot...', components: [] });
+
+    if (type === 'rps') {
+      g.p1pick = null; g.p2pick = botRPS();
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`rps_${gid}_r`).setLabel('✊ Rock').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`rps_${gid}_p`).setLabel('✋ Paper').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`rps_${gid}_s`).setLabel('✌️ Scissors').setStyle(ButtonStyle.Secondary),
+      );
+      return interaction.channel.send({ content: `✊ **Rock Paper Scissors vs 🤖 Bot**\n${freshMember} — Pick your move!`, components: [row] });
+    }
+    if (type === 'ttt') {
+      g.board = Array(9).fill(''); g.turn = g.p1;
+      const rows = buildTttRows(g.board, gid, false);
+      rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('_').setLabel(`❌ ${freshMember.displayName}'s turn`).setStyle(ButtonStyle.Secondary).setDisabled(true)));
+      return interaction.channel.send({ content: `❌⭕ **Tic Tac Toe vs 🤖 Bot** — ${freshMember} you go first (❌)`, components: rows });
+    }
+    if (type === 'c4') {
+      g.board = newC4(); g.turn = g.p1;
+      const embed = new EmbedBuilder().setTitle('🟡 Connect 4 vs 🤖 Bot').setDescription(renderC4(g.board)).setColor(0x00c8ff).setFooter({text:`🔴 ${freshMember.displayName} vs 🟡 Bot — 🔴 you go first`});
+      return interaction.channel.send({ embeds: [embed], components: [c4Buttons(gid, g.board, false)] });
+    }
+    if (type === 'hl') {
+      g.number = Math.floor(Math.random()*100)+1; g.p1guess = null;
+      g.p2guess = Math.floor(Math.random()*100)+1; // bot guesses immediately
+      const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`hl_${gid}`).setLabel('🔢 Make Your Guess (1–100)').setStyle(ButtonStyle.Primary));
+      return interaction.channel.send({ content: `🔢 **Higher or Lower vs 🤖 Bot**\n${freshMember} — I've picked a number 1–100. The bot already guessed. Can you get closer?`, components: [row] });
+    }
   }
 
   // ACCEPT CHALLENGE
@@ -555,13 +621,14 @@ client.on('interactionCreate', async interaction => {
     // Both picked — reveal
     const names = { r:'✊ Rock', p:'✋ Paper', s:'✌️ Scissors' };
     const beats = { r:'s', p:'r', s:'p' };
-    const [p1m, p2m] = await Promise.all([interaction.guild.members.fetch(g.p1), interaction.guild.members.fetch(g.p2)]);
+    const p1m = await interaction.guild.members.fetch(g.p1);
+    const p2Name = g.p2 === BOT_ID ? '🤖 Bot' : (await interaction.guild.members.fetch(g.p2)).displayName;
     let result;
     if (g.p1pick === g.p2pick) result = "It's a **draw**!";
     else if (beats[g.p1pick] === g.p2pick) result = `🏆 **${p1m.displayName}** wins!`;
-    else result = `🏆 **${p2m.displayName}** wins!`;
+    else result = `🏆 **${p2Name}** wins!`;
     games.delete(gid);
-    return interaction.update({ content: `✊ **Rock Paper Scissors Result**\n${p1m}: ${names[g.p1pick]}\n${p2m}: ${names[g.p2pick]}\n\n${result}`, components: [] });
+    return interaction.update({ content: `✊ **Rock Paper Scissors Result**\n${p1m}: ${names[g.p1pick]}\n${p2Name}: ${names[g.p2pick]}\n\n${result}`, components: [] });
   }
 
   // TTT MOVE
@@ -575,18 +642,37 @@ client.on('interactionCreate', async interaction => {
     const symbol = interaction.user.id === g.p1 ? 'X' : 'O';
     g.board[cell] = symbol;
     const winner = tttWinner(g.board);
-    const [p1m, p2m] = await Promise.all([interaction.guild.members.fetch(g.p1), interaction.guild.members.fetch(g.p2)]);
+    const tttP1m = await interaction.guild.members.fetch(g.p1);
+    const p2Name = g.p2 === BOT_ID ? '🤖 Bot' : (await interaction.guild.members.fetch(g.p2))?.displayName;
     if (winner) {
       games.delete(gid);
       const rows = buildTttRows(g.board, gid, true);
-      const msg = winner === 'draw' ? "It's a **draw**!" : `🏆 **${winner === 'X' ? p1m.displayName : p2m.displayName}** wins!`;
+      const msg = winner === 'draw' ? "It's a **draw**!" : `🏆 **${winner === 'X' ? tttP1m.displayName : p2Name}** wins!`;
       rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('_done').setLabel(msg).setStyle(ButtonStyle.Secondary).setDisabled(true)));
       return interaction.update({ components: rows });
     }
     g.turn = g.turn === g.p1 ? g.p2 : g.p1;
-    const nextMember = await interaction.guild.members.fetch(g.turn);
+    // Bot's turn
+    if (g.turn === BOT_ID) {
+      const botCell = botTTT(g.board);
+      if (botCell >= 0) {
+        g.board[botCell] = 'O';
+        const botWin = tttWinner(g.board);
+        g.turn = g.p1;
+        const rows2 = buildTttRows(g.board, gid, !!botWin);
+        if (botWin) {
+          games.delete(gid);
+          const msg2 = botWin === 'draw' ? "It's a **draw**!" : `🏆 **🤖 Bot** wins!`;
+          rows2.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('_done2').setLabel(msg2).setStyle(ButtonStyle.Secondary).setDisabled(true)));
+        } else {
+          rows2.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('_').setLabel(`❌ ${tttP1m.displayName}'s turn`).setStyle(ButtonStyle.Secondary).setDisabled(true)));
+        }
+        return interaction.update({ components: rows2 });
+      }
+    }
+    const nextName = g.turn === BOT_ID ? '🤖 Bot' : (await interaction.guild.members.fetch(g.turn))?.displayName;
     const rows = buildTttRows(g.board, gid, false);
-    rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('_').setLabel(`${symbol === 'X' ? '⭕' : '❌'} ${nextMember.displayName}'s turn`).setStyle(ButtonStyle.Secondary).setDisabled(true)));
+    rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('_').setLabel(`${symbol === 'X' ? '⭕' : '❌'} ${nextName}'s turn`).setStyle(ButtonStyle.Secondary).setDisabled(true)));
     return interaction.update({ components: rows });
   }
 
@@ -599,11 +685,12 @@ client.on('interactionCreate', async interaction => {
     if (interaction.user.id !== g.turn) return interaction.reply({ content: '❌ Not your turn!', ephemeral: true });
     const player = interaction.user.id === g.p1 ? 1 : 2;
     if (!dropC4(g.board, col, player)) return interaction.reply({ content: '❌ Column full!', ephemeral: true });
-    const [p1m, p2m] = await Promise.all([interaction.guild.members.fetch(g.p1), interaction.guild.members.fetch(g.p2)]);
+    const p1m = await interaction.guild.members.fetch(g.p1);
+    const p2Name = g.p2 === BOT_ID ? '🤖 Bot' : (await interaction.guild.members.fetch(g.p2))?.displayName ?? 'Player 2';
     if (checkC4(g.board, player)) {
       games.delete(gid);
-      const winner = player === 1 ? p1m : p2m;
-      const embed = new EmbedBuilder().setTitle('🟡 Connect 4').setDescription(renderC4(g.board)).setColor(0x00c8ff).setFooter({text:`🏆 ${winner.displayName} wins!`});
+      const winName = player === 1 ? p1m.displayName : p2Name;
+      const embed = new EmbedBuilder().setTitle('🟡 Connect 4').setDescription(renderC4(g.board)).setColor(0x00c8ff).setFooter({text:`🏆 ${winName} wins!`});
       return interaction.update({ embeds: [embed], components: [] });
     }
     if (g.board[0].every(c=>c!==0)) {
@@ -612,8 +699,21 @@ client.on('interactionCreate', async interaction => {
       return interaction.update({ embeds: [embed], components: [] });
     }
     g.turn = g.turn === g.p1 ? g.p2 : g.p1;
-    const next = player === 1 ? p2m : p1m;
-    const embed = new EmbedBuilder().setTitle('🟡 Connect 4').setDescription(renderC4(g.board)).setColor(0x00c8ff).setFooter({text:`🔴 ${p1m.displayName} vs 🟡 ${p2m.displayName} — ${player===1?'🟡':'🔴'} ${next.displayName}'s turn`});
+    // Bot's turn
+    if (g.turn === BOT_ID) {
+      const botCol = botC4(g.board);
+      dropC4(g.board, botCol, 2);
+      g.turn = g.p1;
+      if (checkC4(g.board, 2)) {
+        games.delete(gid);
+        const embed = new EmbedBuilder().setTitle('🟡 Connect 4').setDescription(renderC4(g.board)).setColor(0x00c8ff).setFooter({text:'🏆 🤖 Bot wins!'});
+        return interaction.update({ embeds: [embed], components: [] });
+      }
+      const embed2 = new EmbedBuilder().setTitle('🟡 Connect 4 vs 🤖 Bot').setDescription(renderC4(g.board)).setColor(0x00c8ff).setFooter({text:`🔴 ${p1m.displayName}'s turn`});
+      return interaction.update({ embeds: [embed2], components: [c4Buttons(gid, g.board, false)] });
+    }
+    const nextName = g.turn === BOT_ID ? '🤖 Bot' : p2Name;
+    const embed = new EmbedBuilder().setTitle('🟡 Connect 4').setDescription(renderC4(g.board)).setColor(0x00c8ff).setFooter({text:`🔴 ${p1m.displayName} vs 🟡 ${p2Name} — ${player===1?'🟡':'🔴'} ${nextName}'s turn`});
     return interaction.update({ embeds: [embed], components: [c4Buttons(gid, g.board, false)] });
   }
 
