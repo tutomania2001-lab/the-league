@@ -6,7 +6,7 @@ import ProfileScreen from '@/app/(tabs)/profile';
 import SwipePager from '@/components/ui/SwipePager';
 import { Colors } from '@/constants/theme';
 import { useRef, useState } from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TABS = [
@@ -29,10 +29,18 @@ export default function TabLayout() {
   const [activeIndex, setActiveIndex] = useState(0);
   const pagerRef = useRef<any>(null);
   const insets = useSafeAreaInsets();
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
 
   function goTo(index: number) {
     pagerRef.current?.setPage(index);
     setActiveIndex(index);
+  }
+
+  function handlePageScroll(e: any) {
+    const offset = e.nativeEvent?.offset ?? 0;
+    // Peaks at 0.18 opacity mid-swipe then back to 0 when settled
+    const v = Math.sin(offset * Math.PI) * 0.22;
+    overlayOpacity.setValue(v);
   }
 
   return (
@@ -41,7 +49,11 @@ export default function TabLayout() {
         ref={pagerRef}
         style={styles.pager}
         initialPage={0}
-        onPageSelected={(e: any) => setActiveIndex(e.nativeEvent?.position ?? activeIndex)}
+        onPageSelected={(e: any) => {
+          setActiveIndex(e.nativeEvent?.position ?? activeIndex);
+          overlayOpacity.setValue(0);
+        }}
+        onPageScroll={handlePageScroll}
         overdrag
         overScrollMode="never"
       >
@@ -51,6 +63,8 @@ export default function TabLayout() {
           </View>
         ))}
       </SwipePager>
+      {/* Crossfade overlay — darkens mid-swipe to disguise the side-by-side seam */}
+      <Animated.View pointerEvents="none" style={[styles.swipeOverlay, { opacity: overlayOpacity }]} />
 
       {/* Bottom tab bar */}
       <View style={[styles.tabBar, { paddingBottom: insets.bottom || 8 }]}>
@@ -99,5 +113,12 @@ const styles = StyleSheet.create({
   tabIndicator: {
     position: 'absolute', top: 0, left: '25%', right: '25%',
     height: 2, borderRadius: 1,
+  },
+  swipeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
+    pointerEvents: 'none',
+    zIndex: 5,
+    bottom: 68,
   },
 });
