@@ -98,11 +98,11 @@ export default function PlayerProfileScreen() {
           </View>
           <View style={{ flex: 1, gap: 4 }}>
             <GlowText style={styles.displayName}>{displayName}</GlowText>
-            {targetTeam && (
-              <Text style={styles.teamLabel}>
-                ⚔️ {targetTeam.clan_tag ? `[${targetTeam.clan_tag.toUpperCase()}] ` : ''}{targetTeam.name}
-              </Text>
-            )}
+            <Text style={[styles.teamLabel, !targetTeam && { color: Colors.textMuted }]}>
+              ⚔️ {targetTeam
+                ? `${targetTeam.clan_tag ? `[${targetTeam.clan_tag.toUpperCase()}] ` : ''}${targetTeam.name}`
+                : '#TEAM'}
+            </Text>
             <RankBadge lp={profile?.lp ?? 0} peakLP={profile?.peak_lp ?? 0} size="sm" />
           </View>
         </View>
