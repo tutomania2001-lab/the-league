@@ -518,18 +518,20 @@ client.on('interactionCreate', async interaction => {
 
   // vs Player — show opponent selector
   if (interaction.customId.startsWith('game_vsp_')) {
+    console.log('game_vsp_ hit:', interaction.customId);
     const type = interaction.customId.replace('game_vsp_', '');
     const sel = new UserSelectMenuBuilder().setCustomId(`game_sel_${type}`).setPlaceholder('Select your opponent').setMaxValues(1);
-    return interaction.update({ content: '👇 Who do you want to challenge?', components: [new ActionRowBuilder().addComponents(sel)] });
+    return interaction.reply({ content: '👇 Who do you want to challenge?', components: [new ActionRowBuilder().addComponents(sel)], ephemeral: true });
   }
 
   // vs Bot — start immediately
   if (interaction.customId.startsWith('game_vsb_')) {
+    console.log('game_vsb_ hit:', interaction.customId);
     const type = interaction.customId.replace('game_vsb_', '');
     const gid = newGid();
     const g = { type, p1: interaction.user.id, p2: BOT_ID, status: 'active', channelId: interaction.channelId };
     games.set(gid, g);
-    await interaction.update({ content: '🤖 Starting game vs Bot...', components: [] });
+    await interaction.reply({ content: '🤖 Starting game vs Bot...', components: [], ephemeral: true });
 
     if (type === 'rps') {
       g.p1pick = null; g.p2pick = botRPS();
