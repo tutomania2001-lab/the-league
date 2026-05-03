@@ -192,11 +192,10 @@ const styles = StyleSheet.create({
   },
   tabIcon: { fontSize: 16 },
   badge: {
-    position: 'absolute', top: -5, right: -5,
-    backgroundColor: Colors.accent, borderRadius: 8,
-    minWidth: 16, height: 16, paddingHorizontal: 2,
+    position: 'absolute', top: -5, left: -8,
+    backgroundColor: Colors.accent, borderRadius: 10,
+    minWidth: 18, height: 18, paddingHorizontal: 4,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: Colors.background,
   },
   badgeText: { color: Colors.background, fontSize: 8, fontWeight: '900' },
 });
