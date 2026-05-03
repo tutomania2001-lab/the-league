@@ -99,16 +99,16 @@ export default function PlayerProfileScreen() {
           <View style={{ flex: 1, gap: 4 }}>
             <GlowText style={styles.displayName}>{displayName}</GlowText>
             <View style={[styles.teamChip, !targetTeam && styles.teamChipEmpty]}>
-              <Text style={styles.teamChipIcon}>⚔️</Text>
               {targetTeam ? (
                 <>
+                  <Text style={styles.teamChipIcon}>⚔️</Text>
                   {targetTeam.clan_tag && (
                     <Text style={styles.teamChipTag}>[{targetTeam.clan_tag.toUpperCase()}]</Text>
                   )}
                   <Text style={styles.teamChipName}>{targetTeam.name}</Text>
                 </>
               ) : (
-                <Text style={styles.teamChipNone}>#TEAM</Text>
+                <Text style={styles.teamChipNone}>⚔️ No Clan</Text>
               )}
             </View>
             <RankBadge lp={profile?.lp ?? 0} peakLP={profile?.peak_lp ?? 0} size="sm" />

@@ -115,16 +115,16 @@ export default function ProfileScreen() {
               </GlowText>
             </PulseGlow>
             <View style={[styles.teamChip, !team && styles.teamChipEmpty]}>
-              <Text style={styles.teamChipIcon}>⚔️</Text>
               {team ? (
                 <>
+                  <Text style={styles.teamChipIcon}>⚔️</Text>
                   {team.clan_tag && (
                     <Text style={styles.teamChipTag}>[{team.clan_tag.toUpperCase()}]</Text>
                   )}
                   <Text style={styles.teamChipName}>{team.name}</Text>
                 </>
               ) : (
-                <Text style={styles.teamChipNone}>#TEAM</Text>
+                <Text style={styles.teamChipNone}>⚔️ No Clan</Text>
               )}
             </View>
             <View style={{ marginTop: Spacing.xs }}>
