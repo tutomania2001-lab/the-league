@@ -4,7 +4,7 @@ import { TappableAvatar } from '@/components/ui/TappableAvatar';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { withClanTag } from '@/lib/clanTag';
 import { useGlobalFeed, GlobalPost } from '@/hooks/useGlobalFeed';
-import { PostComment, useTeamFeed } from '@/hooks/useTeamFeed';
+import { PostComment } from '@/hooks/useTeamFeed';
 import { useTeam } from '@/hooks/useTeam';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
@@ -164,9 +164,8 @@ function PostCard({ post, myId, onToggleLike, onFetchComments, onAddComment, onD
 export default function PlayerHubScreen() {
   const router = useRouter();
   const [myId, setMyId] = useState<string>();
-  const { posts, loading, toggleLike, fetchComments, addComment, deleteComment, refresh } = useGlobalFeed(myId);
+  const { posts, loading, toggleLike, fetchComments, addComment, deleteComment, refresh, createHubPost, uploadMedia } = useGlobalFeed(myId);
   const { team } = useTeam(myId);
-  const { createPost, uploadMedia } = useTeamFeed(team?.id, myId);
   const [refreshing, setRefreshing] = useState(false);
   const [showNewPost, setShowNewPost] = useState(false);
   const [postCaption, setPostCaption] = useState('');
@@ -195,7 +194,7 @@ export default function PlayerHubScreen() {
       mediaType = postMedia.type;
       setUploadProgress('');
     }
-    await createPost(team.id, myId, mediaUrl, mediaType, postCaption, true);
+    await createHubPost(myId, mediaUrl, mediaType, postCaption, team?.id ?? null);
     setPosting(false);
     setShowNewPost(false);
     setPostMedia(null);
@@ -214,11 +213,9 @@ export default function PlayerHubScreen() {
           <GlowText style={styles.headerTitle}>🌐 PLAYER HUB</GlowText>
           <Text style={styles.headerSub}>Community highlights from all clans</Text>
         </View>
-        {team && (
-          <TouchableOpacity style={styles.newPostBtn} onPress={() => setShowNewPost(true)}>
-            <Text style={styles.newPostBtnText}>＋ Post</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity style={styles.newPostBtn} onPress={() => setShowNewPost(true)}>
+          <Text style={styles.newPostBtnText}>＋ Post</Text>
+        </TouchableOpacity>
       </View>
 
       {/* New post modal */}

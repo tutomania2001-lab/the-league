@@ -4,7 +4,7 @@ import { PostComment } from './useTeamFeed';
 
 export type GlobalPost = {
   id: string;
-  team_id: string;
+  team_id: string | null;
   user_id: string;
   media_url: string | null;
   media_type: 'image' | 'video' | null;
@@ -32,22 +32,22 @@ export function useGlobalFeed(myId: string | undefined) {
     if (error || !postsData?.length) { setPosts([]); setLoading(false); return; }
 
     const authorIds = [...new Set(postsData.map(p => p.user_id))];
-    const teamIds   = [...new Set(postsData.map(p => p.team_id))];
+    const teamIds   = [...new Set(postsData.map(p => p.team_id).filter(Boolean))];
 
-    const [{ data: authors }, { data: teams }, { data: likes }] = await Promise.all([
+    const [{ data: authors }, teamsRes, { data: likes }] = await Promise.all([
       supabase.from('users').select('id, riot_id, username, avatar_url').in('id', authorIds),
-      supabase.from('teams').select('id, name, clan_tag').in('id', teamIds),
+      teamIds.length ? supabase.from('teams').select('id, name, clan_tag').in('id', teamIds) : Promise.resolve({ data: [] }),
       supabase.from('team_post_likes').select('post_id').eq('user_id', myId ?? '00000000-0000-0000-0000-000000000000'),
     ]);
 
     const authorMap = Object.fromEntries((authors ?? []).map((a: any) => [a.id, a]));
-    const teamMap   = Object.fromEntries((teams   ?? []).map((t: any) => [t.id, t]));
+    const teamMap   = Object.fromEntries(((teamsRes as any).data ?? []).map((t: any) => [t.id, t]));
     const likedSet  = new Set((likes ?? []).map((l: any) => l.post_id));
 
     setPosts(postsData.map(p => ({
       ...p,
       author: authorMap[p.user_id],
-      team: teamMap[p.team_id],
+      team: p.team_id ? teamMap[p.team_id] : undefined,
       liked: likedSet.has(p.id),
     })));
     setLoading(false);
@@ -94,5 +94,40 @@ export function useGlobalFeed(myId: string | undefined) {
     ));
   }
 
-  return { posts, loading, toggleLike, fetchComments, addComment, deleteComment, refresh: fetchPosts };
+  async function createHubPost(userId: string, mediaUrl: string | null, mediaType: 'image' | 'video' | null, caption: string, teamId?: string | null) {
+    const { error } = await supabase.from('team_posts').insert({
+      team_id: teamId ?? null,
+      user_id: userId,
+      media_url: mediaUrl,
+      media_type: mediaType,
+      caption: caption.trim() || null,
+      is_public: true,
+    });
+    if (error) return { error: error.message };
+    fetchPosts();
+    return { error: null };
+  }
+
+  async function uploadMedia(uri: string, type: 'image' | 'video', userId: string): Promise<string | null> {
+    try {
+      const ext = type === 'video' ? 'mp4' : 'jpg';
+      const path = `${userId}/${Date.now()}.${ext}`;
+      const contentType = type === 'video' ? 'video/mp4' : 'image/jpeg';
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return null;
+      const formData = new FormData();
+      formData.append('file', { uri, type: contentType, name: `upload.${ext}` } as any);
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/storage/v1/object/team-media/${path}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'x-upsert': 'false' },
+        body: formData,
+      });
+      if (!response.ok) return null;
+      const { data } = supabase.storage.from('team-media').getPublicUrl(path);
+      return data.publicUrl;
+    } catch { return null; }
+  }
+
+  return { posts, loading, toggleLike, fetchComments, addComment, deleteComment, refresh: fetchPosts, createHubPost, uploadMedia };
 }
