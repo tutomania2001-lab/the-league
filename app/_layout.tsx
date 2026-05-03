@@ -88,10 +88,38 @@ export default function RootLayout() {
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: 'transparent' },
-            cardStyle: { backgroundColor: 'transparent' },
-            animation: 'fade',
+            animation: 'slide_from_right',
+            animationDuration: 260,
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
           }}
-        />
+        >
+          {/* Landing & auth — fade in */}
+          <Stack.Screen name="index" options={{ animation: 'fade', animationDuration: 400 }} />
+          <Stack.Screen name="auth/log-in" options={{ animation: 'fade', animationDuration: 220 }} />
+          <Stack.Screen name="auth/sign-up" options={{ animation: 'fade', animationDuration: 220 }} />
+          <Stack.Screen name="auth/callback" options={{ animation: 'none' }} />
+
+          {/* Main tabs — fade */}
+          <Stack.Screen name="(tabs)" options={{ animation: 'fade', animationDuration: 300 }} />
+
+          {/* Push screens — slide from right (default) */}
+          <Stack.Screen name="profile/[userId]" options={{ animation: 'slide_from_right', animationDuration: 260 }} />
+          <Stack.Screen name="profile/friends" options={{ animation: 'slide_from_right', animationDuration: 260 }} />
+          <Stack.Screen name="hub/index" options={{ animation: 'slide_from_right', animationDuration: 280 }} />
+          <Stack.Screen name="tournament/[id]" options={{ animation: 'slide_from_right', animationDuration: 260 }} />
+          <Stack.Screen name="tournament/create" options={{ animation: 'slide_from_right', animationDuration: 260 }} />
+          <Stack.Screen name="match/[id]" options={{ animation: 'slide_from_right', animationDuration: 260 }} />
+          <Stack.Screen name="chat/[userId]" options={{ animation: 'slide_from_right', animationDuration: 260 }} />
+          <Stack.Screen name="team/lobby" options={{ animation: 'slide_from_right', animationDuration: 260 }} />
+
+          {/* Modal screens — slide up from bottom */}
+          <Stack.Screen name="profile/settings" options={{ animation: 'slide_from_bottom', presentation: 'modal', animationDuration: 300 }} />
+          <Stack.Screen name="profile/icon-picker" options={{ animation: 'slide_from_bottom', presentation: 'modal', animationDuration: 300 }} />
+          <Stack.Screen name="wallet/top-up" options={{ animation: 'slide_from_bottom', presentation: 'modal', animationDuration: 300 }} />
+          <Stack.Screen name="wallet/withdraw" options={{ animation: 'slide_from_bottom', presentation: 'modal', animationDuration: 300 }} />
+          <Stack.Screen name="team/invite" options={{ animation: 'slide_from_bottom', presentation: 'modal', animationDuration: 300 }} />
+        </Stack>
         {/* Friends panel — only inside the app, never on auth/landing screens */}
         {(session || DEV_BYPASS.enabled) && segments[0] === '(tabs)' && <FriendsPanel userId={userId} />}
         <StatusBar style="light" />
