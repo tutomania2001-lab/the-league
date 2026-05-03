@@ -86,35 +86,52 @@ export function useChat(userId: string | undefined, friendId: string | undefined
   return { messages, loading, send };
 }
 
+// Module-level singleton — one subscription shared across all hook instances
+const unreadListeners = new Set<(counts: Record<string, number>) => void>();
+let unreadCache: Record<string, number> = {};
+let unreadSub: any = null;
+let unreadUserId: string | null = null;
+
+function broadcastUnread(counts: Record<string, number>) {
+  unreadCache = counts;
+  unreadListeners.forEach(fn => fn(counts));
+}
+
+async function fetchUnreadFor(uid: string) {
+  const { data } = await supabase
+    .from('direct_messages')
+    .select('sender_id')
+    .eq('receiver_id', uid)
+    .eq('read', false);
+  const counts: Record<string, number> = {};
+  data?.forEach((m: any) => { counts[m.sender_id] = (counts[m.sender_id] ?? 0) + 1; });
+  broadcastUnread(counts);
+}
+
+function ensureUnreadSubscription(uid: string) {
+  if (unreadSub && unreadUserId === uid) return;
+  if (unreadSub) { unreadSub.unsubscribe(); unreadSub = null; }
+  unreadUserId = uid;
+  fetchUnreadFor(uid);
+  unreadSub = supabase.channel(`unread-singleton:${uid}`)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' },
+      (payload) => {
+        const msg = payload.new as any;
+        if (msg.receiver_id === uid || msg.sender_id === uid) fetchUnreadFor(uid);
+      }
+    ).subscribe();
+}
+
 export function useUnreadCounts(userId: string | undefined) {
-  const [unreadByUser, setUnreadByUser] = useState<Record<string, number>>({});
+  const [unreadByUser, setUnreadByUser] = useState<Record<string, number>>(unreadCache);
 
   useEffect(() => {
     if (!userId) return;
-    fetchUnread();
-
-    const sub = supabase.channel(`unread:${userId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' },
-        (payload) => {
-          const msg = payload.new as any;
-          if (msg.receiver_id === userId || msg.sender_id === userId) fetchUnread();
-        }
-      ).subscribe();
-
-    return () => { sub.unsubscribe(); };
+    ensureUnreadSubscription(userId);
+    unreadListeners.add(setUnreadByUser);
+    setUnreadByUser(unreadCache);
+    return () => { unreadListeners.delete(setUnreadByUser); };
   }, [userId]);
-
-  async function fetchUnread() {
-    if (!userId) return;
-    const { data } = await supabase
-      .from('direct_messages')
-      .select('sender_id')
-      .eq('receiver_id', userId)
-      .eq('read', false);
-    const counts: Record<string, number> = {};
-    data?.forEach(m => { counts[m.sender_id] = (counts[m.sender_id] ?? 0) + 1; });
-    setUnreadByUser(counts);
-  }
 
   const totalUnread = Object.values(unreadByUser).reduce((a, b) => a + b, 0);
   return { unreadByUser, totalUnread };
