@@ -1,8 +1,8 @@
 import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, REST, Routes, SlashCommandBuilder, ChannelType } from 'discord.js';
 import { createClient } from '@supabase/supabase-js';
 
-const TOKEN = process.env.DISCORD_TOKEN;
-const GUILD_ID = process.env.GUILD_ID;
+const TOKEN = process.env.DISCORD_TOKEN?.replace(/\s/g, '');
+const GUILD_ID = process.env.GUILD_ID?.trim();
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
 if (!TOKEN || !GUILD_ID) { console.error('Missing env vars'); process.exit(1); }
