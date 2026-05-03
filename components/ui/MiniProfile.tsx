@@ -1,6 +1,7 @@
 import { GlowText } from '@/components/ui/GlowText';
 import { DefaultAvatar } from '@/components/ui/DefaultAvatar';
 import { StatusDot, STATUS_CONFIG, UserStatus } from '@/components/ui/StatusDot';
+import { openMiniChat } from '@/lib/miniChat';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { getRankFromLP, getRankLabel } from '@/constants/ranks';
 import { useRouter } from 'expo-router';
@@ -98,22 +99,33 @@ export function MiniProfile({ user, onClose, onAddFriend, isFriend, onRemoveFrie
         <View style={styles.actions}>
           {/* Message — only for friends */}
           {isFriend && (
-            <TouchableOpacity
-              style={styles.btnPrimary}
-              onPress={() => {
-                onClose();
-                router.push({
-                  pathname: `/chat/${user!.id}`,
-                  params: {
-                    name: user!.riot_id ?? user!.username,
-                    avatar: user!.avatar_url ?? '',
-                    status: user!.status ?? 'offline',
-                  },
-                });
-              }}
-            >
-              <Text style={styles.btnPrimaryText}>💬 Message</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <TouchableOpacity
+                style={[styles.btnPrimary, { flex: 1 }]}
+                onPress={() => {
+                  onClose();
+                  router.push({
+                    pathname: `/chat/${user!.id}`,
+                    params: {
+                      name: user!.riot_id ?? user!.username,
+                      avatar: user!.avatar_url ?? '',
+                      status: user!.status ?? 'offline',
+                    },
+                  });
+                }}
+              >
+                <Text style={styles.btnPrimaryText}>💬 Message</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.btnPopOut}
+                onPress={() => {
+                  openMiniChat({ id: user!.id, name: user!.riot_id ?? user!.username ?? 'Player', avatarUrl: user!.avatar_url });
+                  onClose();
+                }}
+              >
+                <Text style={styles.btnPopOutText}>⧉</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {/* Invite to team */}
@@ -222,4 +234,9 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.accentBorder,
   },
   btnCloseText: { color: Colors.textMuted, fontSize: 12 },
+  btnPopOut: {
+    width: 38, borderRadius: 6, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,200,255,0.1)', borderWidth: 1, borderColor: Colors.accent + '55',
+  },
+  btnPopOutText: { color: Colors.accent, fontSize: 16, fontWeight: '700' },
 });

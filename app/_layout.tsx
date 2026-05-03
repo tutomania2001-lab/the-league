@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { DEV_BYPASS } from '@/lib/dev';
 import { RootBackground } from '@/components/ui/RootBackground';
 import { FriendsPanel } from '@/components/ui/FriendsPanel';
+import { FloatingMiniChat } from '@/components/ui/FloatingMiniChat';
 import { usePresence } from '@/hooks/usePresence';
 import { NewsTicker } from '@/components/ui/NewsTicker';
 import { Colors } from '@/constants/theme';
@@ -111,6 +112,8 @@ export default function RootLayout() {
         </Stack>
         {/* Friends panel — only inside the app, never on auth/landing screens */}
         {(session || DEV_BYPASS.enabled) && segments[0] === '(tabs)' && <FriendsPanel userId={userId} />}
+        {/* Floating mini chat — available on every screen */}
+        {(session || DEV_BYPASS.enabled) && <FloatingMiniChat myId={userId} />}
         <StatusBar style="light" />
       </View>
     </ThemeProvider>
