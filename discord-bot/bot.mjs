@@ -111,6 +111,21 @@ client.once('clientReady', async () => {
     console.log('✅ Register button posted');
   }
 
+  // Ensure #commands channel exists
+  let commandsChannel = guildChannels.find(c => c?.name === 'commands');
+  if (!commandsChannel) {
+    commandsChannel = await guild.channels.create({
+      name: 'commands',
+      topic: 'Use bot slash commands here',
+      permissionOverwrites: [
+        { id: roles.everyone, deny: [PermissionFlagsBits.SendMessages] },
+        { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+      ],
+    });
+    console.log('✅ #commands channel created');
+  }
+  client.commandsChannelId = commandsChannel.id;
+
   // Post role selector in #get-roles
   const getRolesChannel = guildChannels.find(c => c.name === 'get-roles');
   if (getRolesChannel) {
@@ -176,6 +191,10 @@ client.on('guildMemberAdd', async member => {
 // ── SLASH COMMANDS ───────────────────────────────────────────────
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
+
+  if (client.commandsChannelId && interaction.channelId !== client.commandsChannelId) {
+    return interaction.reply({ content: `❌ Use slash commands in <#${client.commandsChannelId}> only.`, ephemeral: true });
+  }
 
   if (interaction.commandName === 'testwelcome') {
     if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
