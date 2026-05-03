@@ -185,18 +185,19 @@ client.once('clientReady', async () => {
   async function updateStats() {
     try {
       const g = client.guilds.cache.get(GUILD_ID);
-      if (!g) return;
+      if (!g) { console.error('Stats: guild not in cache'); return; }
       await g.members.fetch();
       const all = g.members.cache;
       const totalMembers = all.filter(m => !m.user.bot).size;
       const botCount     = all.filter(m => m.user.bot).size;
       const onlineCount  = all.filter(m => !m.user.bot && m.presence?.status && m.presence.status !== 'offline').size;
+      console.log(`Stats: members=${totalMembers} online=${onlineCount} bots=${botCount}`);
 
-      if (client.statChannels) {
-        await client.statChannels.members.setName(`👥 Members: ${totalMembers}`).catch(() => {});
-        await client.statChannels.online.setName(`🟢 Online: ${onlineCount}`).catch(() => {});
-        await client.statChannels.bots.setName(`🤖 Bots: ${botCount}`).catch(() => {});
-      }
+      const sc = client.statChannels;
+      if (!sc) { console.error('Stats: statChannels not set'); return; }
+      if (sc.members) await sc.members.setName(`👥 Members: ${totalMembers}`).catch(e => console.error('members rename:', e.message));
+      if (sc.online)  await sc.online.setName(`🟢 Online: ${onlineCount}`).catch(e => console.error('online rename:', e.message));
+      if (sc.bots)    await sc.bots.setName(`🤖 Bots: ${botCount}`).catch(e => console.error('bots rename:', e.message));
     } catch (e) { console.error('Stats update error:', e.message); }
   }
 
