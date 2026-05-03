@@ -19,11 +19,12 @@ export function useRecentChats(myId: string | undefined) {
     fetchChats();
 
     const sub = supabase.channel(`recent-chats:${myId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'direct_messages',
-        filter: `receiver_id=eq.${myId}` }, () => fetchChats())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'direct_messages',
-        filter: `sender_id=eq.${myId}` }, () => fetchChats())
-      .subscribe();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' },
+        (payload) => {
+          const msg = payload.new as any;
+          if (msg.sender_id === myId || msg.receiver_id === myId) fetchChats();
+        }
+      ).subscribe();
 
     return () => { sub.unsubscribe(); };
   }, [myId]);
