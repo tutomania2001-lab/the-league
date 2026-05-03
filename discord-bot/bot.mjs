@@ -494,7 +494,7 @@ client.on('interactionCreate', async interaction => {
 
   // ACCEPT CHALLENGE
   if (interaction.customId.startsWith('game_acc_')) {
-    const [,,,gid,...rest] = interaction.customId.split('_');
+    const [,,gid,...rest] = interaction.customId.split('_');
     const type = rest.join('_');
     const g = games.get(gid);
     if (!g) return interaction.update({ content: '❌ Challenge expired.', components: [] });
