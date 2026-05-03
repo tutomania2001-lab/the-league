@@ -51,8 +51,7 @@ export default function PlayerProfileScreen() {
   const friendEntry = friends.find(f => f.profile.id === targetId);
   const isFriend = !!friendEntry;
   const isPending = outgoing.some(f => f.profile.id === targetId) || incoming.some(f => f.profile.id === targetId);
-  const isCaptain = team?.captain_id === myId;
-  const canInvite = isCaptain && myId && targetId && members.length < 10 && !isMe;
+  const canInvite = !!team && myId && targetId && members.length < 10 && !isMe;
 
   const displayName = withClanTag(profile?.riot_id ?? profile?.username ?? 'Player', (profile as any)?.clan_tag ?? targetTeam?.clan_tag);
 

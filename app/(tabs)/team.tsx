@@ -676,6 +676,42 @@ export default function TeamScreen() {
             {isCaptain && (
               <ClanTagEditor team={team} onSaved={refreshTeam} />
             )}
+
+            {/* Privacy setting — captain only */}
+            {isCaptain && (
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionTitle}>🔐 Clan Privacy</Text>
+                <Text style={[Typography.body, { fontSize: 11, marginBottom: Spacing.sm }]}>
+                  Controls how players can join your clan
+                </Text>
+                {([
+                  { key: 'open',        icon: '🌐', label: 'Open',        desc: 'Anyone can join freely' },
+                  { key: 'invite_only', icon: '✉️',  label: 'Invite Only', desc: 'Any member can invite — joins immediately' },
+                  { key: 'private',     icon: '🔒', label: 'Private',     desc: 'Any member can invite — captain approves' },
+                ] as const).map(opt => {
+                  const current = (team as any).privacy ?? 'invite_only';
+                  const isActive = current === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[styles.privacyOption, isActive && styles.privacyOptionActive]}
+                      onPress={async () => {
+                        await supabase.from('teams').update({ privacy: opt.key }).eq('id', team.id);
+                        refreshTeam();
+                      }}
+                    >
+                      <Text style={styles.privacyIcon}>{opt.icon}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.privacyLabel, isActive && { color: Colors.gold }]}>{opt.label}</Text>
+                        <Text style={styles.privacyDesc}>{opt.desc}</Text>
+                      </View>
+                      {isActive && <Text style={{ color: Colors.gold, fontSize: 14 }}>✓</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
             {!isCaptain && (team as any).clan_tag && (
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>🏷️ Clan Tag</Text>
@@ -1392,6 +1428,11 @@ const styles = StyleSheet.create({
   captionInput: { margin: Spacing.md, backgroundColor: 'rgba(20,14,0,0.8)', borderRadius: 10, borderWidth: 1, borderColor: Colors.gold + '44', padding: Spacing.md, color: Colors.text, fontSize: 14, minHeight: 60 },
   postSubmitBtn: { margin: Spacing.md, marginTop: 0, backgroundColor: Colors.gold, borderRadius: 10, padding: 14, alignItems: 'center' },
   postSubmitText: { color: '#0a0800', fontWeight: '900', fontSize: 14 },
+  privacyOption: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.sm, borderRadius: 10, borderWidth: 1, borderColor: Colors.accentBorder, marginBottom: 6 },
+  privacyOptionActive: { borderColor: Colors.gold + '88', backgroundColor: 'rgba(200,155,60,0.08)' },
+  privacyIcon: { fontSize: 18, width: 28, textAlign: 'center' },
+  privacyLabel: { fontSize: 13, fontWeight: '800', color: Colors.text },
+  privacyDesc: { fontSize: 11, color: Colors.textMuted, marginTop: 1 },
   visibilityRow: { flexDirection: 'row', gap: Spacing.sm, marginHorizontal: Spacing.md, marginBottom: Spacing.sm },
   visibilityBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: Colors.accentBorder, backgroundColor: Colors.surfaceAlt },
   visibilityBtnActive: { borderColor: Colors.gold + '88', backgroundColor: 'rgba(200,155,60,0.12)' },

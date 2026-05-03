@@ -42,7 +42,10 @@ export function useTeamInvites(userId: string | undefined) {
   async function accept(inviteId: string, teamId: string) {
     if (!userId) return;
     await supabase.from('team_invites').update({ status: 'accepted' }).eq('id', inviteId);
-    await supabase.from('team_members').insert({ team_id: teamId, user_id: userId, status: 'active' });
+    // Private teams: join as pending (captain must approve). Others: join as active immediately.
+    const { data: teamData } = await supabase.from('teams').select('privacy').eq('id', teamId).single();
+    const memberStatus = teamData?.privacy === 'private' ? 'pending' : 'active';
+    await supabase.from('team_members').insert({ team_id: teamId, user_id: userId, status: memberStatus });
     fetchInvites();
   }
 

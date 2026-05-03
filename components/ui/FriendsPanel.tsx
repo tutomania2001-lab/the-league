@@ -47,9 +47,8 @@ export function FriendsPanel({ userId: userIdProp }: Props) {
   const [addError, setAddError] = useState<string | null>(null);
   const [addSuccess, setAddSuccess] = useState(false);
   const [tab, setTab] = useState<'friends' | 'recent' | 'requests'>('friends');
-  const isCaptain = team?.captain_id === userId;
   const hasTeamSpace = members.length < 10;
-  const canInvite = isCaptain && hasTeamSpace;
+  const canInvite = !!team && hasTeamSpace;
   const totalNotifs = incoming.length + teamInvites.length;
   const [refreshing, setRefreshing] = useState(false);
   const [miniProfile, setMiniProfile] = useState<MiniProfileUser | null>(null);

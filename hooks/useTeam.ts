@@ -25,7 +25,7 @@ export function useTeam(userId: string | undefined) {
     }
 
     const [teamRes, membersRes] = await Promise.all([
-      supabase.from('teams').select('*, clan_tag, bank_balance, wins, tournaments_played, total_earnings, room_code, room_password').eq('id', membership.team_id).single(),
+      supabase.from('teams').select('*, clan_tag, privacy, bank_balance, wins, tournaments_played, total_earnings, room_code, room_password').eq('id', membership.team_id).single(),
       supabase.from('team_members').select('*').eq('team_id', membership.team_id),
     ]);
 

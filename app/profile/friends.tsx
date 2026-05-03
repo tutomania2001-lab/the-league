@@ -23,7 +23,7 @@ export default function FriendsScreen() {
   const { team, members } = useTeam(userId);
   const { sendInvite } = useTeamInvites(userId);
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
-  const isCaptain = team?.captain_id === userId;
+  const isInTeam = !!team;
   const hasSpace = members.length < 10;
   const [searchRiotId, setSearchRiotId] = useState('');
   const router = useRouter();
@@ -129,7 +129,7 @@ export default function FriendsScreen() {
                     <Text style={styles.friendName}>{withClanTag(f.profile.riot_id ?? f.profile.username, (f.profile as any).clan_tag)}</Text>
                     <Text style={styles.friendSub}>Wild Rift Player</Text>
                   </View>
-                  {isCaptain && hasSpace && (
+                  {isInTeam && hasSpace && (
                     <TouchableOpacity
                       style={[styles.inviteBtn, invitedIds.has(f.profile.id) && { opacity: 0.5 }]}
                       onPress={async (e) => {

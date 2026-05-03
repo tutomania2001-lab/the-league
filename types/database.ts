@@ -24,6 +24,7 @@ export type TeamRow = {
   room_code: string | null;
   room_password: string | null;
   clan_tag: string | null;
+  privacy: 'open' | 'invite_only' | 'private';
   wins: number;
   tournaments_played: number;
   total_earnings: number;
