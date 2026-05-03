@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
+import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, REST, Routes, SlashCommandBuilder } from 'discord.js';
 import { createClient } from '@supabase/supabase-js';
 
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -31,6 +31,15 @@ const client = new Client({
 
 client.once('clientReady', async () => {
   console.log(`✅ Bot online: ${client.user.tag}`);
+
+  // Register slash commands
+  const rest = new REST().setToken(TOKEN);
+  await rest.put(Routes.applicationGuildCommands(client.user.id, GUILD_ID), {
+    body: [
+      new SlashCommandBuilder().setName('testwelcome').setDescription('Test the welcome message (admin only)').toJSON(),
+    ],
+  }).catch(console.error);
+  console.log('✅ Slash commands registered');
 
   const guild = await client.guilds.fetch(GUILD_ID);
   const guildRoles = await guild.roles.fetch();
@@ -162,6 +171,39 @@ client.on('guildMemberAdd', async member => {
     .setTimestamp();
 
   await welcomeChannel.send({ content: `👋 ${member}`, embeds: [embed] }).catch(() => {});
+});
+
+// ── SLASH COMMANDS ───────────────────────────────────────────────
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === 'testwelcome') {
+    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
+    }
+    const channels = await interaction.guild.channels.fetch();
+    const welcomeChannel =
+      channels.find(c => c?.name === 'welcome') ??
+      channels.find(c => c?.name === 'announcements') ??
+      channels.find(c => c?.name === 'general');
+    if (!welcomeChannel) {
+      return interaction.reply({ content: '❌ No welcome/announcements/general channel found.', ephemeral: true });
+    }
+    const member = interaction.member;
+    const embed = new EmbedBuilder()
+      .setTitle('◈ A NEW CHALLENGER APPROACHES')
+      .setDescription(
+        `Welcome ${member}, to **The League**! 🎉\n\n` +
+        `→ Read the rules and register in <#${channels.find(c => c?.name === 'rules')?.id ?? ''}>\n` +
+        `→ Pick your roles in <#${channels.find(c => c?.name === 'get-roles')?.id ?? ''}>`
+      )
+      .setThumbnail(interaction.user.displayAvatarURL({ size: 256 }))
+      .setColor(0x00c8ff)
+      .setFooter({ text: `Member #${interaction.guild.memberCount}` })
+      .setTimestamp();
+    await welcomeChannel.send({ content: `👋 ${member}`, embeds: [embed] });
+    return interaction.reply({ content: `✅ Welcome message sent to ${welcomeChannel}`, ephemeral: true });
+  }
 });
 
 // ── BUTTON INTERACTIONS ──────────────────────────────────────────
