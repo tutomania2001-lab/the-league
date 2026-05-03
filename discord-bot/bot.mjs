@@ -377,6 +377,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 client.on('interactionCreate', async interaction => {
   if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
+  try {
   const freshMember = await interaction.guild.members.fetch(interaction.user.id);
 
   // TEST WELCOME (admin only)
@@ -496,6 +497,11 @@ client.on('interactionCreate', async interaction => {
       new TextInputBuilder().setCustomId('rank_username').setLabel('Your username or Riot ID from the app').setStyle(TextInputStyle.Short).setPlaceholder('e.g. LeftRightSleep#2735').setRequired(true).setMaxLength(60)
     ));
     return interaction.showModal(modal);
+  }
+
+  } catch (e) {
+    console.error('Button handler error:', e);
+    interaction.reply({ content: '❌ Something went wrong — check Railway logs.', ephemeral: true }).catch(() => {});
   }
 });
 
