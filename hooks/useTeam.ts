@@ -10,12 +10,13 @@ export function useTeam(userId: string | undefined) {
   const [loading, setLoading] = useState(true);
 
   async function fetchTeam(uid: string) {
-    // Find any membership — null status rows are old captain rows before status column was added
-    const { data: membership } = await supabase
+    // Find any membership — use limit(1) to avoid maybeSingle() failing on duplicate rows
+    const { data: membershipRows } = await supabase
       .from('team_members')
       .select('team_id')
       .eq('user_id', uid)
-      .maybeSingle();
+      .limit(1);
+    const membership = membershipRows?.[0] ?? null;
 
     if (!membership) {
       // Check if they're pending somewhere
