@@ -1,25 +1,32 @@
-import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
+import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const GUILD_ID = process.env.GUILD_ID;
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-if (!TOKEN || !GUILD_ID) {
-  console.error('Missing DISCORD_TOKEN or GUILD_ID environment variables');
-  process.exit(1);
+if (!TOKEN || !GUILD_ID) { console.error('Missing env vars'); process.exit(1); }
+
+// LP thresholds matching the app's rank system
+const RANKS = [
+  { key: 'iron',        name: '⚙️ Iron',        minLP: 0,    maxLP: 399  },
+  { key: 'bronze',      name: '🥉 Bronze',      minLP: 400,  maxLP: 799  },
+  { key: 'silver',      name: '🥈 Silver',      minLP: 800,  maxLP: 1199 },
+  { key: 'gold',        name: '🥇 Gold',        minLP: 1200, maxLP: 1599 },
+  { key: 'platinum',    name: '💠 Platinum',    minLP: 1600, maxLP: 1999 },
+  { key: 'emerald',     name: '💚 Emerald',     minLP: 2000, maxLP: 2399 },
+  { key: 'diamond',     name: '💎 Diamond',     minLP: 2400, maxLP: 2799 },
+  { key: 'master',      name: '👑 Master',      minLP: 2800, maxLP: 3599 },
+  { key: 'grandmaster', name: '🔴 Grandmaster', minLP: 3600, maxLP: 4799 },
+  { key: 'challenger',  name: '⚡ Challenger',   minLP: 4800, maxLP: 999999 },
+];
+
+function getRankForLP(lp) {
+  return RANKS.slice().reverse().find(r => lp >= r.minLP) ?? RANKS[0];
 }
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages,
-  ],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages],
 });
 
 client.once('clientReady', async () => {
@@ -29,69 +36,52 @@ client.once('clientReady', async () => {
   const guildRoles = await guild.roles.fetch();
   const guildChannels = await guild.channels.fetch();
 
-  // Map roles
+  // Map all roles
   const roles = {};
   for (const [id, role] of guildRoles) {
     if (role.name.includes('New Arrival'))     roles.newArrival = id;
     if (role.name.includes('Member') && !role.name.includes('New')) roles.member = id;
     if (role.name.includes('Verified Player')) roles.verified = id;
-    if (role.name.includes('Challenger'))      roles.challenger = id;
     if (role.name.includes('Admin'))           roles.admin = id;
     if (role.name === '@everyone')             roles.everyone = id;
+    // Map rank roles
+    for (const rank of RANKS) {
+      if (role.name.toLowerCase().includes(rank.key)) roles[rank.key] = id;
+    }
   }
   client.roles = roles;
   console.log('Roles mapped:', Object.keys(roles));
 
-  // ── LOCK ALL CHANNELS: only Member+ can see them ──────────────
-  // Allow: rules, announcements, app-download (visible to everyone)
+  // Lock all channels except public ones
   const publicChannels = ['rules', 'announcements', 'app-download'];
-
   for (const [, channel] of guildChannels) {
-    if (!channel.permissionsFor) continue;
-    if (channel.isVoiceBased?.()) continue; // skip voice for now
-
-    const isPublic = publicChannels.includes(channel.name);
-
-    if (!isPublic && channel.type !== 4) { // 4 = category
+    if (!channel.permissionsFor || channel.type === 4) continue;
+    if (!publicChannels.includes(channel.name)) {
       try {
-        await channel.permissionOverwrites.edit(roles.everyone, {
-          ViewChannel: false,
-        });
-        await channel.permissionOverwrites.edit(roles.member, {
-          ViewChannel: true,
-        });
-        console.log(`🔒 Locked #${channel.name}`);
-      } catch (e) {
-        console.log(`⚠️  Could not lock #${channel.name}:`, e.message);
-      }
+        await channel.permissionOverwrites.edit(roles.everyone, { ViewChannel: false });
+        await channel.permissionOverwrites.edit(roles.member, { ViewChannel: true });
+      } catch {}
     }
   }
 
-  // ── ASSIGN NEW ARRIVAL to anyone without Member role ─────────
+  // Auto-assign New Arrival to members without Member role
   const members = await guild.members.fetch();
   for (const [, member] of members) {
     if (member.user.bot) continue;
-    const hasMember = member.roles.cache.has(roles.member);
-    const hasNewArrival = member.roles.cache.has(roles.newArrival);
-    if (!hasMember && !hasNewArrival) {
+    if (!member.roles.cache.has(roles.member) && !member.roles.cache.has(roles.newArrival)) {
       await member.roles.add(roles.newArrival).catch(() => {});
     }
   }
 
-  // ── POST REGISTER BUTTON in #rules ───────────────────────────
+  // Post Register button in #rules
   const rulesChannel = guildChannels.find(c => c.name === 'rules');
   if (rulesChannel) {
     const existing = await rulesChannel.messages.fetch({ limit: 20 });
-    const botMsgs = existing.filter(m => m.author.id === client.user.id);
-    for (const [, m] of botMsgs) await m.delete().catch(() => {});
+    for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
 
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('register')
-        .setLabel('✅ I have read the rules — Register')
-        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('register').setLabel('✅ I have read the rules — Register').setStyle(ButtonStyle.Success),
     );
-
     const embed = new EmbedBuilder()
       .setTitle('◈ THE LEAGUE — SERVER RULES')
       .setDescription(
@@ -104,205 +94,172 @@ client.once('clientReady', async () => {
         '**7️⃣** English only in main channels\n' +
         '**8️⃣** No sharing of personal information\n\n' +
         '> Breaking these rules = ⚠️ warning → 🔇 mute → 🔨 ban\n\n' +
-        '**Click the button below to register and access the server.**'
+        '**Click below to register and access the server.**'
       )
       .setColor(0x00c8ff)
       .setFooter({ text: 'The League — Wild Rift Tournament Platform' });
-
     await rulesChannel.send({ embeds: [embed], components: [row] });
-    console.log('✅ Registration button posted in #rules');
+    console.log('✅ Register button posted');
   }
 
-  // ── POST ROLE SELECTOR in #get-roles ─────────────────────────
+  // Post role selector in #get-roles
   const getRolesChannel = guildChannels.find(c => c.name === 'get-roles');
   if (getRolesChannel) {
-    const existing = await getRolesChannel.messages.fetch({ limit: 10 });
-    const alreadyPosted = existing.some(m => m.author.id === client.user.id && m.embeds.length > 0);
+    const existing = await getRolesChannel.messages.fetch({ limit: 20 });
+    for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
 
-    if (!alreadyPosted) {
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('toggle_verified').setLabel('✅ Verified Player').setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId('toggle_challenger').setLabel('💎 Challenger').setStyle(ButtonStyle.Secondary),
-      );
+    // Verified Player button
+    const verifiedRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('toggle_verified').setLabel('✅ Verified Player — Link your app account').setStyle(ButtonStyle.Primary),
+    );
 
-      const embed = new EmbedBuilder()
-        .setTitle('◈ SELECT YOUR ROLES')
-        .setDescription('Click to add or remove optional roles. Click again to remove.')
-        .setColor(0x00c8ff)
-        .addFields(
-          { name: '✅ Verified Player', value: 'Registered on The League app' },
-          { name: '💎 Challenger', value: 'High-rank competitive Wild Rift player' },
-        )
-        .setFooter({ text: '⚠️ Admin and Moderator roles are assigned by staff only' });
+    // Rank select menu
+    const rankMenu = new StringSelectMenuBuilder()
+      .setCustomId('rank_select')
+      .setPlaceholder('🏆 Claim your rank — enter your app username to verify')
+      .addOptions(RANKS.map(r => ({ label: r.name, value: r.key, description: `${r.minLP}–${r.maxLP === 999999 ? '∞' : r.maxLP} LP` })));
+    const rankRow = new ActionRowBuilder().addComponents(rankMenu);
 
-      await getRolesChannel.send({ embeds: [embed], components: [row] });
-      console.log('✅ Role selector posted in #get-roles');
-    }
+    const embed = new EmbedBuilder()
+      .setTitle('◈ SELECT YOUR ROLES')
+      .setDescription(
+        '**✅ Verified Player** — Link your The League app account\n' +
+        '**🏆 Rank Role** — Select your rank from the dropdown. Your LP in the app must match.\n\n' +
+        '> Only your exact rank will be assigned — you cannot claim a rank you haven\'t earned in the app.\n' +
+        '> Rank roles update when your LP changes in the app.'
+      )
+      .setColor(0x00c8ff)
+      .setFooter({ text: '⚠️ Admin and Moderator roles are assigned by staff only' });
+
+    await getRolesChannel.send({ embeds: [embed], components: [verifiedRow, rankRow] });
+    console.log('✅ Role selector with rank dropdown posted');
   }
 });
 
-// ── NEW MEMBER: auto-assign New Arrival ──────────────────────────
+// New member → New Arrival
 client.on('guildMemberAdd', async member => {
   if (member.user.bot) return;
-  const newArrivalId = client.roles?.newArrival;
-  if (newArrivalId) await member.roles.add(newArrivalId).catch(() => {});
-  console.log(`👋 New member: ${member.user.tag} — assigned New Arrival`);
+  if (client.roles?.newArrival) await member.roles.add(client.roles.newArrival).catch(() => {});
+  console.log(`👋 ${member.user.tag} joined — New Arrival assigned`);
 });
 
 // ── BUTTON INTERACTIONS ──────────────────────────────────────────
 client.on('interactionCreate', async interaction => {
-  if (!interaction.isButton()) return;
+  if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
-  const { customId, member } = interaction;
+  const freshMember = await interaction.guild.members.fetch(interaction.user.id);
 
-  // REGISTER button
-  if (customId === 'register') {
-    // Force-fetch fresh member data to avoid stale cache
-    const freshMember = await interaction.guild.members.fetch(interaction.user.id);
-    const hasMember = freshMember.roles.cache.has(client.roles.member);
-    if (hasMember) {
+  // REGISTER
+  if (interaction.customId === 'register') {
+    if (freshMember.roles.cache.has(client.roles.member)) {
       return interaction.reply({ content: '✅ You are already registered!', ephemeral: true });
     }
     try {
       await freshMember.roles.add(client.roles.member);
       await freshMember.roles.remove(client.roles.newArrival).catch(() => {});
-      return interaction.reply({
-        content: '🎉 Welcome to **The League**! You now have access to all channels.\nHead to **#get-roles** to pick your optional roles.',
-        ephemeral: true
-      });
+      return interaction.reply({ content: '🎉 Welcome to **The League**! You now have access to all channels.\nHead to **#get-roles** to pick your roles.', ephemeral: true });
     } catch (e) {
-      console.error('Register error:', e.message);
       return interaction.reply({ content: '❌ Registration failed — contact staff.', ephemeral: true });
     }
   }
 
-  // VERIFIED PLAYER — show modal to enter Riot ID
-  if (customId === 'toggle_verified') {
-    const freshMember2 = await interaction.guild.members.fetch(interaction.user.id);
-    if (!freshMember2.roles.cache.has(client.roles.member)) {
-      return interaction.reply({ content: '❌ You must register first in **#rules**.', ephemeral: true });
-    }
-    // If already verified, remove the role
-    if (freshMember2.roles.cache.has(client.roles.verified)) {
-      await freshMember2.roles.remove(client.roles.verified);
+  // Must be registered for everything below
+  if (!freshMember.roles.cache.has(client.roles.member)) {
+    return interaction.reply({ content: '❌ You must register first in **#rules**.', ephemeral: true });
+  }
+
+  // VERIFIED PLAYER
+  if (interaction.customId === 'toggle_verified') {
+    if (freshMember.roles.cache.has(client.roles.verified)) {
+      await freshMember.roles.remove(client.roles.verified);
       return interaction.reply({ content: '✅ Removed **Verified Player** role', ephemeral: true });
     }
-    // Show modal asking for Riot ID
-    const modal = new ModalBuilder()
-      .setCustomId('verify_riot_modal')
-      .setTitle('Verify Your The League Account');
-    const riotInput = new TextInputBuilder()
-      .setCustomId('riot_id_input')
-      .setLabel('Your Riot ID (e.g. PlayerName#EUW)')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Name#TAG')
-      .setRequired(true)
-      .setMaxLength(50);
-    modal.addComponents(new ActionRowBuilder().addComponents(riotInput));
+    const modal = new ModalBuilder().setCustomId('verify_modal').setTitle('Link Your The League Account');
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('username_input').setLabel('Your username or Riot ID from the app').setStyle(TextInputStyle.Short).setPlaceholder('e.g. LeftRightSleep#2735').setRequired(true).setMaxLength(60)
+    ));
     return interaction.showModal(modal);
   }
 
-  // CHALLENGER — requires Diamond+ rank in The League app
-  if (customId === 'toggle_challenger') {
-    const freshMember2 = await interaction.guild.members.fetch(interaction.user.id);
-    if (!freshMember2.roles.cache.has(client.roles.member)) {
-      return interaction.reply({ content: '❌ You must register first in **#rules**.', ephemeral: true });
-    }
-    // If already has role, remove it
-    if (freshMember2.roles.cache.has(client.roles.challenger)) {
-      await freshMember2.roles.remove(client.roles.challenger);
-      return interaction.reply({ content: '✅ Removed **Challenger** role', ephemeral: true });
-    }
-    // Show modal to enter Riot ID for rank check
-    const modal = new ModalBuilder()
-      .setCustomId('verify_challenger_modal')
-      .setTitle('Verify Your Rank');
-    const riotInput = new TextInputBuilder()
-      .setCustomId('challenger_riot_id')
-      .setLabel('Your Riot ID (e.g. PlayerName#EUW)')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Name#TAG')
-      .setRequired(true)
-      .setMaxLength(50);
-    modal.addComponents(new ActionRowBuilder().addComponents(riotInput));
+  // RANK SELECT
+  if (interaction.customId === 'rank_select') {
+    const selectedRank = interaction.values[0];
+    const rank = RANKS.find(r => r.key === selectedRank);
+    if (!rank) return interaction.reply({ content: '❌ Invalid rank.', ephemeral: true });
+
+    const modal = new ModalBuilder().setCustomId(`rank_modal_${selectedRank}`).setTitle(`Claim ${rank.name} Rank`);
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('rank_username').setLabel('Your username or Riot ID from the app').setStyle(TextInputStyle.Short).setPlaceholder('e.g. LeftRightSleep#2735').setRequired(true).setMaxLength(60)
+    ));
     return interaction.showModal(modal);
   }
 });
 
-// ── MODAL SUBMIT: Challenger rank verification ────────────────────
+// ── MODAL SUBMISSIONS ────────────────────────────────────────────
 client.on('interactionCreate', async interaction => {
   if (!interaction.isModalSubmit()) return;
-  if (interaction.customId !== 'verify_challenger_modal') return;
 
   await interaction.deferReply({ ephemeral: true });
+  const guild = interaction.guild;
+  const member = await guild.members.fetch(interaction.user.id);
 
-  const riotId = interaction.fields.getTextInputValue('challenger_riot_id').trim();
-
-  // Search by riot_id OR username
-  let { data } = await supabase.from('users').select('id, riot_id, username, lp').ilike('riot_id', riotId).maybeSingle();
-  if (!data) {
-    const res = await supabase.from('users').select('id, riot_id, username, lp').ilike('username', riotId).maybeSingle();
-    data = res.data;
+  // Helper: find user in Supabase by riot_id or username
+  async function findUser(input) {
+    let { data } = await supabase.from('users').select('id, riot_id, username, lp').ilike('riot_id', input).maybeSingle();
+    if (!data) {
+      const res = await supabase.from('users').select('id, riot_id, username, lp').ilike('username', input).maybeSingle();
+      data = res.data;
+    }
+    return data;
   }
 
-  if (!data) {
+  // VERIFIED PLAYER modal
+  if (interaction.customId === 'verify_modal') {
+    const input = interaction.fields.getTextInputValue('username_input').trim();
+    const user = await findUser(input);
+    if (!user) {
+      return interaction.editReply({ content: `❌ No account found for **${input}**.\nRegister at https://the-leagueapp.netlify.app first.` });
+    }
+    await member.roles.add(client.roles.verified).catch(() => {});
+    return interaction.editReply({ content: `✅ Account **${user.riot_id ?? user.username}** verified!\nYou now have the **✅ Verified Player** role 🎉` });
+  }
+
+  // RANK modal
+  if (interaction.customId.startsWith('rank_modal_')) {
+    const rankKey = interaction.customId.replace('rank_modal_', '');
+    const claimedRank = RANKS.find(r => r.key === rankKey);
+    if (!claimedRank) return interaction.editReply({ content: '❌ Invalid rank.' });
+
+    const input = interaction.fields.getTextInputValue('rank_username').trim();
+    const user = await findUser(input);
+    if (!user) {
+      return interaction.editReply({ content: `❌ No account found for **${input}**.\nRegister at https://the-leagueapp.netlify.app first.` });
+    }
+
+    const lp = user.lp ?? 0;
+    const actualRank = getRankForLP(lp);
+
+    if (actualRank.key !== claimedRank.key) {
+      return interaction.editReply({
+        content: `❌ Your rank in The League is **${actualRank.name}** (${lp} LP) — not ${claimedRank.name}.\nYou can only claim the rank that matches your LP in the app.`
+      });
+    }
+
+    // Remove all existing rank roles first
+    for (const rank of RANKS) {
+      const roleId = client.roles[rank.key];
+      if (roleId && member.roles.cache.has(roleId)) {
+        await member.roles.remove(roleId).catch(() => {});
+      }
+    }
+
+    // Assign correct rank role
+    const rankRoleId = client.roles[rankKey];
+    if (rankRoleId) await member.roles.add(rankRoleId).catch(() => {});
+
     return interaction.editReply({
-      content: `❌ No account found for **${riotId}**.\nMake sure you've registered on The League app: https://the-leagueapp.netlify.app`
+      content: `🏆 Verified! **${user.riot_id ?? user.username}** is **${actualRank.name}** (${lp} LP).\nYou now have the **${actualRank.name}** role!`
     });
-  }
-
-  const lp = data.lp ?? 0;
-  const ABOVE_DIAMOND_LP = 2800;
-  if (lp < ABOVE_DIAMOND_LP) {
-    const currentTier = lp >= 2400 ? 'Diamond' : lp >= 2000 ? 'Emerald' : lp >= 1600 ? 'Platinum' : lp >= 1200 ? 'Gold' : 'below Gold';
-    return interaction.editReply({
-      content: `❌ Your rank is **${currentTier}** (${lp} LP).\nYou need **Master or above** (2800+ LP) to claim the Challenger role.`
-    });
-  }
-
-  try {
-    const member = await interaction.guild.members.fetch(interaction.user.id);
-    await member.roles.add(client.roles.challenger);
-    return interaction.editReply({
-      content: `💎 Verified! Account **${data.riot_id ?? data.username}** is at **${lp} LP**.\nYou now have the **💎 Challenger** role 🎉`
-    });
-  } catch (e) {
-    return interaction.editReply({ content: '❌ Could not assign role — contact staff.' });
-  }
-});
-
-// ── MODAL SUBMIT: Riot ID verification ───────────────────────────
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isModalSubmit()) return;
-  if (interaction.customId !== 'verify_riot_modal') return;
-
-  await interaction.deferReply({ ephemeral: true });
-
-  const riotId = interaction.fields.getTextInputValue('riot_id_input').trim();
-
-  // Search by riot_id OR username
-  let { data } = await supabase.from('users').select('id, riot_id, username').ilike('riot_id', riotId).maybeSingle();
-  if (!data) {
-    const res = await supabase.from('users').select('id, riot_id, username').ilike('username', riotId).maybeSingle();
-    data = res.data;
-  }
-
-  if (!data) {
-    return interaction.editReply({
-      content: `❌ No account found for **${riotId}**.\nMake sure you've registered on The League app: https://the-leagueapp.netlify.app`
-    });
-  }
-
-  // Assign verified role
-  try {
-    const member = await interaction.guild.members.fetch(interaction.user.id);
-    await member.roles.add(client.roles.verified);
-    return interaction.editReply({
-      content: `✅ Verified! Your account **${data.riot_id ?? data.username}** is linked to The League.\nYou now have the **✅ Verified Player** role 🎉`
-    });
-  } catch (e) {
-    console.error('Verify role error:', e.message);
-    return interaction.editReply({ content: '❌ Could not assign role — contact staff.' });
   }
 });
 
