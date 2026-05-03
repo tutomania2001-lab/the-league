@@ -102,6 +102,19 @@ export default function HomeScreen() {
           <Badge variant="open" />
         </View>
 
+        {/* Player Hub banner */}
+        <TouchableOpacity onPress={() => router.push('/hub')} activeOpacity={0.88}>
+          <View style={styles.featuredBanner}>
+            <Image source={{ uri: getRiftImage(5) }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
+            <View style={styles.featuredBannerOverlay} />
+            <View style={styles.featuredBannerContent}>
+              <Text style={styles.featuredBannerType}>🌐 COMMUNITY</Text>
+              <GlowText style={styles.featuredBannerTitle}>Player Hub</GlowText>
+              <Text style={styles.featuredBannerStat}>Upload plays · Chat · Engage with the community</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
         {/* Tournament splash strip — shows tournaments if any, otherwise champion splashes */}
         <View style={styles.champStrip}>
           {allActive.length > 0 ? (
@@ -224,18 +237,6 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Player Hub banner */}
-        <TouchableOpacity onPress={() => router.push('/hub')} activeOpacity={0.88}>
-          <View style={styles.featuredBanner}>
-            <Image source={{ uri: getRiftImage(5) }} style={StyleSheet.absoluteFillObject as any} resizeMode="cover" />
-            <View style={styles.featuredBannerOverlay} />
-            <View style={styles.featuredBannerContent}>
-              <Text style={styles.featuredBannerType}>🌐 COMMUNITY</Text>
-              <GlowText style={styles.featuredBannerTitle}>Player Hub</GlowText>
-              <Text style={styles.featuredBannerStat}>Upload plays · Chat · Engage with the community</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
 
         <Card style={styles.infoCard}>
           <Text style={Typography.label}>How it works</Text>
