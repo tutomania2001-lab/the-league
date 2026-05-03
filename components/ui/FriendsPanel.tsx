@@ -45,7 +45,7 @@ export function FriendsPanel({ userId: userIdProp }: Props) {
 
   // Auto-close when a mini chat opens
   useEffect(() => onMiniChatChange(friend => {
-    if (friend) setOpen(false);
+    if (friend) close();
   }), []);
   const [addingFriend, setAddingFriend] = useState(false);
   const [addRiotId, setAddRiotId] = useState('');
