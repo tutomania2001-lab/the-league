@@ -2,6 +2,7 @@ import { Colors, Spacing } from '@/constants/theme';
 import { useRecentChats } from '@/hooks/useRecentChats';
 import { useUnreadCounts } from '@/hooks/useChat';
 import { openMiniChat } from '@/lib/miniChat';
+import { onFriendsPanelChange } from '@/lib/panelState';
 import { supabase } from '@/lib/supabase';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -23,7 +24,13 @@ export function FloatingChatPanel({ myId }: { myId: string | undefined }) {
   const insets = useSafeAreaInsets();
   const [resolvedMyId, setResolvedMyId] = useState(myId);
   const [open, setOpen] = useState(false);
+  const [friendsPanelOpen, setFriendsPanelOpen] = useState(false);
   const dropdownAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => onFriendsPanelChange(v => {
+    setFriendsPanelOpen(v);
+    if (v) close();
+  }), []);
 
   useEffect(() => {
     if (myId) { setResolvedMyId(myId); return; }
@@ -108,8 +115,8 @@ export function FloatingChatPanel({ myId }: { myId: string | undefined }) {
         </Animated.View>
       )}
 
-      {/* Floating tab */}
-      {!open && (
+      {/* Floating tab — hide when friends panel is open */}
+      {!open && !friendsPanelOpen && (
         <TouchableOpacity style={[styles.tab, { top: tabTop }]} onPress={toggle} activeOpacity={0.85}>
           <Text style={styles.tabIcon}>💬</Text>
           {totalUnread > 0 && (

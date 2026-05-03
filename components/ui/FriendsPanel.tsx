@@ -9,6 +9,7 @@ import { MiniProfile, MiniProfileUser } from '@/components/ui/MiniProfile';
 import { getStatusFromLastSeen } from '@/hooks/usePresence';
 import { withClanTag } from '@/lib/clanTag';
 import { onMiniChatChange } from '@/lib/miniChat';
+import { setFriendsPanelOpen } from '@/lib/panelState';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Animated, Dimensions, Easing, Image,
@@ -65,6 +66,7 @@ export function FriendsPanel({ userId: userIdProp }: Props) {
   function toggle() {
     const opening = !open;
     setOpen(opening);
+    setFriendsPanelOpen(opening);
     Animated.parallel([
       Animated.timing(slideX, {
         toValue: opening ? 0 : PANEL_W,
@@ -77,6 +79,7 @@ export function FriendsPanel({ userId: userIdProp }: Props) {
 
   function close() {
     setOpen(false);
+    setFriendsPanelOpen(false);
     Animated.parallel([
       Animated.timing(slideX, { toValue: PANEL_W, duration: 250, useNativeDriver: true, easing: Easing.in(Easing.cubic) }),
       Animated.timing(backdropOp, { toValue: 0, duration: 250, useNativeDriver: true }),
