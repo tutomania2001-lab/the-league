@@ -10,73 +10,81 @@ export type RecentChat = {
   unread: number;
 };
 
-export function useRecentChats(myId: string | undefined) {
-  const [chats, setChats] = useState<RecentChat[]>([]);
-  const [loading, setLoading] = useState(true);
+// Singleton — one subscription shared across all callers
+type Listener = (chats: RecentChat[]) => void;
+const listeners = new Set<Listener>();
+let cachedChats: RecentChat[] = [];
+let activeSub: any = null;
+let activeUserId: string | null = null;
 
-  useEffect(() => {
-    if (!myId) { setLoading(false); return; }
-    fetchChats();
+function broadcast(chats: RecentChat[]) {
+  cachedChats = chats;
+  listeners.forEach(fn => fn(chats));
+}
 
-    const sub = supabase.channel(`recent-chats:${myId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' },
-        (payload) => {
-          const msg = payload.new as any;
-          if (msg.sender_id === myId || msg.receiver_id === myId) fetchChats();
-        }
-      ).subscribe();
+async function fetchChatsFor(myId: string) {
+  const { data: messages } = await supabase
+    .from('direct_messages')
+    .select('sender_id, receiver_id, content, created_at, read')
+    .or(`sender_id.eq.${myId},receiver_id.eq.${myId}`)
+    .order('created_at', { ascending: false })
+    .limit(200);
 
-    return () => { sub.unsubscribe(); };
-  }, [myId]);
+  if (!messages?.length) { broadcast([]); return; }
 
-  async function fetchChats() {
-    if (!myId) return;
-
-    // Get all messages involving me
-    const { data: messages } = await supabase
-      .from('direct_messages')
-      .select('sender_id, receiver_id, content, created_at, read')
-      .or(`sender_id.eq.${myId},receiver_id.eq.${myId}`)
-      .order('created_at', { ascending: false })
-      .limit(200);
-
-    if (!messages?.length) { setChats([]); setLoading(false); return; }
-
-    // Build conversation map — keyed by the OTHER person's ID
-    const convMap: Record<string, { lastMessage: string; lastAt: string; unread: number }> = {};
-    for (const m of messages) {
-      const otherId = m.sender_id === myId ? m.receiver_id : m.sender_id;
-      if (!convMap[otherId]) {
-        convMap[otherId] = { lastMessage: m.content, lastAt: m.created_at, unread: 0 };
-      }
-      if (m.receiver_id === myId && !m.read) {
-        convMap[otherId].unread++;
-      }
+  const convMap: Record<string, { lastMessage: string; lastAt: string; unread: number }> = {};
+  for (const m of messages) {
+    const otherId = m.sender_id === myId ? m.receiver_id : m.sender_id;
+    if (!convMap[otherId]) {
+      convMap[otherId] = { lastMessage: m.content, lastAt: m.created_at, unread: 0 };
     }
-
-    const otherIds = Object.keys(convMap);
-    if (!otherIds.length) { setChats([]); setLoading(false); return; }
-
-    const { data: profiles } = await supabase
-      .from('users').select('id, riot_id, username, avatar_url').in('id', otherIds);
-
-    const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.id, p]));
-
-    const result: RecentChat[] = otherIds
-      .map(uid => {
-        const p = profileMap[uid];
-        return {
-          userId: uid,
-          name: p?.riot_id ?? p?.username ?? 'Player',
-          avatarUrl: p?.avatar_url ?? null,
-          ...convMap[uid],
-        };
-      })
-      .sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime());
-
-    setChats(result);
-    setLoading(false);
+    if (m.receiver_id === myId && !m.read) convMap[otherId].unread++;
   }
 
-  return { chats, loading, refresh: fetchChats };
+  const otherIds = Object.keys(convMap);
+  if (!otherIds.length) { broadcast([]); return; }
+
+  const { data: profiles } = await supabase
+    .from('users').select('id, riot_id, username, avatar_url').in('id', otherIds);
+
+  const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.id, p]));
+
+  const result: RecentChat[] = otherIds
+    .map(uid => ({
+      userId: uid,
+      name: profileMap[uid]?.riot_id ?? profileMap[uid]?.username ?? 'Player',
+      avatarUrl: profileMap[uid]?.avatar_url ?? null,
+      ...convMap[uid],
+    }))
+    .sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime());
+
+  broadcast(result);
+}
+
+function ensureSubscription(myId: string) {
+  if (activeSub && activeUserId === myId) return;
+  if (activeSub) { activeSub.unsubscribe(); activeSub = null; }
+  activeUserId = myId;
+  fetchChatsFor(myId);
+  activeSub = supabase.channel(`recent-chats-singleton:${myId}`)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' },
+      (payload) => {
+        const msg = payload.new as any;
+        if (msg.sender_id === myId || msg.receiver_id === myId) fetchChatsFor(myId);
+      }
+    ).subscribe();
+}
+
+export function useRecentChats(myId: string | undefined) {
+  const [chats, setChats] = useState<RecentChat[]>(cachedChats);
+
+  useEffect(() => {
+    if (!myId) return;
+    ensureSubscription(myId);
+    listeners.add(setChats);
+    setChats(cachedChats);
+    return () => { listeners.delete(setChats); };
+  }, [myId]);
+
+  return { chats, refresh: () => myId && fetchChatsFor(myId) };
 }
