@@ -33,20 +33,13 @@ client.once('clientReady', async () => {
   console.log(`✅ Bot online: ${client.user.tag}`);
 
   try {
-  // Register slash commands
-  try {
-    const rest = new REST().setToken(TOKEN.trim());
-    await rest.put(Routes.applicationGuildCommands(client.user.id, GUILD_ID), {
-      body: [
-        new SlashCommandBuilder().setName('testwelcome').setDescription('Test the welcome message (admin only)').toJSON(),
-      ],
-    });
-    console.log('✅ Slash commands registered');
-  } catch (e) {
-    console.error('⚠️ Slash command registration failed (non-fatal):', e.message);
-  }
-
+  // Register slash commands via guild (uses existing ws connection, no separate REST auth)
   const guild = await client.guilds.fetch(GUILD_ID);
+  await guild.commands.set([
+    new SlashCommandBuilder().setName('testwelcome').setDescription('Test the welcome message (admin only)'),
+  ]).catch(e => console.error('⚠️ Slash command registration failed:', e.message));
+  console.log('✅ Slash commands registered');
+
   const guildRoles = await guild.roles.fetch();
   const guildChannels = await guild.channels.fetch();
 
