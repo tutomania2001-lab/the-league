@@ -35,6 +35,7 @@ export type TeamRow = {
 export type TeamMemberRow = {
   team_id: string;
   user_id: string;
+  role: 'member' | 'admin';
   joined_at: string;
 };
 

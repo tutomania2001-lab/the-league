@@ -29,12 +29,15 @@ const { width } = Dimensions.get('window');
 
 // ── Role config ────────────────────────────────────────────
 const ROLES: Record<string, { label: string; color: string; bg: string }> = {
-  leader:    { label: 'LEADER',    color: Colors.gold,    bg: 'rgba(200,155,60,0.2)' },
-  member:    { label: 'MEMBER',    color: Colors.textMuted, bg: Colors.surfaceAlt },
+  leader: { label: 'CAPTAIN', color: Colors.gold,    bg: 'rgba(200,155,60,0.2)' },
+  admin:  { label: 'ADMIN',   color: Colors.accent,  bg: 'rgba(0,200,255,0.12)' },
+  member: { label: 'MEMBER',  color: Colors.textMuted, bg: Colors.surfaceAlt },
 };
 
-function getRoleLabel(captainId: string, userId: string) {
-  return captainId === userId ? 'leader' : 'member';
+function getRoleLabel(captainId: string, userId: string, memberRole?: string) {
+  if (captainId === userId) return 'leader';
+  if (memberRole === 'admin') return 'admin';
+  return 'member';
 }
 
 // ── Team Banner ────────────────────────────────────────────
@@ -400,7 +403,7 @@ function FeedVideo({ uri }: { uri: string }) {
 export default function TeamScreen() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>();
-  const { team, members, pendingMembers, loading, createTeam, leaveTeam, refreshTeam, approveMember, removeMember } = useTeam(userId);
+  const { team, members, pendingMembers, loading, createTeam, leaveTeam, refreshTeam, approveMember, removeMember, promoteToAdmin, demoteToMember } = useTeam(userId);
   const { teamBattles } = useTournamentList();
   const openTournaments = teamBattles.filter(t => t.status === 'open');
   const [memberProfiles, setMemberProfiles] = useState<Record<string, any>>({});
@@ -605,6 +608,8 @@ export default function TeamScreen() {
   );
 
   const isCaptain = team.captain_id === userId;
+  const isAdmin = members.find(m => m.user_id === userId)?.role === 'admin';
+  const isManager = isCaptain || isAdmin;
   const wins = team.wins ?? 0;
 
   // ── Clan Hub ─────────────────────────────────────────────
@@ -867,8 +872,9 @@ export default function TeamScreen() {
               <Text style={styles.sectionTitle}>👥 Members — {members.length}/10</Text>
               {members.map(m => {
                 const p = memberProfiles[m.user_id];
-                const role = getRoleLabel(team.captain_id, m.user_id);
+                const role = getRoleLabel(team.captain_id, m.user_id, (m as any).role);
                 const roleCfg = ROLES[role];
+                const isThisAdmin = (m as any).role === 'admin';
                 return (
                   <View key={m.user_id} style={styles.memberRow}>
                     <TappableAvatar userId={m.user_id} avatarUrl={p?.avatar_url} name={p?.riot_id ?? p?.username ?? '?'} size={44} borderColor={Colors.gold + '55'} />
@@ -879,6 +885,16 @@ export default function TeamScreen() {
                     <View style={[styles.roleBadge, { backgroundColor: roleCfg.bg, borderColor: roleCfg.color + '55' }]}>
                       <Text style={[styles.roleText, { color: roleCfg.color }]}>{roleCfg.label}</Text>
                     </View>
+                    {isCaptain && m.user_id !== userId && (
+                      <TouchableOpacity
+                        style={[styles.kickBtn, { borderColor: isThisAdmin ? Colors.accent + '55' : Colors.gold + '44', marginRight: 4 }]}
+                        onPress={() => isThisAdmin ? demoteToMember(m.user_id) : promoteToAdmin(m.user_id)}
+                      >
+                        <Text style={{ color: isThisAdmin ? Colors.accent : Colors.gold, fontSize: 10, fontWeight: '700' }}>
+                          {isThisAdmin ? '⭐ Demote' : '⭐ Admin'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                     {isCaptain && m.user_id !== userId && (
                       <TouchableOpacity style={styles.kickBtn} onPress={() => removeMember(m.user_id)}>
                         <Text style={{ color: Colors.error, fontSize: 11 }}>Kick</Text>
@@ -895,7 +911,7 @@ export default function TeamScreen() {
               ))}
             </View>
             {/* Pending approvals — captain only */}
-            {isCaptain && pendingMembers.length > 0 && (
+            {isManager && pendingMembers.length > 0 && (
               <View style={[styles.sectionCard, { borderColor: Colors.warning + '55', marginTop: Spacing.sm }]}>
                 <Text style={[styles.sectionTitle, { color: Colors.warning }]}>
                   ⏳ Pending Approval ({pendingMembers.length})

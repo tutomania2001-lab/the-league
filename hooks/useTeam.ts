@@ -98,7 +98,19 @@ export function useTeam(userId: string | undefined) {
     return { error: null, pendingApproval: true };
   }
 
-  // Captain approves a pending member
+  async function promoteToAdmin(memberId: string) {
+    if (!team) return;
+    await supabase.from('team_members').update({ role: 'admin' }).eq('team_id', team.id).eq('user_id', memberId);
+    if (userId) fetchTeam(userId);
+  }
+
+  async function demoteToMember(memberId: string) {
+    if (!team) return;
+    await supabase.from('team_members').update({ role: 'member' }).eq('team_id', team.id).eq('user_id', memberId);
+    if (userId) fetchTeam(userId);
+  }
+
+  // Captain/admin approves a pending member
   async function approveMember(memberId: string) {
     if (!team) return;
     await supabase.from('team_members')
@@ -128,5 +140,5 @@ export function useTeam(userId: string | undefined) {
     if (userId) await fetchTeam(userId);
   }
 
-  return { team, members, pendingMembers, loading, createTeam, joinTeam, approveMember, removeMember, leaveTeam, refreshTeam };
+  return { team, members, pendingMembers, loading, createTeam, joinTeam, approveMember, removeMember, leaveTeam, refreshTeam, promoteToAdmin, demoteToMember };
 }
