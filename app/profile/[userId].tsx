@@ -98,11 +98,19 @@ export default function PlayerProfileScreen() {
           </View>
           <View style={{ flex: 1, gap: 4 }}>
             <GlowText style={styles.displayName}>{displayName}</GlowText>
-            <Text style={[styles.teamLabel, !targetTeam && { color: Colors.textMuted }]}>
-              ⚔️ {targetTeam
-                ? `${targetTeam.clan_tag ? `[${targetTeam.clan_tag.toUpperCase()}] ` : ''}${targetTeam.name}`
-                : '#TEAM'}
-            </Text>
+            <View style={[styles.teamChip, !targetTeam && styles.teamChipEmpty]}>
+              <Text style={styles.teamChipIcon}>⚔️</Text>
+              {targetTeam ? (
+                <>
+                  {targetTeam.clan_tag && (
+                    <Text style={styles.teamChipTag}>[{targetTeam.clan_tag.toUpperCase()}]</Text>
+                  )}
+                  <Text style={styles.teamChipName}>{targetTeam.name}</Text>
+                </>
+              ) : (
+                <Text style={styles.teamChipNone}>#TEAM</Text>
+              )}
+            </View>
             <RankBadge lp={profile?.lp ?? 0} peakLP={profile?.peak_lp ?? 0} size="sm" />
           </View>
         </View>
@@ -197,7 +205,18 @@ const styles = StyleSheet.create({
   avatarLetter: { fontSize: 28, fontWeight: '900', color: Colors.accent },
   statusDot: { position: 'absolute', bottom: -3, right: -3, backgroundColor: Colors.surface, borderRadius: 8, padding: 2 },
   displayName: { fontSize: 20, fontWeight: '900' },
-  teamLabel: { fontSize: 12, color: Colors.gold, fontWeight: '700' },
+  teamChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
+    backgroundColor: 'rgba(200,155,60,0.12)', borderWidth: 1, borderColor: Colors.gold + '55',
+    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
+  },
+  teamChipEmpty: {
+    backgroundColor: 'rgba(255,255,255,0.04)', borderColor: Colors.textMuted + '44',
+  },
+  teamChipIcon: { fontSize: 11 },
+  teamChipTag: { fontSize: 11, fontWeight: '900', color: Colors.gold, letterSpacing: 0.5 },
+  teamChipName: { fontSize: 11, fontWeight: '600', color: Colors.gold + 'cc' },
+  teamChipNone: { fontSize: 11, fontWeight: '700', color: Colors.textMuted, letterSpacing: 1 },
 
   actions: { flexDirection: 'row', gap: Spacing.sm },
 

@@ -114,11 +114,19 @@ export default function ProfileScreen() {
                 {profile?.riot_id ?? profile?.username ?? 'Summoner'}
               </GlowText>
             </PulseGlow>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: team ? Colors.gold : Colors.textMuted, marginTop: 2 }}>
-              ⚔️ {team
-                ? `${team.clan_tag ? `[${team.clan_tag.toUpperCase()}] ` : ''}${team.name}`
-                : '#TEAM'}
-            </Text>
+            <View style={[styles.teamChip, !team && styles.teamChipEmpty]}>
+              <Text style={styles.teamChipIcon}>⚔️</Text>
+              {team ? (
+                <>
+                  {team.clan_tag && (
+                    <Text style={styles.teamChipTag}>[{team.clan_tag.toUpperCase()}]</Text>
+                  )}
+                  <Text style={styles.teamChipName}>{team.name}</Text>
+                </>
+              ) : (
+                <Text style={styles.teamChipNone}>#TEAM</Text>
+              )}
+            </View>
             <View style={{ marginTop: Spacing.xs }}>
               <RankBadge lp={profile?.lp ?? 0} peakLP={profile?.peak_lp ?? 0} size="sm" />
             </View>
@@ -338,6 +346,18 @@ const styles = StyleSheet.create({
     width: 20, height: 20, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: Colors.accentBorder,
   },
+  teamChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
+    backgroundColor: 'rgba(200,155,60,0.12)', borderWidth: 1, borderColor: Colors.gold + '55',
+    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginTop: 2,
+  },
+  teamChipEmpty: {
+    backgroundColor: 'rgba(255,255,255,0.04)', borderColor: Colors.textMuted + '44',
+  },
+  teamChipIcon: { fontSize: 11 },
+  teamChipTag: { fontSize: 11, fontWeight: '900', color: Colors.gold, letterSpacing: 0.5 },
+  teamChipName: { fontSize: 11, fontWeight: '600', color: Colors.gold + 'cc' },
+  teamChipNone: { fontSize: 11, fontWeight: '700', color: Colors.textMuted, letterSpacing: 1 },
   balance: { fontSize: 36, fontWeight: '900', marginTop: Spacing.xs },
   statsRow: { flexDirection: 'row', gap: Spacing.sm },
   statCard: { flex: 1, alignItems: 'center', gap: 4, padding: Spacing.sm },
