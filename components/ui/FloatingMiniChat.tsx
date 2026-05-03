@@ -1,11 +1,12 @@
 import { Colors, Spacing } from '@/constants/theme';
 import { useChat } from '@/hooks/useChat';
+import { useRecentChats } from '@/hooks/useRecentChats';
 import { closeMiniChat, onMiniChatChange } from '@/lib/miniChat';
 import { supabase } from '@/lib/supabase';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Animated, Easing, FlatList, Image, KeyboardAvoidingView,
-  Platform, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  Animated, FlatList, Image, KeyboardAvoidingView,
+  Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DefaultAvatar } from './DefaultAvatar';
@@ -17,7 +18,6 @@ export function FloatingMiniChat({ myId }: { myId: string | undefined }) {
   const [expanded, setExpanded] = useState(false);
   const [input, setInput] = useState('');
   const slideY = useRef(new Animated.Value(300)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
   const listRef = useRef<FlatList>(null);
   const insets = useSafeAreaInsets();
 
@@ -28,6 +28,8 @@ export function FloatingMiniChat({ myId }: { myId: string | undefined }) {
   }, [myId]);
 
   const { messages, send } = useChat(resolvedMyId, friend?.id);
+  const { chats } = useRecentChats(resolvedMyId);
+  const recentSwitcher = chats.slice(0, 5);
 
   useEffect(() => onMiniChatChange(f => {
     if (f) { setFriend(f); setExpanded(true); }
@@ -60,7 +62,7 @@ export function FloatingMiniChat({ myId }: { myId: string | undefined }) {
 
   return (
     <>
-      {/* Floating bubble — always visible when a chat is attached */}
+      {/* Minimised bubble */}
       {!expanded && (
         <TouchableOpacity
           style={[styles.bubble, { bottom: bottomOffset + 12, right: 16 }]}
@@ -76,18 +78,42 @@ export function FloatingMiniChat({ myId }: { myId: string | undefined }) {
       )}
 
       {/* Chat panel */}
-      <Animated.View
-        style={[
-          styles.panel,
-          { bottom: bottomOffset, transform: [{ translateY: slideY }] },
-        ]}
-      >
+      <Animated.View style={[styles.panel, { bottom: bottomOffset, transform: [{ translateY: slideY }] }]}>
+
+        {/* Conversation switcher bar */}
+        {recentSwitcher.length > 1 && (
+          <View style={styles.switcher}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.switcherScroll}>
+              {recentSwitcher.map(c => {
+                const isActive = c.userId === friend.id;
+                return (
+                  <TouchableOpacity
+                    key={c.userId}
+                    style={[styles.switcherAvatar, isActive && styles.switcherAvatarActive]}
+                    onPress={() => {
+                      setFriend({ id: c.userId, name: c.name, avatarUrl: c.avatarUrl });
+                      setInput('');
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    {c.avatarUrl
+                      ? <Image source={{ uri: c.avatarUrl }} style={styles.switcherImg} />
+                      : <DefaultAvatar size={30} />
+                    }
+                    {c.unread > 0 && <View style={styles.switcherUnread} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             {friend.avatarUrl
               ? <Image source={{ uri: friend.avatarUrl }} style={styles.headerAvatar} />
-              : <DefaultAvatar size={30} />
+              : <DefaultAvatar size={28} />
             }
             <Text style={styles.headerName} numberOfLines={1}>{friend.name}</Text>
           </View>
@@ -120,9 +146,7 @@ export function FloatingMiniChat({ myId }: { myId: string | undefined }) {
               </View>
             );
           }}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>Say hi to {friend.name}!</Text>
-          }
+          ListEmptyComponent={<Text style={styles.emptyText}>Say hi to {friend.name}!</Text>}
         />
 
         {/* Input */}
@@ -178,6 +202,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15, shadowRadius: 12, elevation: 12,
   },
 
+  switcher: {
+    borderBottomWidth: 1, borderBottomColor: Colors.accentBorder,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  switcherScroll: { paddingHorizontal: 8, paddingVertical: 6, gap: 8 },
+  switcherAvatar: {
+    width: 34, height: 34, borderRadius: 10, overflow: 'hidden',
+    borderWidth: 2, borderColor: 'transparent', opacity: 0.5,
+  },
+  switcherAvatarActive: {
+    borderColor: Colors.accent, opacity: 1,
+  },
+  switcherImg: { width: 30, height: 30 },
+  switcherUnread: {
+    position: 'absolute', top: 0, right: 0,
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: Colors.accent, borderWidth: 1.5, borderColor: 'rgba(8,14,26,1)',
+  },
+
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: Spacing.sm, paddingVertical: 8,
@@ -185,7 +228,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,200,255,0.05)',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  headerAvatar: { width: 30, height: 30, borderRadius: 8 },
+  headerAvatar: { width: 28, height: 28, borderRadius: 8 },
   headerName: { color: Colors.text, fontSize: 13, fontWeight: '800', flex: 1 },
   headerActions: { flexDirection: 'row', gap: 4 },
   headerBtn: {
@@ -201,7 +244,6 @@ const styles = StyleSheet.create({
   bubbleMe: { backgroundColor: Colors.accent, borderBottomRightRadius: 4 },
   bubbleThem: { backgroundColor: Colors.surfaceAlt, borderBottomLeftRadius: 4 },
   msgText: { fontSize: 13, color: Colors.text },
-
   emptyText: { textAlign: 'center', color: Colors.textMuted, fontSize: 12, marginTop: 20 },
 
   inputRow: {
