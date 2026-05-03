@@ -100,13 +100,15 @@ export function useTeam(userId: string | undefined) {
 
   async function promoteToAdmin(memberId: string) {
     if (!team) return;
-    await supabase.from('team_members').update({ role: 'admin' }).eq('team_id', team.id).eq('user_id', memberId);
+    const { error } = await supabase.from('team_members').update({ role: 'admin' }).eq('team_id', team.id).eq('user_id', memberId);
+    if (error) { console.log('promoteToAdmin error:', error.message); return; }
     if (userId) fetchTeam(userId);
   }
 
   async function demoteToMember(memberId: string) {
     if (!team) return;
-    await supabase.from('team_members').update({ role: 'member' }).eq('team_id', team.id).eq('user_id', memberId);
+    const { error } = await supabase.from('team_members').update({ role: 'member' }).eq('team_id', team.id).eq('user_id', memberId);
+    if (error) { console.log('demoteToMember error:', error.message); return; }
     if (userId) fetchTeam(userId);
   }
 
