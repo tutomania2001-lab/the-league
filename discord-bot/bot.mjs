@@ -202,24 +202,70 @@ client.on('interactionCreate', async interaction => {
     return interaction.showModal(modal);
   }
 
-  // CHALLENGER — direct toggle
+  // CHALLENGER — requires Diamond+ rank in The League app
   if (customId === 'toggle_challenger') {
     const freshMember2 = await interaction.guild.members.fetch(interaction.user.id);
     if (!freshMember2.roles.cache.has(client.roles.member)) {
       return interaction.reply({ content: '❌ You must register first in **#rules**.', ephemeral: true });
     }
-    const hasRole = freshMember2.roles.cache.has(client.roles.challenger);
-    try {
-      if (hasRole) {
-        await freshMember2.roles.remove(client.roles.challenger);
-        await interaction.reply({ content: '✅ Removed **Challenger** role', ephemeral: true });
-      } else {
-        await freshMember2.roles.add(client.roles.challenger);
-        await interaction.reply({ content: '✅ You now have the **Challenger** role 🎉', ephemeral: true });
-      }
-    } catch (e) {
-      await interaction.reply({ content: '❌ Could not assign role — contact staff.', ephemeral: true });
+    // If already has role, remove it
+    if (freshMember2.roles.cache.has(client.roles.challenger)) {
+      await freshMember2.roles.remove(client.roles.challenger);
+      return interaction.reply({ content: '✅ Removed **Challenger** role', ephemeral: true });
     }
+    // Show modal to enter Riot ID for rank check
+    const modal = new ModalBuilder()
+      .setCustomId('verify_challenger_modal')
+      .setTitle('Verify Your Rank');
+    const riotInput = new TextInputBuilder()
+      .setCustomId('challenger_riot_id')
+      .setLabel('Your Riot ID (e.g. PlayerName#EUW)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Name#TAG')
+      .setRequired(true)
+      .setMaxLength(50);
+    modal.addComponents(new ActionRowBuilder().addComponents(riotInput));
+    return interaction.showModal(modal);
+  }
+});
+
+// ── MODAL SUBMIT: Challenger rank verification ────────────────────
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isModalSubmit()) return;
+  if (interaction.customId !== 'verify_challenger_modal') return;
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const riotId = interaction.fields.getTextInputValue('challenger_riot_id').trim();
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, riot_id, lp')
+    .ilike('riot_id', riotId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return interaction.editReply({
+      content: `❌ No account found with Riot ID **${riotId}**.\nRegister on The League app first: https://the-leagueapp.netlify.app`
+    });
+  }
+
+  const ABOVE_DIAMOND_LP = 2800; // Master and above
+  if ((data.lp ?? 0) < ABOVE_DIAMOND_LP) {
+    const currentTier = data.lp >= 2400 ? 'Diamond' : data.lp >= 2000 ? 'Emerald' : data.lp >= 1600 ? 'Platinum' : 'below Platinum';
+    return interaction.editReply({
+      content: `❌ Your current rank is **${currentTier}** (${data.lp ?? 0} LP).\nYou need to be **Master or above** (2800+ LP) to claim the Challenger role.`
+    });
+  }
+
+  try {
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    await member.roles.add(client.roles.challenger);
+    return interaction.editReply({
+      content: `💎 Verified! Your account **${data.riot_id}** is ranked at **${data.lp} LP**.\nYou now have the **💎 Challenger** role 🎉`
+    });
+  } catch (e) {
+    return interaction.editReply({ content: '❌ Could not assign role — contact staff.' });
   }
 });
 
