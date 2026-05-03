@@ -119,16 +119,15 @@ client.once('clientReady', async () => {
   // Ensure #commands channel exists
   let commandsChannel = guildChannels.find(c => c?.name === 'commands');
   if (!commandsChannel) {
+    console.log('Creating #commands channel...');
     commandsChannel = await guild.channels.create({
       name: 'commands',
       type: ChannelType.GuildText,
       topic: 'Use bot slash commands here',
-      permissionOverwrites: [
-        { id: roles.everyone, allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.SendMessages] },
-        { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
-      ],
     }).catch(e => { console.error('❌ Failed to create #commands:', e.message); return null; });
-    if (commandsChannel) console.log('✅ #commands channel created');
+    console.log(commandsChannel ? '✅ #commands channel created: ' + commandsChannel.id : '❌ #commands not created');
+  } else {
+    console.log('✅ #commands already exists: ' + commandsChannel.id);
   }
   client.commandsChannelId = commandsChannel?.id ?? null;
 
