@@ -9,7 +9,7 @@ import { MiniProfile, MiniProfileUser } from '@/components/ui/MiniProfile';
 import { getStatusFromLastSeen } from '@/hooks/usePresence';
 import { withClanTag } from '@/lib/clanTag';
 import { onMiniChatChange } from '@/lib/miniChat';
-import { setFriendsPanelOpen } from '@/lib/panelState';
+import { setFriendsPanelOpen, onChatDropdownChange } from '@/lib/panelState';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Animated, Dimensions, Easing, Image,
@@ -48,6 +48,9 @@ export function FriendsPanel({ userId: userIdProp }: Props) {
   useEffect(() => onMiniChatChange(friend => {
     if (friend) close();
   }), []);
+
+  const [chatDropdownOpen, setChatDropdownOpenState] = useState(false);
+  useEffect(() => onChatDropdownChange(v => setChatDropdownOpenState(v)), []);
   const [addingFriend, setAddingFriend] = useState(false);
   const [addRiotId, setAddRiotId] = useState('');
   const [addLoading, setAddLoading] = useState(false);
@@ -312,8 +315,8 @@ export function FriendsPanel({ userId: userIdProp }: Props) {
         </ScrollView>
       </Animated.View>
 
-      {/* Floating tab — only visible when panel is closed */}
-      {!open && (
+      {/* Floating tab — hidden when panel is open or chat dropdown is open */}
+      {!open && !chatDropdownOpen && (
         <TouchableOpacity style={[styles.floatTab, { top: insets.top + 120 }]} onPress={toggle} activeOpacity={0.85}>
           <Text style={styles.floatIcon}>👥</Text>
           {(totalNotifs + totalUnread) > 0 && (

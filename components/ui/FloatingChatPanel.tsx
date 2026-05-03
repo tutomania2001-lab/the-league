@@ -2,7 +2,7 @@ import { Colors, Spacing } from '@/constants/theme';
 import { useRecentChats } from '@/hooks/useRecentChats';
 import { useUnreadCounts } from '@/hooks/useChat';
 import { openMiniChat } from '@/lib/miniChat';
-import { onFriendsPanelChange } from '@/lib/panelState';
+import { onFriendsPanelChange, setChatDropdownOpen } from '@/lib/panelState';
 import { supabase } from '@/lib/supabase';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -44,6 +44,7 @@ export function FloatingChatPanel({ myId }: { myId: string | undefined }) {
   function toggle() {
     const opening = !open;
     setOpen(opening);
+    setChatDropdownOpen(opening);
     Animated.timing(dropdownAnim, {
       toValue: opening ? 1 : 0,
       duration: 220,
@@ -54,6 +55,7 @@ export function FloatingChatPanel({ myId }: { myId: string | undefined }) {
 
   function close() {
     setOpen(false);
+    setChatDropdownOpen(false);
     Animated.timing(dropdownAnim, {
       toValue: 0, duration: 180, useNativeDriver: true, easing: Easing.in(Easing.cubic),
     }).start();
@@ -132,7 +134,7 @@ export function FloatingChatPanel({ myId }: { myId: string | undefined }) {
 
 const styles = StyleSheet.create({
   dropdown: {
-    position: 'absolute', right: 44, zIndex: 102,
+    position: 'absolute', right: 0, zIndex: 102,
     width: 230,
     backgroundColor: 'rgba(8,14,26,0.98)',
     borderRadius: 12, borderWidth: 1, borderColor: Colors.accentBorder,
