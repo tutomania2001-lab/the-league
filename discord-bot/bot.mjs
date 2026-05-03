@@ -235,6 +235,7 @@ client.once('clientReady', async () => {
   }
 
   // ── PRIVATE TEAM ROOMS ───────────────────────────────────────────
+  console.log('Setting up private rooms...');
   const allChannels = await guild.channels.fetch();
   let privateCat = allChannels.find(c => c?.name === '🔒 Private Rooms' && c.type === ChannelType.GuildCategory);
   if (!privateCat) {
