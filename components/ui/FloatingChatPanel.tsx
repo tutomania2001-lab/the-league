@@ -1,17 +1,15 @@
-import { Colors, Spacing, Typography } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
 import { useRecentChats } from '@/hooks/useRecentChats';
 import { useUnreadCounts } from '@/hooks/useChat';
 import { openMiniChat } from '@/lib/miniChat';
 import { supabase } from '@/lib/supabase';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Animated, Easing, Image, ScrollView,
-  StyleSheet, Text, TouchableOpacity, View,
+  Animated, Easing, Image, StyleSheet,
+  Text, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DefaultAvatar } from './DefaultAvatar';
-
-const PANEL_W = 260;
 
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -25,8 +23,7 @@ export function FloatingChatPanel({ myId }: { myId: string | undefined }) {
   const insets = useSafeAreaInsets();
   const [resolvedMyId, setResolvedMyId] = useState(myId);
   const [open, setOpen] = useState(false);
-  const slideX = useRef(new Animated.Value(PANEL_W)).current;
-  const backdropOp = useRef(new Animated.Value(0)).current;
+  const dropdownAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (myId) { setResolvedMyId(myId); return; }
@@ -35,100 +32,85 @@ export function FloatingChatPanel({ myId }: { myId: string | undefined }) {
 
   const { chats } = useRecentChats(resolvedMyId);
   const { totalUnread } = useUnreadCounts(resolvedMyId);
+  const recent = chats.slice(0, 5);
 
   function toggle() {
     const opening = !open;
     setOpen(opening);
-    Animated.parallel([
-      Animated.timing(slideX, {
-        toValue: opening ? 0 : PANEL_W,
-        duration: 280, useNativeDriver: true,
-        easing: opening ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
-      }),
-      Animated.timing(backdropOp, { toValue: opening ? 1 : 0, duration: 280, useNativeDriver: true }),
-    ]).start();
+    Animated.timing(dropdownAnim, {
+      toValue: opening ? 1 : 0,
+      duration: 220,
+      useNativeDriver: true,
+      easing: opening ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+    }).start();
   }
 
   function close() {
     setOpen(false);
-    Animated.parallel([
-      Animated.timing(slideX, { toValue: PANEL_W, duration: 250, useNativeDriver: true, easing: Easing.in(Easing.cubic) }),
-      Animated.timing(backdropOp, { toValue: 0, duration: 250, useNativeDriver: true }),
-    ]).start();
+    Animated.timing(dropdownAnim, {
+      toValue: 0, duration: 180, useNativeDriver: true, easing: Easing.in(Easing.cubic),
+    }).start();
   }
 
   const tabTop = insets.top + 64;
+  const dropdownTop = tabTop;
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Invisible backdrop to close on outside tap */}
       {open && (
-        <Animated.View style={[styles.backdrop, { opacity: backdropOp }]} pointerEvents={open ? 'auto' : 'none'}>
-          <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={close} />
-        </Animated.View>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFillObject}
+          onPress={close}
+          activeOpacity={1}
+        />
       )}
 
-      {/* Sliding panel — from right */}
-      <Animated.View style={[styles.panel, { transform: [{ translateX: slideX }], top: 0, bottom: 0 }]}>
-        <View style={[styles.panelHeader, { paddingTop: insets.top + 12 }]}>
-          <Text style={styles.panelTitle}>💬 Messages</Text>
-          <TouchableOpacity onPress={close} style={styles.closeBtn}>
-            <Text style={{ color: Colors.textMuted, fontSize: 16 }}>✕</Text>
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView contentContainerStyle={{ padding: Spacing.sm, gap: 2 }} showsVerticalScrollIndicator={false}>
-          {chats.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={{ fontSize: 32 }}>💬</Text>
-              <Text style={[Typography.body, { textAlign: 'center', marginTop: 8 }]}>No messages yet</Text>
+      {/* Compact dropdown */}
+      {open && (
+        <Animated.View style={[
+          styles.dropdown,
+          { top: dropdownTop, opacity: dropdownAnim, transform: [{ scaleY: dropdownAnim }, { translateX: 0 }] },
+        ]}>
+          {recent.length === 0 ? (
+            <View style={styles.emptyRow}>
+              <Text style={styles.emptyText}>No messages yet</Text>
             </View>
           ) : (
-            chats.map(chat => (
+            recent.map(chat => (
               <TouchableOpacity
                 key={chat.userId}
-                style={[styles.chatRow, chat.unread > 0 && styles.chatRowUnread]}
-                onPress={() => {
-                  openMiniChat({ id: chat.userId, name: chat.name, avatarUrl: chat.avatarUrl });
-                  close();
-                }}
+                style={[styles.row, chat.unread > 0 && styles.rowUnread]}
+                onPress={() => { openMiniChat({ id: chat.userId, name: chat.name, avatarUrl: chat.avatarUrl }); close(); }}
                 activeOpacity={0.75}
               >
                 <View style={styles.avatarWrap}>
                   {chat.avatarUrl
                     ? <Image source={{ uri: chat.avatarUrl }} style={styles.avatar} />
-                    : <DefaultAvatar size={42} />
+                    : <DefaultAvatar size={36} />
                   }
-                  {chat.unread > 0 && (
-                    <View style={styles.unreadDot}>
-                      <Text style={styles.unreadDotText}>{chat.unread > 9 ? '9+' : chat.unread}</Text>
-                    </View>
-                  )}
+                  {chat.unread > 0 && <View style={styles.unreadDot} />}
                 </View>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <View style={styles.chatRowTop}>
-                    <Text style={[styles.chatName, chat.unread > 0 && { color: Colors.text }]} numberOfLines={1}>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.rowTop}>
+                    <Text style={[styles.name, chat.unread > 0 && { color: Colors.text, fontWeight: '800' }]} numberOfLines={1}>
                       {chat.name}
                     </Text>
-                    <Text style={styles.chatTime}>{timeAgo(chat.lastAt)}</Text>
+                    <Text style={styles.time}>{timeAgo(chat.lastAt)}</Text>
                   </View>
-                  <Text style={[styles.lastMsg, chat.unread > 0 && { color: Colors.text, fontWeight: '600' }]} numberOfLines={1}>
+                  <Text style={[styles.preview, chat.unread > 0 && { color: Colors.textMuted, fontWeight: '600' }]} numberOfLines={1}>
                     {chat.lastMessage}
                   </Text>
                 </View>
               </TouchableOpacity>
             ))
           )}
-        </ScrollView>
-      </Animated.View>
+        </Animated.View>
+      )}
 
-      {/* Floating tab — hidden when panel is open */}
+      {/* Floating tab */}
       {!open && (
-        <TouchableOpacity
-          style={[styles.tab, { top: tabTop }]}
-          onPress={toggle}
-          activeOpacity={0.85}
-        >
+        <TouchableOpacity style={[styles.tab, { top: tabTop }]} onPress={toggle} activeOpacity={0.85}>
           <Text style={styles.tabIcon}>💬</Text>
           {totalUnread > 0 && (
             <View style={styles.badge}>
@@ -142,47 +124,37 @@ export function FloatingChatPanel({ myId }: { myId: string | undefined }) {
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    zIndex: 90,
-  },
-  panel: {
-    position: 'absolute', right: 0, width: PANEL_W,
+  dropdown: {
+    position: 'absolute', right: 44, zIndex: 102,
+    width: 230,
     backgroundColor: 'rgba(8,14,26,0.98)',
-    borderLeftWidth: 1, borderLeftColor: Colors.accentBorder,
-    zIndex: 95,
+    borderRadius: 12, borderWidth: 1, borderColor: Colors.accentBorder,
+    overflow: 'hidden',
+    transformOrigin: 'top right',
+    shadowColor: Colors.accent, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15, shadowRadius: 12, elevation: 10,
   },
-  panelHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm,
-    borderBottomWidth: 1, borderBottomColor: Colors.accentBorder,
-    backgroundColor: 'rgba(0,200,255,0.04)',
-  },
-  panelTitle: { fontSize: 16, fontWeight: '900', color: Colors.text, letterSpacing: 0.5 },
-  closeBtn: { padding: 6 },
 
-  chatRow: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-    padding: Spacing.sm, borderRadius: 10,
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 10, paddingVertical: 8,
+    borderBottomWidth: 1, borderBottomColor: Colors.accentBorder + '55',
   },
-  chatRowUnread: { backgroundColor: 'rgba(0,200,255,0.06)' },
+  rowUnread: { backgroundColor: 'rgba(0,200,255,0.06)' },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 42, height: 42, borderRadius: 10, borderWidth: 1, borderColor: Colors.accentBorder },
+  avatar: { width: 36, height: 36, borderRadius: 8, borderWidth: 1, borderColor: Colors.accentBorder },
   unreadDot: {
-    position: 'absolute', top: -4, right: -4,
-    backgroundColor: Colors.accent, borderRadius: 8,
-    minWidth: 16, height: 16, paddingHorizontal: 3,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: Colors.background,
+    position: 'absolute', top: -2, right: -2,
+    width: 9, height: 9, borderRadius: 5,
+    backgroundColor: Colors.accent, borderWidth: 1.5, borderColor: 'rgba(8,14,26,1)',
   },
-  unreadDotText: { color: Colors.background, fontSize: 9, fontWeight: '900' },
-  chatRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  chatName: { fontSize: 13, fontWeight: '700', color: Colors.textMuted, flex: 1 },
-  chatTime: { fontSize: 10, color: Colors.textMuted },
-  lastMsg: { fontSize: 11, color: Colors.textMuted },
+  rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  name: { fontSize: 12, fontWeight: '700', color: Colors.textMuted, flex: 1 },
+  time: { fontSize: 9, color: Colors.textMuted },
+  preview: { fontSize: 11, color: Colors.textMuted, marginTop: 1 },
 
-  empty: { alignItems: 'center', paddingTop: 40 },
+  emptyRow: { padding: 16, alignItems: 'center' },
+  emptyText: { color: Colors.textMuted, fontSize: 12 },
 
   tab: {
     position: 'absolute', right: 0, zIndex: 101,
