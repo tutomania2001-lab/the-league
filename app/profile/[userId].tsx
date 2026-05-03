@@ -27,7 +27,7 @@ export default function PlayerProfileScreen() {
   const { team, members } = useTeam(myId);
   const { sendInvite } = useTeamInvites(myId);
   const [inviteSent, setInviteSent] = useState(false);
-  const [team, setTeam] = useState<{ name: string; clan_tag: string | null } | null>(null);
+  const [targetTeam, setTargetTeam] = useState<{ name: string; clan_tag: string | null } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export default function PlayerProfileScreen() {
       .eq('status', 'active')
       .maybeSingle()
       .then(({ data }) => {
-        if (data?.team) setTeam(data.team as any);
+        if (data?.team) setTargetTeam(data.team as any);
       });
   }, [targetId]);
 
@@ -54,7 +54,7 @@ export default function PlayerProfileScreen() {
   const isCaptain = team?.captain_id === myId;
   const canInvite = isCaptain && myId && targetId && members.length < 10 && !isMe;
 
-  const displayName = withClanTag(profile?.riot_id ?? profile?.username ?? 'Player', (profile as any)?.clan_tag ?? team?.clan_tag);
+  const displayName = withClanTag(profile?.riot_id ?? profile?.username ?? 'Player', (profile as any)?.clan_tag ?? targetTeam?.clan_tag);
 
   async function handleFriendAction() {
     setActionLoading(true);
@@ -100,9 +100,9 @@ export default function PlayerProfileScreen() {
           </View>
           <View style={{ flex: 1, gap: 4 }}>
             <GlowText style={styles.displayName}>{displayName}</GlowText>
-            {team && (
+            {targetTeam && (
               <Text style={styles.teamLabel}>
-                ⚔️ {team.clan_tag ? `[${team.clan_tag.toUpperCase()}] ` : ''}{team.name}
+                ⚔️ {targetTeam.clan_tag ? `[${targetTeam.clan_tag.toUpperCase()}] ` : ''}{targetTeam.name}
               </Text>
             )}
             <RankBadge lp={profile?.lp ?? 0} peakLP={profile?.peak_lp ?? 0} size="sm" />
