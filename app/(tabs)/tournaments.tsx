@@ -212,7 +212,7 @@ export default function TournamentsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, paddingRight: 52 },
   createBtn: { paddingVertical: 6, paddingHorizontal: 14, minHeight: 36 },
   subTabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.accentBorder },
   subTab: { flex: 1, paddingVertical: Spacing.sm, alignItems: 'center' },
