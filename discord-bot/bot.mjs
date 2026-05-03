@@ -151,16 +151,17 @@ client.on('interactionCreate', async interaction => {
 
   // REGISTER button
   if (customId === 'register') {
-    const hasMember = member.roles.cache.has(client.roles.member);
+    // Force-fetch fresh member data to avoid stale cache
+    const freshMember = await interaction.guild.members.fetch(interaction.user.id);
+    const hasMember = freshMember.roles.cache.has(client.roles.member);
     if (hasMember) {
       return interaction.reply({ content: '✅ You are already registered!', ephemeral: true });
     }
     try {
-      await member.roles.add(client.roles.member);
-      await member.roles.remove(client.roles.newArrival).catch(() => {});
+      await freshMember.roles.add(client.roles.member);
+      await freshMember.roles.remove(client.roles.newArrival).catch(() => {});
       return interaction.reply({
-        content: '🎉 Welcome to **The League**! You now have access to all channels.\nHead to <#' +
-          Object.entries(client.roles).find()?.[0] + '> to pick extra roles.',
+        content: '🎉 Welcome to **The League**! You now have access to all channels.\nHead to **#get-roles** to pick your optional roles.',
         ephemeral: true
       });
     } catch (e) {
@@ -171,9 +172,9 @@ client.on('interactionCreate', async interaction => {
 
   // TOGGLE ROLE buttons
   if (customId.startsWith('toggle_')) {
-    // Must be a Member to get extra roles
-    if (!member.roles.cache.has(client.roles.member)) {
-      return interaction.reply({ content: '❌ You must register first in #rules.', ephemeral: true });
+    const freshMember2 = await interaction.guild.members.fetch(interaction.user.id);
+    if (!freshMember2.roles.cache.has(client.roles.member)) {
+      return interaction.reply({ content: '❌ You must register first in **#rules**.', ephemeral: true });
     }
 
     const roleKey = customId.replace('toggle_', '');
@@ -181,13 +182,13 @@ client.on('interactionCreate', async interaction => {
 
     if (!roleId) return interaction.reply({ content: '❌ Role not found.', ephemeral: true });
 
-    const hasRole = member.roles.cache.has(roleId);
+    const hasRole = freshMember2.roles.cache.has(roleId);
     try {
       if (hasRole) {
-        await member.roles.remove(roleId);
+        await freshMember2.roles.remove(roleId);
         await interaction.reply({ content: `✅ Removed **${roleKey}** role`, ephemeral: true });
       } else {
-        await member.roles.add(roleId);
+        await freshMember2.roles.add(roleId);
         await interaction.reply({ content: `✅ You now have the **${roleKey}** role 🎉`, ephemeral: true });
       }
     } catch (e) {
