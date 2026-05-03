@@ -61,6 +61,7 @@
     "jest": "^30.3.0",
     "jest-expo": "^55.0.16",
     "qrcode": "^1.5.4",
+    "react-test-renderer": "19.1.0",
     "typescript": "~5.9.2"
   },
   "private": true
