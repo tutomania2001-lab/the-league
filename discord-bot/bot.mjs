@@ -184,11 +184,13 @@ client.once('clientReady', async () => {
   // ── SERVER STATS CHANNELS ────────────────────────────────────────
   async function updateStats() {
     try {
-      const g = await client.guilds.fetch(GUILD_ID);
-      const members = await g.members.fetch();
-      const totalMembers = members.filter(m => !m.user.bot).size;
-      const botCount    = members.filter(m => m.user.bot).size;
-      const onlineCount = members.filter(m => !m.user.bot && m.presence?.status && m.presence.status !== 'offline').size;
+      const g = client.guilds.cache.get(GUILD_ID);
+      if (!g) return;
+      await g.members.fetch();
+      const all = g.members.cache;
+      const totalMembers = all.filter(m => !m.user.bot).size;
+      const botCount     = all.filter(m => m.user.bot).size;
+      const onlineCount  = all.filter(m => !m.user.bot && m.presence?.status && m.presence.status !== 'offline').size;
 
       if (client.statChannels) {
         await client.statChannels.members.setName(`👥 Members: ${totalMembers}`).catch(() => {});
@@ -225,7 +227,7 @@ client.once('clientReady', async () => {
     };
     console.log('✅ Stat channels ready');
     await updateStats();
-    setInterval(updateStats, 5 * 60 * 1000); // refresh every 5 minutes
+    setInterval(updateStats, 60 * 1000); // refresh every 1 minute
   }
 
   } catch (e) {
