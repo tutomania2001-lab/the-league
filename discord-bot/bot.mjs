@@ -1,4 +1,10 @@
-import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const GUILD_ID = process.env.GUILD_ID;
@@ -170,30 +176,85 @@ client.on('interactionCreate', async interaction => {
     }
   }
 
-  // TOGGLE ROLE buttons
-  if (customId.startsWith('toggle_')) {
+  // VERIFIED PLAYER — show modal to enter Riot ID
+  if (customId === 'toggle_verified') {
     const freshMember2 = await interaction.guild.members.fetch(interaction.user.id);
     if (!freshMember2.roles.cache.has(client.roles.member)) {
       return interaction.reply({ content: '❌ You must register first in **#rules**.', ephemeral: true });
     }
+    // If already verified, remove the role
+    if (freshMember2.roles.cache.has(client.roles.verified)) {
+      await freshMember2.roles.remove(client.roles.verified);
+      return interaction.reply({ content: '✅ Removed **Verified Player** role', ephemeral: true });
+    }
+    // Show modal asking for Riot ID
+    const modal = new ModalBuilder()
+      .setCustomId('verify_riot_modal')
+      .setTitle('Verify Your The League Account');
+    const riotInput = new TextInputBuilder()
+      .setCustomId('riot_id_input')
+      .setLabel('Your Riot ID (e.g. PlayerName#EUW)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Name#TAG')
+      .setRequired(true)
+      .setMaxLength(50);
+    modal.addComponents(new ActionRowBuilder().addComponents(riotInput));
+    return interaction.showModal(modal);
+  }
 
-    const roleKey = customId.replace('toggle_', '');
-    const roleId = roleKey === 'verified' ? client.roles.verified : client.roles.challenger;
-
-    if (!roleId) return interaction.reply({ content: '❌ Role not found.', ephemeral: true });
-
-    const hasRole = freshMember2.roles.cache.has(roleId);
+  // CHALLENGER — direct toggle
+  if (customId === 'toggle_challenger') {
+    const freshMember2 = await interaction.guild.members.fetch(interaction.user.id);
+    if (!freshMember2.roles.cache.has(client.roles.member)) {
+      return interaction.reply({ content: '❌ You must register first in **#rules**.', ephemeral: true });
+    }
+    const hasRole = freshMember2.roles.cache.has(client.roles.challenger);
     try {
       if (hasRole) {
-        await freshMember2.roles.remove(roleId);
-        await interaction.reply({ content: `✅ Removed **${roleKey}** role`, ephemeral: true });
+        await freshMember2.roles.remove(client.roles.challenger);
+        await interaction.reply({ content: '✅ Removed **Challenger** role', ephemeral: true });
       } else {
-        await freshMember2.roles.add(roleId);
-        await interaction.reply({ content: `✅ You now have the **${roleKey}** role 🎉`, ephemeral: true });
+        await freshMember2.roles.add(client.roles.challenger);
+        await interaction.reply({ content: '✅ You now have the **Challenger** role 🎉', ephemeral: true });
       }
     } catch (e) {
       await interaction.reply({ content: '❌ Could not assign role — contact staff.', ephemeral: true });
     }
+  }
+});
+
+// ── MODAL SUBMIT: Riot ID verification ───────────────────────────
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isModalSubmit()) return;
+  if (interaction.customId !== 'verify_riot_modal') return;
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const riotId = interaction.fields.getTextInputValue('riot_id_input').trim();
+
+  // Check against Supabase users table
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, riot_id, email')
+    .ilike('riot_id', riotId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return interaction.editReply({
+      content: `❌ No account found with Riot ID **${riotId}**.\nMake sure you\'ve registered on The League app first: https://the-leagueapp.netlify.app`
+    });
+  }
+
+  // Assign verified role
+  try {
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    await member.roles.add(client.roles.verified);
+    return interaction.editReply({
+      content: `✅ Verified! Your account **${data.riot_id}** is linked to The League.\nYou now have the **✅ Verified Player** role 🎉`
+    });
+  } catch (e) {
+    console.error('Verify role error:', e.message);
+    return interaction.editReply({ content: '❌ Could not assign role — contact staff.' });
   }
 });
 
