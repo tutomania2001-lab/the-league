@@ -4,13 +4,15 @@ import { TappableAvatar } from '@/components/ui/TappableAvatar';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { withClanTag } from '@/lib/clanTag';
 import { useGlobalFeed, GlobalPost } from '@/hooks/useGlobalFeed';
-import { PostComment } from '@/hooks/useTeamFeed';
+import { PostComment, useTeamFeed } from '@/hooks/useTeamFeed';
+import { useTeam } from '@/hooks/useTeam';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import * as ImagePicker from 'expo-image-picker';
 import {
-  ActivityIndicator, FlatList, Image, KeyboardAvoidingView,
+  ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal,
   Platform, RefreshControl, StyleSheet, Text,
   TextInput, TouchableOpacity, View,
 } from 'react-native';
@@ -163,7 +165,14 @@ export default function PlayerHubScreen() {
   const router = useRouter();
   const [myId, setMyId] = useState<string>();
   const { posts, loading, toggleLike, fetchComments, addComment, deleteComment, refresh } = useGlobalFeed(myId);
+  const { team } = useTeam(myId);
+  const { createPost, uploadMedia } = useTeamFeed(team?.id, myId);
   const [refreshing, setRefreshing] = useState(false);
+  const [showNewPost, setShowNewPost] = useState(false);
+  const [postCaption, setPostCaption] = useState('');
+  const [postMedia, setPostMedia] = useState<{ uri: string; type: 'image' | 'video' } | null>(null);
+  const [posting, setPosting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setMyId(data.user?.id));
@@ -173,6 +182,25 @@ export default function PlayerHubScreen() {
     setRefreshing(true);
     await refresh();
     setRefreshing(false);
+  }
+
+  async function handlePost() {
+    if (!myId || !team) return;
+    setPosting(true);
+    let mediaUrl: string | null = null;
+    let mediaType: 'image' | 'video' | null = null;
+    if (postMedia) {
+      setUploadProgress('Uploading...');
+      mediaUrl = await uploadMedia(postMedia.uri, postMedia.type, myId);
+      mediaType = postMedia.type;
+      setUploadProgress('');
+    }
+    await createPost(team.id, myId, mediaUrl, mediaType, postCaption, true);
+    setPosting(false);
+    setShowNewPost(false);
+    setPostMedia(null);
+    setPostCaption('');
+    refresh();
   }
 
   return (
@@ -186,7 +214,82 @@ export default function PlayerHubScreen() {
           <GlowText style={styles.headerTitle}>🌐 PLAYER HUB</GlowText>
           <Text style={styles.headerSub}>Community highlights from all clans</Text>
         </View>
+        {team && (
+          <TouchableOpacity style={styles.newPostBtn} onPress={() => setShowNewPost(true)}>
+            <Text style={styles.newPostBtnText}>＋ Post</Text>
+          </TouchableOpacity>
+        )}
       </View>
+
+      {/* New post modal */}
+      <Modal visible={showNewPost} animationType="slide" transparent onRequestClose={() => setShowNewPost(false)}>
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={() => setShowNewPost(false)} />
+        </View>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>📸 New Hub Post</Text>
+            <TouchableOpacity onPress={() => { setShowNewPost(false); setPostMedia(null); setPostCaption(''); }}>
+              <Text style={{ color: Colors.textMuted, fontSize: 16 }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Media preview or picker */}
+          {postMedia ? (
+            <View style={{ position: 'relative' }}>
+              {postMedia.type === 'image'
+                ? <Image source={{ uri: postMedia.uri }} style={styles.mediaPreview} resizeMode="cover" />
+                : <View style={[styles.mediaPreview, { backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={{ color: '#fff', fontSize: 40 }}>🎬</Text>
+                    <Text style={{ color: Colors.textMuted, fontSize: 12, marginTop: 4 }}>Video selected</Text>
+                  </View>
+              }
+              <TouchableOpacity style={styles.removeMedia} onPress={() => setPostMedia(null)}>
+                <Text style={{ color: '#fff', fontWeight: '900' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.mediaPicker}>
+              <TouchableOpacity style={styles.mediaPickBtn} onPress={async () => {
+                const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+                if (!r.canceled && r.assets[0]) setPostMedia({ uri: r.assets[0].uri, type: 'image' });
+              }}>
+                <Text style={{ fontSize: 28 }}>🖼️</Text>
+                <Text style={styles.mediaPickLabel}>Photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.mediaPickBtn} onPress={async () => {
+                const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Videos, videoMaxDuration: 30, quality: 0.8 });
+                if (!r.canceled && r.assets[0]) setPostMedia({ uri: r.assets[0].uri, type: 'video' });
+              }}>
+                <Text style={{ fontSize: 28 }}>🎬</Text>
+                <Text style={styles.mediaPickLabel}>Clip (30s)</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <TextInput
+            style={styles.captionInput}
+            value={postCaption}
+            onChangeText={setPostCaption}
+            placeholder="Write a caption..."
+            placeholderTextColor={Colors.textDim}
+            multiline maxLength={200}
+          />
+
+          {uploadProgress ? <Text style={{ color: Colors.accent, fontSize: 12, textAlign: 'center', marginBottom: 8 }}>{uploadProgress}</Text> : null}
+
+          <TouchableOpacity
+            style={[styles.submitBtn, (!postMedia && !postCaption.trim()) && { opacity: 0.4 }]}
+            disabled={(!postMedia && !postCaption.trim()) || posting}
+            onPress={handlePost}
+          >
+            {posting
+              ? <ActivityIndicator color={Colors.background} size="small" />
+              : <Text style={styles.submitBtnText}>Share to Hub 🌐</Text>
+            }
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
       {loading ? (
         <ActivityIndicator color={Colors.accent} style={{ flex: 1 }} />
@@ -236,6 +339,46 @@ const styles = StyleSheet.create({
   backText: { color: Colors.accent, fontSize: 28, fontWeight: '300', lineHeight: 32 },
   headerTitle: { fontSize: 18, fontWeight: '900', letterSpacing: 1.5 },
   headerSub: { fontSize: 11, color: Colors.textMuted, marginTop: 1 },
+  newPostBtn: {
+    backgroundColor: Colors.accent, borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 7,
+  },
+  newPostBtnText: { color: Colors.background, fontSize: 12, fontWeight: '900' },
+
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 10 },
+  modalSheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 11,
+    backgroundColor: 'rgba(8,12,22,0.99)', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    borderTopWidth: 2, borderTopColor: Colors.accent + '55', paddingBottom: 32,
+  },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.accentBorder,
+  },
+  modalTitle: { fontSize: 15, fontWeight: '900', color: Colors.text },
+  mediaPreview: { width: '100%', height: 200 },
+  removeMedia: {
+    position: 'absolute', top: 8, right: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12,
+    width: 24, height: 24, alignItems: 'center', justifyContent: 'center',
+  },
+  mediaPicker: { flexDirection: 'row', gap: Spacing.md, padding: Spacing.md, justifyContent: 'center' },
+  mediaPickBtn: {
+    alignItems: 'center', gap: 6, flex: 1,
+    backgroundColor: Colors.surfaceAlt, borderRadius: 12, padding: Spacing.md,
+    borderWidth: 1, borderColor: Colors.accentBorder,
+  },
+  mediaPickLabel: { fontSize: 12, color: Colors.textMuted, fontWeight: '600' },
+  captionInput: {
+    margin: Spacing.md, marginTop: 0,
+    backgroundColor: Colors.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: Colors.accentBorder,
+    color: Colors.text, fontSize: 13, padding: 12, minHeight: 72, textAlignVertical: 'top',
+  },
+  submitBtn: {
+    margin: Spacing.md, marginTop: 0,
+    backgroundColor: Colors.accent, borderRadius: 10, padding: 14, alignItems: 'center',
+  },
+  submitBtnText: { color: Colors.background, fontWeight: '900', fontSize: 14 },
 
   list: { padding: Spacing.sm, gap: Spacing.sm, paddingBottom: 80 },
 
