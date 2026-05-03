@@ -232,7 +232,7 @@ export default function HomeScreen() {
             <View style={styles.featuredBannerContent}>
               <Text style={styles.featuredBannerType}>🌐 COMMUNITY</Text>
               <GlowText style={styles.featuredBannerTitle}>Player Hub</GlowText>
-              <Text style={styles.featuredBannerStat}>Highlights & plays from all clans</Text>
+              <Text style={styles.featuredBannerStat}>Upload plays · Chat · Engage with the community</Text>
             </View>
           </View>
         </TouchableOpacity>
