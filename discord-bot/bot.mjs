@@ -181,6 +181,53 @@ client.once('clientReady', async () => {
     console.log('✅ Role selector with rank dropdown posted');
   }
 
+  // ── SERVER STATS CHANNELS ────────────────────────────────────────
+  async function updateStats() {
+    try {
+      const g = await client.guilds.fetch(GUILD_ID);
+      const members = await g.members.fetch();
+      const totalMembers = members.filter(m => !m.user.bot).size;
+      const botCount    = members.filter(m => m.user.bot).size;
+      const onlineCount = members.filter(m => !m.user.bot && m.presence?.status && m.presence.status !== 'offline').size;
+
+      if (client.statChannels) {
+        await client.statChannels.members.setName(`👥 Members: ${totalMembers}`).catch(() => {});
+        await client.statChannels.online.setName(`🟢 Online: ${onlineCount}`).catch(() => {});
+        await client.statChannels.bots.setName(`🤖 Bots: ${botCount}`).catch(() => {});
+      }
+    } catch (e) { console.error('Stats update error:', e.message); }
+  }
+
+  // Create or find the stats category + channels
+  let statsCat = guildChannels.find(c => c?.name === '📊 Server Stats' && c.type === ChannelType.GuildCategory);
+  if (!statsCat) {
+    statsCat = await guild.channels.create({
+      name: '📊 Server Stats',
+      type: ChannelType.GuildCategory,
+      position: 0,
+      permissionOverwrites: [{ id: roles.everyone, deny: [PermissionFlagsBits.Connect] }],
+    }).catch(() => null);
+  }
+
+  if (statsCat) {
+    const noConnect = [{ id: roles.everyone, deny: [PermissionFlagsBits.Connect, PermissionFlagsBits.SendMessages] }];
+    const existing = await guild.channels.fetch();
+
+    const findOrCreate = async (name, fallback) => {
+      return existing.find(c => c?.parentId === statsCat.id && c?.name?.startsWith(fallback)) ??
+        await guild.channels.create({ name, type: ChannelType.GuildVoice, parent: statsCat.id, permissionOverwrites: noConnect }).catch(() => null);
+    };
+
+    client.statChannels = {
+      members: await findOrCreate('👥 Members: ...', '👥'),
+      online:  await findOrCreate('🟢 Online: ...', '🟢'),
+      bots:    await findOrCreate('🤖 Bots: ...', '🤖'),
+    };
+    console.log('✅ Stat channels ready');
+    await updateStats();
+    setInterval(updateStats, 5 * 60 * 1000); // refresh every 5 minutes
+  }
+
   } catch (e) {
     console.error('❌ clientReady error:', e);
   }
