@@ -37,6 +37,10 @@ client.once('clientReady', async () => {
   const guildRoles = await guild.roles.fetch();
   const guildChannels = await guild.channels.fetch();
 
+  // Cache announcements channel for presence notifications
+  client.announcementsChannel = guildChannels.find(c => c?.name === 'announcements') ?? null;
+  console.log(client.announcementsChannel ? '✅ Announcements channel cached' : '❌ Announcements channel not found');
+
   // Map all roles
   const roles = {};
   for (const [id, role] of guildRoles) {
@@ -184,18 +188,13 @@ client.on('guildMemberAdd', async member => {
 // Member comes back online → notify announcements
 client.on('presenceUpdate', async (oldPresence, newPresence) => {
   if (newPresence.user?.bot) return;
+  if (!client.announcementsChannel) return;
   const wasOffline = !oldPresence || oldPresence.status === 'offline';
   const isOnline = newPresence.status !== 'offline';
   if (!wasOffline || !isOnline) return;
-
-  const guild = newPresence.guild;
-  if (!guild) return;
-  const channels = await guild.channels.fetch();
-  const announcementsChannel = channels.find(c => c?.name === 'announcements');
-  if (!announcementsChannel) return;
-
   const name = newPresence.member?.displayName ?? newPresence.user?.username ?? 'Someone';
-  await announcementsChannel.send(`👋 **${name}** is back online!`).catch(() => {});
+  console.log(`👁️ Presence: ${name} came online`);
+  await client.announcementsChannel.send(`👋 **${name}** is back online!`).catch(() => {});
 });
 
 // ── BUTTON INTERACTIONS ──────────────────────────────────────────
