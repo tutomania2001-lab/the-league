@@ -58,20 +58,22 @@ export function MiniProfile({ user, onClose, onAddFriend, isFriend, onRemoveFrie
       <Animated.View style={[styles.card, { opacity: opAnim, transform: [{ scale: scaleAnim }] }]}>
         {/* Header — avatar + name + status */}
         <View style={styles.header}>
-          {user.avatar_url ? (
-            <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <Text style={styles.avatarLetter}>{(user.riot_id ?? user.username ?? 'S')[0].toUpperCase()}</Text>
-            </View>
-          )}
+          <TouchableOpacity onPress={() => { onClose(); router.push(`/profile/${user!.id}`); }} activeOpacity={0.75}>
+            {user.avatar_url ? (
+              <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarLetter}>{(user.riot_id ?? user.username ?? 'S')[0].toUpperCase()}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
           {/* Status dot overlay on avatar */}
           <View style={styles.statusDotWrap}>
             <StatusDot status={status} size={12} />
           </View>
 
-          <View style={styles.nameBlock}>
+          <TouchableOpacity style={styles.nameBlock} onPress={() => { onClose(); router.push(`/profile/${user!.id}`); }} activeOpacity={0.75}>
             <GlowText style={styles.name} intensity="low">{user.riot_id ?? user.username}</GlowText>
             <View style={styles.statusRow}>
               <Text style={[styles.statusLabel, { color: statusCfg.color }]}>
@@ -79,7 +81,7 @@ export function MiniProfile({ user, onClose, onAddFriend, isFriend, onRemoveFrie
                 {status === 'in_game' && user.current_game ? ` · ${user.current_game}` : ''}
               </Text>
             </View>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Rank */}
