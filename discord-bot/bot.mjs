@@ -5,60 +5,66 @@ const WILDRIFT_BASE = 'https://wildrift.leagueoflegends.com';
 const seenArticles = new Set();
 
 async function fetchWildRiftArticles() {
-  // Try Gatsby page-data endpoint first
-  const pageDataUrl = 'https://wildrift.leagueoflegends.com/page-data/en-sg/news/tags/patch-notes/page-data.json';
-  let res = await fetch(pageDataUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }).catch(() => null);
-
-  if (res?.ok) {
-    const json = await res.json().catch(() => null);
-    if (json) {
-      // Search recursively for articles array
-      const articles = [];
-      function dig(obj) {
-        if (!obj || typeof obj !== 'object') return;
-        if (Array.isArray(obj)) { obj.forEach(dig); return; }
-        if (obj.title && obj.url && (obj.description || obj.summary || obj.excerpt)) {
-          articles.push(obj); return;
-        }
-        Object.values(obj).forEach(dig);
-      }
-      dig(json);
-      if (articles.length) {
-        console.log(`📰 Found ${articles.length} articles via page-data`);
-        console.log('📰 Sample article keys:', Object.keys(articles[0]));
-        console.log('📰 Sample article:', JSON.stringify(articles[0]).slice(0, 500));
-        return articles.slice(0, 10);
-      }
-    }
-  }
-
-  // Fallback: fetch HTML and extract __NEXT_DATA__
-  res = await fetch(WILDRIFT_NEWS_URL, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }).catch(() => null);
+  const res = await fetch(WILDRIFT_NEWS_URL, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+  }).catch(() => null);
   if (!res?.ok) throw new Error(`HTTP ${res?.status}`);
   const html = await res.text();
 
   const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-  if (nextMatch) {
-    const data = JSON.parse(nextMatch[1]);
-    const articles = [];
-    function dig2(obj) {
-      if (!obj || typeof obj !== 'object') return;
-      if (Array.isArray(obj)) { obj.forEach(dig2); return; }
-      if (obj.title && (obj.link || obj.url || obj.slug) && (obj.description || obj.summary || obj.excerpt || obj.image)) {
-        articles.push(obj); return;
+  if (!nextMatch) throw new Error('__NEXT_DATA__ not found');
+
+  const data = JSON.parse(nextMatch[1]);
+
+  // Find the page object that has 'blades'
+  const articles = [];
+  function findInBlades(obj) {
+    if (!obj || typeof obj !== 'object') return;
+    if (Array.isArray(obj)) { obj.forEach(findInBlades); return; }
+
+    // If this object has blades, search inside them for article cards
+    if (Array.isArray(obj.blades)) {
+      for (const blade of obj.blades) {
+        if (!blade || typeof blade !== 'object') continue;
+        // Look for arrays of items inside each blade
+        for (const val of Object.values(blade)) {
+          if (!Array.isArray(val)) continue;
+          for (const item of val) {
+            if (!item || typeof item !== 'object') continue;
+            // Article cards have a title + some kind of URL/path + image
+            const hasTitle = item.title || item.heading;
+            const hasUrl = item.link || item.url || item.slug || item.path || item.articleUrl;
+            const hasMedia = item.image || item.banner || item.thumbnail || item.backgroundImage || item.featuredImage;
+            if (hasTitle && hasUrl && hasMedia) {
+              articles.push(item);
+            }
+          }
+        }
       }
-      Object.values(obj).forEach(dig2);
+      return; // don't recurse further once we found blades
     }
-    dig2(data);
-    if (articles.length) {
-      console.log(`📰 Found ${articles.length} articles via __NEXT_DATA__`);
-      console.log('📰 Sample article keys:', Object.keys(articles[0]));
-      console.log('📰 Sample article:', JSON.stringify(articles[0]).slice(0, 500));
-      return articles.slice(0, 10);
-    }
+    Object.values(obj).forEach(findInBlades);
+  }
+  findInBlades(data);
+
+  if (articles.length) {
+    console.log(`📰 Found ${articles.length} articles in blades`);
+    console.log('📰 Sample keys:', Object.keys(articles[0]));
+    console.log('📰 Sample:', JSON.stringify(articles[0]).slice(0, 600));
+    return articles.slice(0, 10);
   }
 
-  console.error('📰 Could not parse articles from page. HTML length:', html.length);
+  // Fallback: log full blades for debugging
+  function logBlades(obj, depth = 0) {
+    if (!obj || typeof obj !== 'object' || depth > 5) return;
+    if (Array.isArray(obj.blades)) {
+      console.log('📰 Blades found:', obj.blades.map(b => b?.type ?? b?._type ?? '?').join(', '));
+      obj.blades.forEach((b,i) => console.log(`  Blade[${i}] keys:`, Object.keys(b || {})));
+      return;
+    }
+    Object.values(obj).forEach(v => logBlades(v, depth + 1));
+  }
+  logBlades(data);
   return [];
 }
 
