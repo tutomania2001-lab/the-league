@@ -11,6 +11,8 @@ export type UserRow = {
   status: 'online' | 'in_game' | 'away' | 'offline';
   current_game: string | null;
   last_seen: string | null;
+  lp: number;
+  peak_lp: number;
   created_at: string;
 };
 

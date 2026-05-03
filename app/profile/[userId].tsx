@@ -8,6 +8,7 @@ import { Colors, Spacing, Typography } from '@/constants/theme';
 import { withClanTag } from '@/lib/clanTag';
 import { useProfile } from '@/hooks/useProfile';
 import { useFriends } from '@/hooks/useFriends';
+import { usePlayerStats } from '@/hooks/usePlayerStats';
 import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -20,6 +21,7 @@ export default function PlayerProfileScreen() {
   const [myId, setMyId] = useState<string>();
   const { profile, loading } = useProfile(targetId);
   const { friends, incoming, outgoing, sendRequest, remove } = useFriends(myId);
+  const { stats } = usePlayerStats(targetId);
   const [team, setTeam] = useState<{ name: string; clan_tag: string | null } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -96,7 +98,7 @@ export default function PlayerProfileScreen() {
                 ⚔️ {team.clan_tag ? `[${team.clan_tag.toUpperCase()}] ` : ''}{team.name}
               </Text>
             )}
-            <RankBadge lp={2465} peakLP={3600} size="sm" />
+            <RankBadge lp={profile?.lp ?? 0} peakLP={profile?.peak_lp ?? 0} size="sm" />
           </View>
         </View>
 
@@ -131,16 +133,16 @@ export default function PlayerProfileScreen() {
         <Card>
           <Text style={Typography.label}>Ranked Standing</Text>
           <View style={{ marginTop: Spacing.sm }}>
-            <RankBadge lp={2465} peakLP={3600} size="lg" showProgress />
+            <RankBadge lp={profile?.lp ?? 0} peakLP={profile?.peak_lp ?? 0} size="lg" showProgress />
           </View>
         </Card>
 
         {/* Stats */}
         <View style={styles.statsRow}>
           {[
-            { label: 'Entered', value: '0' },
-            { label: 'Wins', value: '0' },
-            { label: 'Earnings', value: '$0' },
+            { label: 'Entered', value: String(stats.tournamentsEntered) },
+            { label: 'Wins', value: String(stats.wins) },
+            { label: 'Earnings', value: `£${stats.earnings.toFixed(0)}` },
           ].map(s => (
             <Card key={s.label} style={styles.statCard}>
               <GlowText style={styles.statValue}>{s.value}</GlowText>

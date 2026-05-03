@@ -9,6 +9,7 @@ import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useProfile } from '@/hooks/useProfile';
 import { useFriends } from '@/hooks/useFriends';
 import { useTeam } from '@/hooks/useTeam';
+import { usePlayerStats } from '@/hooks/usePlayerStats';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
@@ -23,6 +24,7 @@ export default function ProfileScreen() {
   const { profile, loading, updateProfile, refreshProfile } = useProfile(userId);
   const { friends, incoming } = useFriends(userId);
   const { team, members } = useTeam(userId);
+  const { stats } = usePlayerStats(userId);
   const [editingRiotId, setEditingRiotId] = useState(false);
   const [riotId, setRiotId] = useState('');
   const [saving, setSaving] = useState(false);
@@ -117,7 +119,7 @@ export default function ProfileScreen() {
               </GlowText>
             </PulseGlow>
             <View style={{ marginTop: Spacing.xs }}>
-              <RankBadge lp={2465} peakLP={3600} size="sm" />
+              <RankBadge lp={profile?.lp ?? 0} peakLP={profile?.peak_lp ?? 0} size="sm" />
             </View>
           </View>
         </View>
@@ -145,9 +147,9 @@ export default function ProfileScreen() {
         {/* Stats */}
         <View style={styles.statsRow}>
           {[
-            { label: 'Entered', value: '0' },
-            { label: 'Wins', value: '0' },
-            { label: 'Earnings', value: '$0' },
+            { label: 'Entered', value: String(stats.tournamentsEntered) },
+            { label: 'Wins', value: String(stats.wins) },
+            { label: 'Earnings', value: `£${stats.earnings.toFixed(0)}` },
           ].map(s => (
             <Card key={s.label} style={styles.statCard}>
               <GlowText style={styles.statValue}>{s.value}</GlowText>
