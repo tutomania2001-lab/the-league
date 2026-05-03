@@ -105,7 +105,7 @@ export default function HomeScreen() {
         {/* Player Hub banner */}
         <TouchableOpacity onPress={() => router.push('/hub')} activeOpacity={0.88}>
           <View style={styles.featuredBanner}>
-            <Image source={require('../../assets/images/hub-banner.jpg')} style={[StyleSheet.absoluteFillObject as any, { backgroundColor: '#000' }]} resizeMode="contain" />
+            <Image source={require('../../assets/images/hub-banner.jpg')} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' }} resizeMode="cover" />
             <View style={styles.featuredBannerOverlay} />
             <View style={styles.featuredBannerContent}>
               <Text style={styles.featuredBannerType}>🌐 COMMUNITY</Text>
