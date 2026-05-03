@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import RSSParser from 'rss-parser';
 
 const rssParser = new RSSParser();
-const WILDRIFT_FEED = 'https://wildrift.leagueoflegends.com/en-us/news/rss.xml';
+const WILDRIFT_FEED = 'https://wildrift.leagueoflegends.com/en-gb/news/rss.xml';
 const seenArticles = new Set();
 
 const TOKEN = process.env.DISCORD_TOKEN?.replace(/\s/g, '');
@@ -392,23 +392,23 @@ client.once('clientReady', async () => {
     }).catch(() => null);
   }
 
-  async function checkWildRiftNews(channel, firstRun = false) {
+  async function checkWildRiftNews(channel) {
     try {
       const feed = await rssParser.parseURL(WILDRIFT_FEED);
-      for (const item of feed.items.slice(0, 10)) {
+      console.log(`📰 Feed fetched: ${feed.items.length} items`);
+      for (const item of feed.items.slice(0, 5)) {
         const id = item.guid || item.link;
         if (seenArticles.has(id)) continue;
         seenArticles.add(id);
-        if (firstRun) continue; // on first run just seed the seen list, don't post
         const embed = new EmbedBuilder()
           .setTitle(item.title ?? 'Wild Rift News')
-          .setURL(item.link ?? 'https://wildrift.leagueoflegends.com/en-us/news/')
-          .setDescription(item.contentSnippet?.slice(0, 300) ?? '')
+          .setURL(item.link ?? 'https://wildrift.leagueoflegends.com/en-gb/news/')
+          .setDescription(item.contentSnippet?.slice(0, 400) ?? '')
           .setColor(0x00c8ff)
           .setFooter({ text: '📰 Wild Rift Official News' })
           .setTimestamp(item.pubDate ? new Date(item.pubDate) : new Date());
         await channel.send({ embeds: [embed] }).catch(() => {});
-        console.log(`📰 Posted news: ${item.title}`);
+        console.log(`📰 Posted: ${item.title}`);
       }
     } catch (e) {
       console.error('RSS feed error:', e.message);
@@ -416,8 +416,8 @@ client.once('clientReady', async () => {
   }
 
   if (newsChannel) {
-    await checkWildRiftNews(newsChannel, true); // seed seen articles on startup
-    setInterval(() => checkWildRiftNews(newsChannel), 30 * 60 * 1000); // check every 30 min
+    await checkWildRiftNews(newsChannel); // post latest on startup
+    setInterval(() => checkWildRiftNews(newsChannel), 30 * 60 * 1000);
     console.log('✅ Wild Rift news feed active');
   }
 
