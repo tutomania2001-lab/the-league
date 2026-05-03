@@ -14,7 +14,8 @@ import { DefaultAvatar } from './DefaultAvatar';
 type Friend = { id: string; name: string; avatarUrl: string | null };
 
 export function FloatingMiniChat({ myId }: { myId: string | undefined }) {
-  const [friend, setFriend] = useState<Friend | null>(null);
+  const [activeFriends, setActiveFriends] = useState<Friend[]>([]);
+  const [currentId, setCurrentId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [input, setInput] = useState('');
   const slideY = useRef(new Animated.Value(300)).current;
@@ -27,27 +28,50 @@ export function FloatingMiniChat({ myId }: { myId: string | undefined }) {
     supabase.auth.getUser().then(({ data }) => { if (data.user?.id) setResolvedMyId(data.user.id); });
   }, [myId]);
 
+  const friend = activeFriends.find(f => f.id === currentId) ?? null;
   const { messages, send } = useChat(resolvedMyId, friend?.id);
   const { chats } = useRecentChats(resolvedMyId);
-  const recentSwitcher = chats.slice(0, 5);
+
+  // Merge unread counts from recent chats into active friends
+  const unreadMap = Object.fromEntries(chats.map(c => [c.userId, c.unread]));
 
   useEffect(() => onMiniChatChange(f => {
-    if (f) { setFriend(f); setExpanded(true); }
-    else { setFriend(null); setExpanded(false); }
+    if (!f) { setActiveFriends([]); setCurrentId(null); setExpanded(false); return; }
+    setActiveFriends(prev => {
+      const exists = prev.find(x => x.id === f.id);
+      return exists ? prev : [...prev, f];
+    });
+    setCurrentId(f.id);
+    setExpanded(true);
   }), []);
 
   useEffect(() => {
     Animated.spring(slideY, {
-      toValue: expanded ? 0 : 300,
+      toValue: expanded && activeFriends.length > 0 ? 0 : 300,
       useNativeDriver: true, tension: 65, friction: 11,
     }).start();
-  }, [expanded]);
+  }, [expanded, activeFriends.length]);
 
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     }
-  }, [messages.length]);
+  }, [messages.length, currentId]);
+
+  function closeConversation(id: string) {
+    const remaining = activeFriends.filter(f => f.id !== id);
+    setActiveFriends(remaining);
+    if (remaining.length === 0) {
+      setCurrentId(null);
+      setExpanded(false);
+      closeMiniChat();
+    } else {
+      // Switch to nearest remaining conversation
+      const idx = activeFriends.findIndex(f => f.id === id);
+      const next = remaining[Math.min(idx, remaining.length - 1)];
+      setCurrentId(next.id);
+    }
+  }
 
   async function handleSend() {
     if (!input.trim()) return;
@@ -56,14 +80,14 @@ export function FloatingMiniChat({ myId }: { myId: string | undefined }) {
     await send(text);
   }
 
-  if (!friend) return null;
+  if (activeFriends.length === 0) return null;
 
   const bottomOffset = 68 + (insets.bottom || 0);
 
   return (
     <>
       {/* Minimised bubble */}
-      {!expanded && (
+      {!expanded && friend && (
         <TouchableOpacity
           style={[styles.bubble, { bottom: bottomOffset + 12, right: 16 }]}
           onPress={() => setExpanded(true)}
@@ -80,28 +104,36 @@ export function FloatingMiniChat({ myId }: { myId: string | undefined }) {
       {/* Chat panel */}
       <Animated.View style={[styles.panel, { bottom: bottomOffset, transform: [{ translateY: slideY }] }]}>
 
-        {/* Conversation switcher bar */}
-        {recentSwitcher.length > 1 && (
+        {/* Conversation switcher */}
+        {activeFriends.length > 0 && (
           <View style={styles.switcher}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.switcherScroll}>
-              {recentSwitcher.map(c => {
-                const isActive = c.userId === friend.id;
+              {activeFriends.map(f => {
+                const isActive = f.id === currentId;
+                const unread = unreadMap[f.id] ?? 0;
                 return (
-                  <TouchableOpacity
-                    key={c.userId}
-                    style={[styles.switcherAvatar, isActive && styles.switcherAvatarActive]}
-                    onPress={() => {
-                      setFriend({ id: c.userId, name: c.name, avatarUrl: c.avatarUrl });
-                      setInput('');
-                    }}
-                    activeOpacity={0.75}
-                  >
-                    {c.avatarUrl
-                      ? <Image source={{ uri: c.avatarUrl }} style={styles.switcherImg} />
-                      : <DefaultAvatar size={30} />
-                    }
-                    {c.unread > 0 && <View style={styles.switcherUnread} />}
-                  </TouchableOpacity>
+                  <View key={f.id} style={styles.switcherItem}>
+                    <TouchableOpacity
+                      style={[styles.switcherAvatar, isActive && styles.switcherAvatarActive]}
+                      onPress={() => { setCurrentId(f.id); setInput(''); }}
+                      activeOpacity={0.75}
+                    >
+                      {f.avatarUrl
+                        ? <Image source={{ uri: f.avatarUrl }} style={styles.switcherImg} />
+                        : <DefaultAvatar size={30} />
+                      }
+                    </TouchableOpacity>
+                    {/* Unread badge */}
+                    {unread > 0 && (
+                      <View style={styles.switcherBadge}>
+                        <Text style={styles.switcherBadgeText}>{unread > 9 ? '9+' : unread}</Text>
+                      </View>
+                    )}
+                    {/* Close this conversation */}
+                    <TouchableOpacity style={styles.switcherClose} onPress={() => closeConversation(f.id)}>
+                      <Text style={styles.switcherCloseText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
                 );
               })}
             </ScrollView>
@@ -109,23 +141,25 @@ export function FloatingMiniChat({ myId }: { myId: string | undefined }) {
         )}
 
         {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            {friend.avatarUrl
-              ? <Image source={{ uri: friend.avatarUrl }} style={styles.headerAvatar} />
-              : <DefaultAvatar size={28} />
-            }
-            <Text style={styles.headerName} numberOfLines={1}>{friend.name}</Text>
+        {friend && (
+          <View style={styles.header}>
+            <View style={styles.headerLeft}>
+              {friend.avatarUrl
+                ? <Image source={{ uri: friend.avatarUrl }} style={styles.headerAvatar} />
+                : <DefaultAvatar size={28} />
+              }
+              <Text style={styles.headerName} numberOfLines={1}>{friend.name}</Text>
+            </View>
+            <View style={styles.headerActions}>
+              <TouchableOpacity style={styles.headerBtn} onPress={() => setExpanded(false)}>
+                <Text style={styles.headerBtnText}>—</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.headerBtn} onPress={() => closeConversation(friend.id)}>
+                <Text style={styles.headerBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.headerBtn} onPress={() => setExpanded(false)}>
-              <Text style={styles.headerBtnText}>—</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerBtn} onPress={closeMiniChat}>
-              <Text style={styles.headerBtnText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        )}
 
         {/* Messages */}
         <FlatList
@@ -146,7 +180,7 @@ export function FloatingMiniChat({ myId }: { myId: string | undefined }) {
               </View>
             );
           }}
-          ListEmptyComponent={<Text style={styles.emptyText}>Say hi to {friend.name}!</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>Say hi to {friend?.name}!</Text>}
         />
 
         {/* Input */}
@@ -191,7 +225,6 @@ const styles = StyleSheet.create({
     width: 11, height: 11, borderRadius: 6,
     backgroundColor: Colors.success, borderWidth: 2, borderColor: Colors.background,
   },
-
   panel: {
     position: 'absolute', left: 12, right: 12,
     height: 320, borderRadius: 16, overflow: 'hidden',
@@ -201,26 +234,34 @@ const styles = StyleSheet.create({
     shadowColor: Colors.accent, shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.15, shadowRadius: 12, elevation: 12,
   },
-
   switcher: {
     borderBottomWidth: 1, borderBottomColor: Colors.accentBorder,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
-  switcherScroll: { paddingHorizontal: 8, paddingVertical: 6, gap: 8 },
+  switcherScroll: { paddingHorizontal: 8, paddingVertical: 6, gap: 10, flexDirection: 'row' },
+  switcherItem: { position: 'relative', width: 38, height: 38 },
   switcherAvatar: {
     width: 34, height: 34, borderRadius: 10, overflow: 'hidden',
     borderWidth: 2, borderColor: 'transparent', opacity: 0.5,
   },
-  switcherAvatarActive: {
-    borderColor: Colors.accent, opacity: 1,
-  },
+  switcherAvatarActive: { borderColor: Colors.accent, opacity: 1 },
   switcherImg: { width: 30, height: 30 },
-  switcherUnread: {
-    position: 'absolute', top: 0, right: 0,
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: Colors.accent, borderWidth: 1.5, borderColor: 'rgba(8,14,26,1)',
+  switcherBadge: {
+    position: 'absolute', top: -4, right: -4,
+    backgroundColor: Colors.accent, borderRadius: 8,
+    minWidth: 16, height: 16, paddingHorizontal: 3,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(8,14,26,1)',
+    zIndex: 2,
   },
-
+  switcherBadgeText: { color: Colors.background, fontSize: 8, fontWeight: '900' },
+  switcherClose: {
+    position: 'absolute', bottom: -4, right: -4,
+    width: 14, height: 14, borderRadius: 7,
+    backgroundColor: Colors.surfaceAlt, borderWidth: 1, borderColor: Colors.accentBorder,
+    alignItems: 'center', justifyContent: 'center', zIndex: 3,
+  },
+  switcherCloseText: { color: Colors.textMuted, fontSize: 7, fontWeight: '900' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: Spacing.sm, paddingVertical: 8,
@@ -236,7 +277,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
   headerBtnText: { color: Colors.textMuted, fontSize: 13, fontWeight: '700' },
-
   messageList: { flex: 1 },
   msgRow: { flexDirection: 'row', justifyContent: 'flex-start' },
   msgRowMe: { justifyContent: 'flex-end' },
@@ -245,7 +285,6 @@ const styles = StyleSheet.create({
   bubbleThem: { backgroundColor: Colors.surfaceAlt, borderBottomLeftRadius: 4 },
   msgText: { fontSize: 13, color: Colors.text },
   emptyText: { textAlign: 'center', color: Colors.textMuted, fontSize: 12, marginTop: 20 },
-
   inputRow: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     padding: 8, borderTopWidth: 1, borderTopColor: Colors.accentBorder,

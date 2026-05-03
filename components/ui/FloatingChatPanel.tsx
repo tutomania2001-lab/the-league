@@ -98,7 +98,11 @@ export function FloatingChatPanel({ myId }: { myId: string | undefined }) {
                     ? <Image source={{ uri: chat.avatarUrl }} style={styles.avatar} />
                     : <DefaultAvatar size={36} />
                   }
-                  {chat.unread > 0 && <View style={styles.unreadDot} />}
+                  {chat.unread > 0 && (
+                    <View style={styles.unreadDot}>
+                      <Text style={styles.unreadDotText}>{chat.unread > 9 ? '9+' : chat.unread}</Text>
+                    </View>
+                  )}
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={styles.rowTop}>
@@ -153,10 +157,13 @@ const styles = StyleSheet.create({
   avatarWrap: { position: 'relative' },
   avatar: { width: 36, height: 36, borderRadius: 8, borderWidth: 1, borderColor: Colors.accentBorder },
   unreadDot: {
-    position: 'absolute', top: -2, right: -2,
-    width: 9, height: 9, borderRadius: 5,
-    backgroundColor: Colors.accent, borderWidth: 1.5, borderColor: 'rgba(8,14,26,1)',
+    position: 'absolute', top: -5, right: -5,
+    backgroundColor: Colors.accent, borderRadius: 8,
+    minWidth: 16, height: 16, paddingHorizontal: 3,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(8,14,26,1)',
   },
+  unreadDotText: { color: Colors.background, fontSize: 8, fontWeight: '900' },
   rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   name: { fontSize: 12, fontWeight: '700', color: Colors.textMuted, flex: 1 },
   time: { fontSize: 9, color: Colors.textMuted },
