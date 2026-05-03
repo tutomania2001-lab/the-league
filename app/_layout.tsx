@@ -114,7 +114,7 @@ export default function RootLayout() {
         {/* Only show overlays when inside the app (not on auth/landing) */}
         {(session || DEV_BYPASS.enabled) && segments[0] !== 'auth' && segments.length > 0 && (
           <>
-            <FriendsPanel userId={userId} />
+            {segments[0] === '(tabs)' && <FriendsPanel userId={userId} />}
             <FloatingMiniChat myId={userId} />
             <FloatingChatPanel myId={userId} />
           </>
