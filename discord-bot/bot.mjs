@@ -34,8 +34,11 @@ const LANES = [
 ];
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildPresences],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildPresences, GatewayIntentBits.GuildVoiceStates],
 });
+
+// In-memory store for private rooms: channelId → { ownerId, password, lobbyMessageId }
+const privateRooms = new Map();
 
 client.once('clientReady', async () => {
   console.log(`✅ Bot online: ${client.user.tag}`);
@@ -231,6 +234,44 @@ client.once('clientReady', async () => {
     setInterval(updateStats, 60 * 1000); // refresh every 1 minute
   }
 
+  // ── PRIVATE TEAM ROOMS ───────────────────────────────────────────
+  const allChannels = await guild.channels.fetch();
+  let privateCat = allChannels.find(c => c?.name === '🔒 Private Rooms' && c.type === ChannelType.GuildCategory);
+  if (!privateCat) {
+    privateCat = await guild.channels.create({
+      name: '🔒 Private Rooms',
+      type: ChannelType.GuildCategory,
+      permissionOverwrites: [{ id: roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
+                             { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel] }],
+    }).catch(() => null);
+  }
+  if (privateCat) {
+    const existing2 = await guild.channels.fetch();
+    // Create-room trigger channel
+    if (!existing2.find(c => c?.parentId === privateCat.id && c?.name === '🔒 Create Private Room')) {
+      await guild.channels.create({
+        name: '🔒 Create Private Room',
+        type: ChannelType.GuildVoice,
+        parent: privateCat.id,
+        permissionOverwrites: [{ id: roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
+                               { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect] }],
+      }).catch(() => null);
+    }
+    // Room lobby text channel
+    let lobbyChannel = existing2.find(c => c?.parentId === privateCat.id && c?.name === '🚪-room-lobby');
+    if (!lobbyChannel) {
+      lobbyChannel = await guild.channels.create({
+        name: '🚪-room-lobby',
+        type: ChannelType.GuildText,
+        parent: privateCat.id,
+        permissionOverwrites: [{ id: roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
+                               { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.SendMessages] }],
+      }).catch(() => null);
+    }
+    client.roomLobbyChannelId = lobbyChannel?.id ?? null;
+    console.log('✅ Private rooms setup done');
+  }
+
   } catch (e) {
     console.error('❌ clientReady error:', e);
   }
@@ -274,6 +315,62 @@ client.on('presenceUpdate', async (oldPresence, newPresence) => {
   const name = newPresence.member?.displayName ?? newPresence.user?.username ?? 'Someone';
   console.log(`👁️ Presence: ${name} came online`);
   await client.announcementsChannel.send(`👋 **${name}** is back online!`).catch(() => {});
+});
+
+// ── PRIVATE ROOMS — VOICE STATE ──────────────────────────────────
+client.on('voiceStateUpdate', async (oldState, newState) => {
+  const guild = newState.guild;
+  const allChannels = await guild.channels.fetch();
+  const createChannel = allChannels.find(c => c?.name === '🔒 Create Private Room');
+
+  // User joined the create-room trigger
+  if (newState.channelId === createChannel?.id) {
+    const member = newState.member;
+    const room = await guild.channels.create({
+      name: `🔒 ${member.displayName}'s Room`,
+      type: ChannelType.GuildVoice,
+      parent: createChannel.parentId,
+      permissionOverwrites: [
+        { id: guild.roles.everyone, deny: [PermissionFlagsBits.Connect, PermissionFlagsBits.ViewChannel] },
+        { id: member.id,            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.MuteMembers] },
+        { id: client.user.id,       allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.ManageChannels] },
+      ],
+    }).catch(() => null);
+    if (!room) return;
+
+    await member.voice.setChannel(room).catch(() => {});
+
+    // Post control panel in room lobby
+    const lobbyChannel = client.roomLobbyChannelId ? guild.channels.cache.get(client.roomLobbyChannelId) : null;
+    if (!lobbyChannel) return;
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`room_setpw_${room.id}`).setLabel('🔑 Set Password').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`room_join_${room.id}`).setLabel('🚪 Join Room').setStyle(ButtonStyle.Secondary),
+    );
+    const embed = new EmbedBuilder()
+      .setTitle(`🔒 ${member.displayName}'s Private Room`)
+      .setDescription(`**Owner:** ${member}\n**Password:** Not set yet\n\nOwner: click **Set Password** to lock your room.\nOthers: click **Join Room** and enter the password.`)
+      .setColor(0x00c8ff)
+      .setTimestamp();
+    const msg = await lobbyChannel.send({ embeds: [embed], components: [row] }).catch(() => null);
+    if (msg) privateRooms.set(room.id, { ownerId: member.id, password: null, lobbyMessageId: msg.id });
+  }
+
+  // Cleanup when private room empties
+  if (oldState.channelId && privateRooms.has(oldState.channelId)) {
+    const room = guild.channels.cache.get(oldState.channelId);
+    if (room && room.members.size === 0) {
+      const data = privateRooms.get(oldState.channelId);
+      privateRooms.delete(oldState.channelId);
+      // Delete lobby message
+      if (client.roomLobbyChannelId && data?.lobbyMessageId) {
+        const lobby = guild.channels.cache.get(client.roomLobbyChannelId);
+        await lobby?.messages.fetch(data.lobbyMessageId).then(m => m.delete()).catch(() => {});
+      }
+      await room.delete().catch(() => {});
+    }
+  }
 });
 
 // ── BUTTON INTERACTIONS ──────────────────────────────────────────
@@ -322,6 +419,33 @@ client.on('interactionCreate', async interaction => {
     } catch (e) {
       return interaction.reply({ content: '❌ Registration failed — contact staff.', ephemeral: true });
     }
+  }
+
+  // PRIVATE ROOM — SET PASSWORD
+  if (interaction.customId.startsWith('room_setpw_')) {
+    const roomId = interaction.customId.replace('room_setpw_', '');
+    const room = privateRooms.get(roomId);
+    if (!room) return interaction.reply({ content: '❌ Room no longer exists.', ephemeral: true });
+    if (room.ownerId !== interaction.user.id) return interaction.reply({ content: '❌ Only the room owner can set the password.', ephemeral: true });
+    const modal = new ModalBuilder().setCustomId(`room_pw_modal_${roomId}`).setTitle('Set Room Password');
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('room_password').setLabel('Password').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(32)
+    ));
+    return interaction.showModal(modal);
+  }
+
+  // PRIVATE ROOM — JOIN
+  if (interaction.customId.startsWith('room_join_')) {
+    const roomId = interaction.customId.replace('room_join_', '');
+    const room = privateRooms.get(roomId);
+    if (!room) return interaction.reply({ content: '❌ Room no longer exists.', ephemeral: true });
+    if (!room.password) return interaction.reply({ content: '❌ The owner hasn\'t set a password yet.', ephemeral: true });
+    if (room.ownerId === interaction.user.id) return interaction.reply({ content: '✅ You\'re the owner — you\'re already in!', ephemeral: true });
+    const modal = new ModalBuilder().setCustomId(`room_join_modal_${roomId}`).setTitle('Enter Room Password');
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('room_password').setLabel('Password').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(32)
+    ));
+    return interaction.showModal(modal);
   }
 
   // Must be registered for everything below
@@ -391,6 +515,44 @@ client.on('interactionCreate', async interaction => {
       data = res.data;
     }
     return data;
+  }
+
+  // PRIVATE ROOM — SET PASSWORD modal
+  if (interaction.customId.startsWith('room_pw_modal_')) {
+    const roomId = interaction.customId.replace('room_pw_modal_', '');
+    const room = privateRooms.get(roomId);
+    if (!room) return interaction.editReply({ content: '❌ Room no longer exists.' });
+    const password = interaction.fields.getTextInputValue('room_password').trim();
+    room.password = password;
+
+    // Update lobby embed
+    if (client.roomLobbyChannelId && room.lobbyMessageId) {
+      const lobby = interaction.guild.channels.cache.get(client.roomLobbyChannelId);
+      const msg = await lobby?.messages.fetch(room.lobbyMessageId).catch(() => null);
+      if (msg) {
+        const updated = EmbedBuilder.from(msg.embeds[0]).setDescription(
+          msg.embeds[0].description.replace('**Password:** Not set yet', '**Password:** ✅ Set')
+        );
+        await msg.edit({ embeds: [updated] }).catch(() => {});
+      }
+    }
+    return interaction.editReply({ content: '🔑 Password set! Others can now click **Join Room** to enter.' });
+  }
+
+  // PRIVATE ROOM — JOIN modal
+  if (interaction.customId.startsWith('room_join_modal_')) {
+    const roomId = interaction.customId.replace('room_join_modal_', '');
+    const room = privateRooms.get(roomId);
+    if (!room) return interaction.editReply({ content: '❌ Room no longer exists.' });
+    const entered = interaction.fields.getTextInputValue('room_password').trim();
+    if (entered !== room.password) return interaction.editReply({ content: '❌ Wrong password.' });
+
+    const voiceChannel = interaction.guild.channels.cache.get(roomId);
+    if (!voiceChannel) return interaction.editReply({ content: '❌ Room channel not found.' });
+    await voiceChannel.permissionOverwrites.edit(interaction.user.id, {
+      ViewChannel: true, Connect: true,
+    }).catch(() => {});
+    return interaction.editReply({ content: `✅ Access granted! Join **${voiceChannel.name}** in the Private Rooms section.` });
   }
 
   // VERIFIED PLAYER modal
