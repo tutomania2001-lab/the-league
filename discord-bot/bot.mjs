@@ -136,11 +136,32 @@ client.once('clientReady', async () => {
   }
 });
 
-// New member → New Arrival
+// New member → New Arrival + public welcome
 client.on('guildMemberAdd', async member => {
   if (member.user.bot) return;
   if (client.roles?.newArrival) await member.roles.add(client.roles.newArrival).catch(() => {});
   console.log(`👋 ${member.user.tag} joined — New Arrival assigned`);
+
+  const channels = await member.guild.channels.fetch();
+  const welcomeChannel =
+    channels.find(c => c?.name === 'welcome') ??
+    channels.find(c => c?.name === 'announcements') ??
+    channels.find(c => c?.name === 'general');
+  if (!welcomeChannel) return;
+
+  const embed = new EmbedBuilder()
+    .setTitle('◈ A NEW CHALLENGER APPROACHES')
+    .setDescription(
+      `Welcome ${member}, to **The League**! 🎉\n\n` +
+      `→ Read the rules and register in <#${channels.find(c => c?.name === 'rules')?.id ?? ''}>\n` +
+      `→ Pick your roles in <#${channels.find(c => c?.name === 'get-roles')?.id ?? ''}>`
+    )
+    .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+    .setColor(0x00c8ff)
+    .setFooter({ text: `Member #${member.guild.memberCount}` })
+    .setTimestamp();
+
+  await welcomeChannel.send({ content: `👋 ${member}`, embeds: [embed] }).catch(() => {});
 });
 
 // ── BUTTON INTERACTIONS ──────────────────────────────────────────
