@@ -4,6 +4,8 @@ import { GlowText } from '@/components/ui/GlowText';
 import { Input } from '@/components/ui/Input';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useFriends } from '@/hooks/useFriends';
+import { useTeam } from '@/hooks/useTeam';
+import { useTeamInvites } from '@/hooks/useTeamInvites';
 import { withClanTag } from '@/lib/clanTag';
 import { TappableAvatar } from '@/components/ui/TappableAvatar';
 import { supabase } from '@/lib/supabase';
@@ -18,6 +20,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function FriendsScreen() {
   const [userId, setUserId] = useState<string>();
   const { friends, incoming, outgoing, loading, sendRequest, accept, decline, remove } = useFriends(userId);
+  const { team, members } = useTeam(userId);
+  const { sendInvite } = useTeamInvites(userId);
+  const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
+  const isCaptain = team?.captain_id === userId;
+  const hasSpace = members.length < 10;
   const [searchRiotId, setSearchRiotId] = useState('');
   const router = useRouter();
   const [adding, setAdding] = useState(false);
@@ -122,6 +129,19 @@ export default function FriendsScreen() {
                     <Text style={styles.friendName}>{withClanTag(f.profile.riot_id ?? f.profile.username, (f.profile as any).clan_tag)}</Text>
                     <Text style={styles.friendSub}>Wild Rift Player</Text>
                   </View>
+                  {isCaptain && hasSpace && (
+                    <TouchableOpacity
+                      style={[styles.inviteBtn, invitedIds.has(f.profile.id) && { opacity: 0.5 }]}
+                      onPress={async (e) => {
+                        e.stopPropagation?.();
+                        if (!team || !userId || invitedIds.has(f.profile.id)) return;
+                        await sendInvite(team.id, f.profile.id, userId);
+                        setInvitedIds(prev => new Set([...prev, f.profile.id]));
+                      }}
+                    >
+                      <Text style={styles.inviteBtnText}>{invitedIds.has(f.profile.id) ? '✓' : '⚔️'}</Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity style={styles.removeBtn} onPress={(e) => { e.stopPropagation?.(); remove(f.id); }}>
                     <Text style={styles.removeBtnText}>···</Text>
                   </TouchableOpacity>
@@ -222,6 +242,11 @@ const styles = StyleSheet.create({
 
   removeBtn: { padding: Spacing.xs },
   removeBtnText: { color: Colors.textMuted, fontSize: 18, letterSpacing: 2 },
+  inviteBtn: {
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+    backgroundColor: 'rgba(200,155,60,0.15)', borderWidth: 1, borderColor: Colors.gold + '66',
+  },
+  inviteBtnText: { color: Colors.gold, fontSize: 14, fontWeight: '800' },
 
   emptyCard: { alignItems: 'center', gap: 4, paddingVertical: Spacing.xl },
 });
