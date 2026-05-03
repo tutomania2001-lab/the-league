@@ -122,19 +122,21 @@ export function FloatingChatPanel({ myId }: { myId: string | undefined }) {
         </ScrollView>
       </Animated.View>
 
-      {/* Floating tab */}
-      <TouchableOpacity
-        style={[styles.tab, { top: tabTop }]}
-        onPress={toggle}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.tabIcon}>💬</Text>
-        {totalUnread > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{totalUnread > 99 ? '99+' : totalUnread}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
+      {/* Floating tab — hidden when panel is open */}
+      {!open && (
+        <TouchableOpacity
+          style={[styles.tab, { top: tabTop }]}
+          onPress={toggle}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.tabIcon}>💬</Text>
+          {totalUnread > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{totalUnread > 99 ? '99+' : totalUnread}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      )}
     </>
   );
 }
@@ -183,19 +185,19 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 40 },
 
   tab: {
-    position: 'absolute', right: 0, zIndex: 96,
-    width: 36, height: 44,
-    backgroundColor: 'rgba(8,14,26,0.95)',
+    position: 'absolute', right: 0, zIndex: 101,
+    backgroundColor: 'rgba(8,14,24,0.95)',
     borderTopLeftRadius: 10, borderBottomLeftRadius: 10,
     borderWidth: 1, borderRightWidth: 0, borderColor: Colors.accentBorder,
-    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 10, paddingHorizontal: 8,
+    alignItems: 'center', gap: 2,
   },
-  tabIcon: { fontSize: 16 },
+  tabIcon: { fontSize: 18 },
   badge: {
     position: 'absolute', top: -5, left: -8,
     backgroundColor: Colors.accent, borderRadius: 10,
     minWidth: 18, height: 18, paddingHorizontal: 4,
     alignItems: 'center', justifyContent: 'center',
   },
-  badgeText: { color: Colors.background, fontSize: 8, fontWeight: '900' },
+  badgeText: { color: Colors.background, fontSize: 10, fontWeight: '900' },
 });
