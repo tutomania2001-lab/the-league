@@ -78,7 +78,8 @@ export default function FriendsScreen() {
               <View style={styles.badge}><Text style={styles.badgeText}>{incoming.length}</Text></View>
             </View>
             {incoming.map(f => (
-              <Card key={f.id} style={styles.friendRow}>
+              <TouchableOpacity key={f.id} onPress={() => router.push(`/profile/${f.profile.id}`)} activeOpacity={0.85}>
+              <Card style={styles.friendRow}>
                 <FriendAvatar profile={f.profile} />
                 <View style={styles.friendInfo}>
                   <Text style={styles.friendName}>{withClanTag(f.profile.riot_id ?? f.profile.username, (f.profile as any).clan_tag)}</Text>
@@ -93,6 +94,7 @@ export default function FriendsScreen() {
                   </TouchableOpacity>
                 </View>
               </Card>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -112,16 +114,18 @@ export default function FriendsScreen() {
             </Card>
           ) : (
             friends.map(f => (
-              <Card key={f.id} style={styles.friendRow}>
-                <FriendAvatar profile={f.profile} />
-                <View style={styles.friendInfo}>
-                  <Text style={styles.friendName}>{withClanTag(f.profile.riot_id ?? f.profile.username, (f.profile as any).clan_tag)}</Text>
-                  <Text style={styles.friendSub}>Wild Rift Player</Text>
-                </View>
-                <TouchableOpacity style={styles.removeBtn} onPress={() => remove(f.id)}>
-                  <Text style={styles.removeBtnText}>···</Text>
-                </TouchableOpacity>
-              </Card>
+              <TouchableOpacity key={f.id} onPress={() => router.push(`/profile/${f.profile.id}`)} activeOpacity={0.85}>
+                <Card style={styles.friendRow}>
+                  <FriendAvatar profile={f.profile} />
+                  <View style={styles.friendInfo}>
+                    <Text style={styles.friendName}>{withClanTag(f.profile.riot_id ?? f.profile.username, (f.profile as any).clan_tag)}</Text>
+                    <Text style={styles.friendSub}>Wild Rift Player</Text>
+                  </View>
+                  <TouchableOpacity style={styles.removeBtn} onPress={(e) => { e.stopPropagation?.(); remove(f.id); }}>
+                    <Text style={styles.removeBtnText}>···</Text>
+                  </TouchableOpacity>
+                </Card>
+              </TouchableOpacity>
             ))
           )}
         </View>
