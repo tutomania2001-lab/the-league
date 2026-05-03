@@ -62,7 +62,7 @@ export default function CreateTournamentScreen() {
           <LeagueEmblem size={48} color={Colors.gold} />
           <View>
             <GlowText style={[Typography.title, { color: Colors.gold }]}>New Tournament</GlowText>
-            <Text style={[Typography.body, { fontSize: 11, color: Colors.textMuted }]}>Official event · 8 teams × 5 players</Text>
+            <Text style={[Typography.body, { fontSize: 11, color: Colors.textMuted }]}>Official event · 20 teams × 5 players</Text>
           </View>
         </View>
 

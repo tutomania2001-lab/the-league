@@ -218,7 +218,7 @@ export default function HomeScreen() {
                       <Text style={{ fontSize: 16, fontWeight: '900', color: Colors.gold }}>🏆 £{t.prize_pool > 0 ? t.prize_pool.toFixed(0) : (t.entry_fee_per_player * 36).toFixed(0)}</Text>
                     </View>
                     <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-                      {t.prize_format === 'top_two' ? '🥈 Top 2 Prize' : '👑 Winner Takes All'} · £{t.entry_fee_per_player}/player · 8 teams
+                      {t.prize_format === 'top_two' ? '🥈 Top 2 Prize' : '👑 Winner Takes All'} · £{t.entry_fee_per_player}/player · 20 teams
                     </Text>
                   </View>
                 </View>

@@ -1306,7 +1306,7 @@ export default function TeamScreen() {
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.tourneyName}>{t.name}</Text>
-                          <Text style={styles.tourneySub}>£{t.entry_fee_per_player}/player · 8 teams</Text>
+                          <Text style={styles.tourneySub}>£{t.entry_fee_per_player}/player · 20 teams</Text>
                         </View>
                         <View style={styles.prizeTag}>
                           <Text style={styles.prizeText}>🏆 £{prize}</Text>

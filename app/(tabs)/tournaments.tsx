@@ -55,7 +55,7 @@ function MajorTournamentCard({ tournament, teamsIn, onPress }: { tournament: any
             </View>
           </View>
           <View style={styles.majorStats}>
-            <Text style={styles.majorStat}>⚔️ {teamsIn}/8 teams</Text>
+            <Text style={styles.majorStat}>⚔️ {teamsIn}/20 teams</Text>
             <Text style={styles.majorStat}>· £{tournament.entry_fee_per_player}/player</Text>
           </View>
         </View>
