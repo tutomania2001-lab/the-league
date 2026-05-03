@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/theme';
-import { Image } from 'react-native';
+import { LeagueEmblem } from '@/components/ui/LeagueEmblem';
 import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useRef } from 'react';
@@ -52,13 +52,7 @@ export default function LandingScreen() {
 
           {/* Logo */}
           <View style={styles.logoBlock}>
-            <View style={styles.logoBadge}>
-              <Image
-                source={require('../assets/images/logo.png')}
-                style={{ width: 80, height: 80 }}
-                resizeMode="contain"
-              />
-            </View>
+            <LeagueEmblem size={90} color="#ffffff" />
             <View style={styles.logoText}>
               <Text style={styles.title}>THE LEAGUE</Text>
               <Text style={styles.rift}>WILD RIFT TOURNAMENTS</Text>
@@ -116,14 +110,6 @@ const styles = StyleSheet.create({
 
   logoBlock: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-  },
-  logoBadge: {
-    width: 86, height: 86, borderRadius: 43,
-    backgroundColor: '#f0ece4',
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: Colors.gold, shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5, shadowRadius: 10,
-    borderWidth: 1.5, borderColor: Colors.gold + '88',
   },
   logoText: { flexDirection: 'column', gap: 5, justifyContent: 'center' },
   title: {

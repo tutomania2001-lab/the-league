@@ -224,6 +224,20 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* Player Hub banner */}
+        <TouchableOpacity onPress={() => router.push('/hub')} activeOpacity={0.85}>
+          <View style={styles.hubBanner}>
+            <View style={styles.hubBannerLeft}>
+              <Text style={styles.hubBannerIcon}>🌐</Text>
+              <View>
+                <Text style={styles.hubBannerTitle}>PLAYER HUB</Text>
+                <Text style={styles.hubBannerSub}>Community highlights from all clans</Text>
+              </View>
+            </View>
+            <Text style={{ color: Colors.accent, fontSize: 20 }}>›</Text>
+          </View>
+        </TouchableOpacity>
+
         <Card style={styles.infoCard}>
           <Text style={Typography.label}>How it works</Text>
           <View style={{ gap: Spacing.sm, marginTop: Spacing.sm }}>
@@ -275,4 +289,14 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', gap: Spacing.sm },
   statCard: { flex: 1, alignItems: 'center', gap: 4, padding: Spacing.sm },
   infoCard: { gap: Spacing.xs },
+  hubBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,200,255,0.07)', borderRadius: 14,
+    borderWidth: 1, borderColor: Colors.accent + '44',
+    padding: Spacing.md,
+  },
+  hubBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  hubBannerIcon: { fontSize: 28 },
+  hubBannerTitle: { fontSize: 14, fontWeight: '900', color: Colors.accent, letterSpacing: 1.5 },
+  hubBannerSub: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
 });

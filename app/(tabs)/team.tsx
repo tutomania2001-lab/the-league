@@ -442,6 +442,7 @@ export default function TeamScreen() {
   }, [targetPostId, posts.length, activeTab]);
   const [postCaption, setPostCaption] = useState('');
   const [postMedia, setPostMedia] = useState<{ uri: string; type: 'image' | 'video' } | null>(null);
+  const [postIsPublic, setPostIsPublic] = useState(false);
   const [posting, setPosting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [lineupTournamentId, setLineupTournamentId] = useState<string | null>(null);
@@ -1191,8 +1192,26 @@ export default function TeamScreen() {
 
                 {uploadProgress ? <Text style={{ color: Colors.accent, fontSize: 12, textAlign: 'center' }}>{uploadProgress}</Text> : null}
 
+                {/* Public / Private toggle */}
+                <View style={styles.visibilityRow}>
+                  <TouchableOpacity
+                    style={[styles.visibilityBtn, !postIsPublic && styles.visibilityBtnActive]}
+                    onPress={() => setPostIsPublic(false)}
+                  >
+                    <Text style={styles.visibilityIcon}>🔒</Text>
+                    <Text style={[styles.visibilityLabel, !postIsPublic && { color: Colors.gold }]}>Clan Only</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.visibilityBtn, postIsPublic && styles.visibilityBtnActiveHub]}
+                    onPress={() => setPostIsPublic(true)}
+                  >
+                    <Text style={styles.visibilityIcon}>🌐</Text>
+                    <Text style={[styles.visibilityLabel, postIsPublic && { color: Colors.accent }]}>Post to Hub</Text>
+                  </TouchableOpacity>
+                </View>
+
                 <TouchableOpacity
-                  style={[styles.postSubmitBtn, (!postMedia && !postCaption.trim()) && { opacity: 0.4 }]}
+                  style={[styles.postSubmitBtn, (!postMedia && !postCaption.trim()) && { opacity: 0.4 }, postIsPublic && { backgroundColor: Colors.accent }]}
                   disabled={(!postMedia && !postCaption.trim()) || posting}
                   onPress={async () => {
                     if (!userId || !team) return;
@@ -1205,16 +1224,17 @@ export default function TeamScreen() {
                       mediaType = postMedia.type;
                       setUploadProgress('');
                     }
-                    await createPost(team.id, userId, mediaUrl, mediaType, postCaption);
+                    await createPost(team.id, userId, mediaUrl, mediaType, postCaption, postIsPublic);
                     setPosting(false);
                     setShowNewPost(false);
                     setPostMedia(null);
                     setPostCaption('');
+                    setPostIsPublic(false);
                   }}
                 >
                   {posting
                     ? <ActivityIndicator color={Colors.background} size="small" />
-                    : <Text style={styles.postSubmitText}>Share to Clan 🏆</Text>
+                    : <Text style={styles.postSubmitText}>{postIsPublic ? 'Share to Hub 🌐' : 'Share to Clan 🏆'}</Text>
                   }
                 </TouchableOpacity>
               </View>
@@ -1390,6 +1410,12 @@ const styles = StyleSheet.create({
   captionInput: { margin: Spacing.md, backgroundColor: 'rgba(20,14,0,0.8)', borderRadius: 10, borderWidth: 1, borderColor: Colors.gold + '44', padding: Spacing.md, color: Colors.text, fontSize: 14, minHeight: 60 },
   postSubmitBtn: { margin: Spacing.md, marginTop: 0, backgroundColor: Colors.gold, borderRadius: 10, padding: 14, alignItems: 'center' },
   postSubmitText: { color: '#0a0800', fontWeight: '900', fontSize: 14 },
+  visibilityRow: { flexDirection: 'row', gap: Spacing.sm, marginHorizontal: Spacing.md, marginBottom: Spacing.sm },
+  visibilityBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: Colors.accentBorder, backgroundColor: Colors.surfaceAlt },
+  visibilityBtnActive: { borderColor: Colors.gold + '88', backgroundColor: 'rgba(200,155,60,0.12)' },
+  visibilityBtnActiveHub: { borderColor: Colors.accent + '88', backgroundColor: 'rgba(0,200,255,0.1)' },
+  visibilityIcon: { fontSize: 16 },
+  visibilityLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted },
 
   inviteBtn: { position: 'absolute', top: Spacing.md, right: Spacing.md, backgroundColor: 'rgba(200,155,60,0.15)', borderRadius: 8, borderWidth: 1, borderColor: Colors.gold + '66', paddingHorizontal: 10, paddingVertical: 5 },
   inviteBtnText: { color: Colors.gold, fontSize: 12, fontWeight: '700' },

@@ -10,6 +10,7 @@ export type TeamPost = {
   caption: string | null;
   likes_count: number;
   comments_count?: number;
+  is_public: boolean;
   created_at: string;
   author?: { riot_id: string | null; username: string; avatar_url: string | null };
   liked?: boolean;
@@ -77,9 +78,9 @@ export function useTeamFeed(teamId: string | undefined, myId: string | undefined
     await supabase.rpc('toggle_post_like', { p_post_id: postId, p_user_id: myId });
   }
 
-  async function createPost(teamId: string, userId: string, mediaUrl: string | null, mediaType: 'image' | 'video' | null, caption: string) {
+  async function createPost(teamId: string, userId: string, mediaUrl: string | null, mediaType: 'image' | 'video' | null, caption: string, isPublic = false) {
     const { data: insertedPost, error } = await supabase.from('team_posts')
-      .insert({ team_id: teamId, user_id: userId, media_url: mediaUrl, media_type: mediaType, caption: caption.trim() || null })
+      .insert({ team_id: teamId, user_id: userId, media_url: mediaUrl, media_type: mediaType, caption: caption.trim() || null, is_public: isPublic })
       .select().single();
     if (error) return { error: error.message };
     const { data: author } = await supabase.from('users').select('riot_id, username, avatar_url').eq('id', userId).single();
