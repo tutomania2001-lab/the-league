@@ -8,6 +8,7 @@ import { StatusDot, UserStatus, STATUS_CONFIG } from '@/components/ui/StatusDot'
 import { MiniProfile, MiniProfileUser } from '@/components/ui/MiniProfile';
 import { getStatusFromLastSeen } from '@/hooks/usePresence';
 import { withClanTag } from '@/lib/clanTag';
+import { onMiniChatChange } from '@/lib/miniChat';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Animated, Dimensions, Easing, Image,
@@ -41,6 +42,11 @@ export function FriendsPanel({ userId: userIdProp }: Props) {
   const { incoming: teamInvites, sendInvite, accept: acceptInvite, decline: declineInvite } = useTeamInvites(userId);
   const { team, members } = useTeam(userId);
   const [open, setOpen] = useState(false);
+
+  // Auto-close when a mini chat opens
+  useEffect(() => onMiniChatChange(friend => {
+    if (friend) setOpen(false);
+  }), []);
   const [addingFriend, setAddingFriend] = useState(false);
   const [addRiotId, setAddRiotId] = useState('');
   const [addLoading, setAddLoading] = useState(false);

@@ -97,35 +97,17 @@ export function MiniProfile({ user, onClose, onAddFriend, isFriend, onRemoveFrie
 
         {/* Action buttons */}
         <View style={styles.actions}>
-          {/* Message — only for friends */}
+          {/* Message — opens floating mini chat */}
           {isFriend && (
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              <TouchableOpacity
-                style={[styles.btnPrimary, { flex: 1 }]}
-                onPress={() => {
-                  onClose();
-                  router.push({
-                    pathname: `/chat/${user!.id}`,
-                    params: {
-                      name: user!.riot_id ?? user!.username,
-                      avatar: user!.avatar_url ?? '',
-                      status: user!.status ?? 'offline',
-                    },
-                  });
-                }}
-              >
-                <Text style={styles.btnPrimaryText}>💬 Message</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.btnPopOut}
-                onPress={() => {
-                  openMiniChat({ id: user!.id, name: user!.riot_id ?? user!.username ?? 'Player', avatarUrl: user!.avatar_url });
-                  onClose();
-                }}
-              >
-                <Text style={styles.btnPopOutText}>⧉</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.btnPrimary}
+              onPress={() => {
+                openMiniChat({ id: user!.id, name: user!.riot_id ?? user!.username ?? 'Player', avatarUrl: user!.avatar_url });
+                onClose();
+              }}
+            >
+              <Text style={styles.btnPrimaryText}>💬 Message</Text>
+            </TouchableOpacity>
           )}
 
           {/* Invite to team */}
