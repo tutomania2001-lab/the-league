@@ -3,6 +3,7 @@ import { GlowText } from '@/components/ui/GlowText';
 import { Input } from '@/components/ui/Input';
 import { LeagueEmblem } from '@/components/ui/LeagueEmblem';
 import { StatusDot } from '@/components/ui/StatusDot';
+import { TappableAvatar } from '@/components/ui/TappableAvatar';
 import { LeaderboardView } from '@/components/tournament/LeaderboardView';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { useTeam } from '@/hooks/useTeam';
@@ -278,11 +279,7 @@ function TeamChat({ teamId, myId, memberProfiles }: { teamId: string; myId: stri
           return (
             <View style={[styles.chatRow, isMe && styles.chatRowMe]}>
               {!isMe && (
-                avatar
-                  ? <Image source={{ uri: avatar }} style={styles.chatAvatar} />
-                  : <View style={[styles.chatAvatar, { backgroundColor: 'rgba(200,155,60,0.2)', alignItems:'center', justifyContent:'center' }]}>
-                      <Text style={{ color: Colors.gold, fontSize: 12, fontWeight: '800' }}>{name[0]}</Text>
-                    </View>
+                <TappableAvatar userId={item.user_id} avatarUrl={avatar} name={name} size={34} borderColor={Colors.gold + '55'} />
               )}
               <View style={{ flex: 1 }}>
                 {!isMe && <Text style={styles.chatName}>{name}</Text>}
@@ -838,12 +835,7 @@ export default function TeamScreen() {
                 const roleCfg = ROLES[role];
                 return (
                   <View key={m.user_id} style={styles.memberRow}>
-                    {p?.avatar_url
-                      ? <Image source={{ uri: p.avatar_url }} style={styles.memberAvatar} />
-                      : <View style={[styles.memberAvatar, { backgroundColor: 'rgba(200,155,60,0.15)', alignItems:'center', justifyContent:'center' }]}>
-                          <Text style={{ color: Colors.gold, fontSize: 16, fontWeight: '800' }}>{(p?.riot_id ?? p?.username ?? '?')[0]}</Text>
-                        </View>
-                    }
+                    <TappableAvatar userId={m.user_id} avatarUrl={p?.avatar_url} name={p?.riot_id ?? p?.username ?? '?'} size={44} borderColor={Colors.gold + '55'} />
                     <View style={{ flex: 1, gap: 3 }}>
                       <Text style={styles.memberName}>{withClanTag(p?.riot_id ?? p?.username ?? 'Player', team?.clan_tag)}</Text>
                       <StatusDot status={p?.status ?? 'offline'} size={8} showLabel />
@@ -876,12 +868,7 @@ export default function TeamScreen() {
                   const p = memberProfiles[m.user_id];
                   return (
                     <View key={m.user_id} style={styles.memberRow}>
-                      {p?.avatar_url
-                        ? <Image source={{ uri: p.avatar_url }} style={styles.memberAvatar} />
-                        : <View style={[styles.memberAvatar, { backgroundColor: 'rgba(255,170,0,0.15)', alignItems:'center', justifyContent:'center' }]}>
-                            <Text style={{ color: Colors.warning, fontSize: 16, fontWeight: '800' }}>{(p?.riot_id ?? p?.username ?? '?')[0]}</Text>
-                          </View>
-                      }
+                      <TappableAvatar userId={m.user_id} avatarUrl={p?.avatar_url} name={p?.riot_id ?? p?.username ?? '?'} size={44} borderColor={Colors.warning + '55'} />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.memberName}>{p?.riot_id ?? p?.username ?? 'Player'}</Text>
                         <Text style={{ fontSize: 10, color: Colors.warning }}>Wants to join</Text>
@@ -1016,12 +1003,7 @@ export default function TeamScreen() {
                   <View style={[styles.postCard, post.id === targetPostId && { borderColor: Colors.gold, borderWidth: 1 }]}>
                     {/* Post header */}
                     <View style={styles.postHeader}>
-                      {post.author?.avatar_url
-                        ? <Image source={{ uri: post.author.avatar_url }} style={styles.postAvatar} />
-                        : <View style={[styles.postAvatar, { backgroundColor: 'rgba(200,155,60,0.2)', alignItems: 'center', justifyContent: 'center' }]}>
-                            <Text style={{ color: Colors.gold, fontWeight: '800' }}>{(post.author?.riot_id ?? post.author?.username ?? '?')[0]}</Text>
-                          </View>
-                      }
+                      <TappableAvatar userId={post.user_id} avatarUrl={post.author?.avatar_url} name={post.author?.riot_id ?? post.author?.username ?? '?'} size={36} borderColor={Colors.gold + '55'} />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.postAuthor}>{withClanTag(post.author?.riot_id ?? post.author?.username ?? 'Member', team?.clan_tag)}</Text>
                         <Text style={styles.postTime}>{timeAgo(post.created_at)}</Text>

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/Input';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useFriends } from '@/hooks/useFriends';
 import { withClanTag } from '@/lib/clanTag';
+import { TappableAvatar } from '@/components/ui/TappableAvatar';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -80,7 +81,7 @@ export default function FriendsScreen() {
             {incoming.map(f => (
               <TouchableOpacity key={f.id} onPress={() => router.push(`/profile/${f.profile.id}`)} activeOpacity={0.85}>
               <Card style={styles.friendRow}>
-                <FriendAvatar profile={f.profile} />
+                <TappableAvatar userId={f.profile.id} avatarUrl={f.profile.avatar_url} name={f.profile.riot_id ?? f.profile.username ?? '?'} size={44} />
                 <View style={styles.friendInfo}>
                   <Text style={styles.friendName}>{withClanTag(f.profile.riot_id ?? f.profile.username, (f.profile as any).clan_tag)}</Text>
                   <Text style={styles.friendSub}>Wants to play with you</Text>
@@ -116,7 +117,7 @@ export default function FriendsScreen() {
             friends.map(f => (
               <TouchableOpacity key={f.id} onPress={() => router.push(`/profile/${f.profile.id}`)} activeOpacity={0.85}>
                 <Card style={styles.friendRow}>
-                  <FriendAvatar profile={f.profile} />
+                  <TappableAvatar userId={f.profile.id} avatarUrl={f.profile.avatar_url} name={f.profile.riot_id ?? f.profile.username ?? '?'} size={44} />
                   <View style={styles.friendInfo}>
                     <Text style={styles.friendName}>{withClanTag(f.profile.riot_id ?? f.profile.username, (f.profile as any).clan_tag)}</Text>
                     <Text style={styles.friendSub}>Wild Rift Player</Text>
@@ -136,7 +137,7 @@ export default function FriendsScreen() {
             <Text style={Typography.label}>Sent Requests ({outgoing.length})</Text>
             {outgoing.map(f => (
               <Card key={f.id} style={[styles.friendRow, { opacity: 0.6 }]}>
-                <FriendAvatar profile={f.profile} />
+                <TappableAvatar userId={f.profile.id} avatarUrl={f.profile.avatar_url} name={f.profile.riot_id ?? f.profile.username ?? '?'} size={44} />
                 <View style={styles.friendInfo}>
                   <Text style={styles.friendName}>{withClanTag(f.profile.riot_id ?? f.profile.username, (f.profile as any).clan_tag)}</Text>
                   <Text style={styles.friendSub}>Pending...</Text>

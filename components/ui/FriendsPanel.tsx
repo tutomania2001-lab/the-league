@@ -1,4 +1,5 @@
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { TappableAvatar } from '@/components/ui/TappableAvatar';
 import { useFriends, useRecentPlayers } from '@/hooks/useFriends';
 import { useUnreadCounts } from '@/hooks/useChat';
 import { useTeamInvites } from '@/hooks/useTeamInvites';
@@ -119,13 +120,7 @@ export function FriendsPanel({ userId: userIdProp }: Props) {
       >
         {/* Avatar with status dot overlay */}
         <View>
-          {profile.avatar_url ? (
-            <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <Text style={styles.avatarLetter}>{(profile.riot_id ?? profile.username ?? 'S')[0].toUpperCase()}</Text>
-            </View>
-          )}
+          <TappableAvatar userId={profile.id} avatarUrl={profile.avatar_url} name={profile.riot_id ?? profile.username ?? '?'} size={38} />
           <View style={styles.statusOverlay}>
             <StatusDot status={status} size={9} />
           </View>

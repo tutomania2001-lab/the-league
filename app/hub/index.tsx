@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/Card';
 import { GlowText } from '@/components/ui/GlowText';
+import { TappableAvatar } from '@/components/ui/TappableAvatar';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { withClanTag } from '@/lib/clanTag';
 import { useGlobalFeed, GlobalPost } from '@/hooks/useGlobalFeed';
@@ -67,12 +68,7 @@ function PostCard({ post, myId, onToggleLike, onFetchComments, onAddComment, onD
     <View style={styles.postCard}>
       {/* Header */}
       <View style={styles.postHeader}>
-        {post.author?.avatar_url
-          ? <Image source={{ uri: post.author.avatar_url }} style={styles.postAvatar} />
-          : <View style={[styles.postAvatar, styles.postAvatarFallback]}>
-              <Text style={styles.postAvatarLetter}>{authorName[0]}</Text>
-            </View>
-        }
+        <TappableAvatar userId={post.user_id} avatarUrl={post.author?.avatar_url} name={authorName} size={38} />
         <View style={{ flex: 1 }}>
           <Text style={styles.postAuthor}>{authorName}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
