@@ -23,7 +23,12 @@ async function fetchWildRiftArticles() {
         Object.values(obj).forEach(dig);
       }
       dig(json);
-      if (articles.length) { console.log(`📰 Found ${articles.length} articles via page-data`); return articles.slice(0, 10); }
+      if (articles.length) {
+        console.log(`📰 Found ${articles.length} articles via page-data`);
+        console.log('📰 Sample article keys:', Object.keys(articles[0]));
+        console.log('📰 Sample article:', JSON.stringify(articles[0]).slice(0, 500));
+        return articles.slice(0, 10);
+      }
     }
   }
 
@@ -45,7 +50,12 @@ async function fetchWildRiftArticles() {
       Object.values(obj).forEach(dig2);
     }
     dig2(data);
-    if (articles.length) { console.log(`📰 Found ${articles.length} articles via __NEXT_DATA__`); return articles.slice(0, 10); }
+    if (articles.length) {
+      console.log(`📰 Found ${articles.length} articles via __NEXT_DATA__`);
+      console.log('📰 Sample article keys:', Object.keys(articles[0]));
+      console.log('📰 Sample article:', JSON.stringify(articles[0]).slice(0, 500));
+      return articles.slice(0, 10);
+    }
   }
 
   console.error('📰 Could not parse articles from page. HTML length:', html.length);
