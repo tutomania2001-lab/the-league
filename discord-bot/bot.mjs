@@ -25,6 +25,14 @@ function getRankForLP(lp) {
   return RANKS.slice().reverse().find(r => lp >= r.minLP) ?? RANKS[0];
 }
 
+const LANES = [
+  { key: 'baron',   name: '🏰 Baron Lane',   emoji: '🏰' },
+  { key: 'jungle',  name: '🌿 Jungle',        emoji: '🌿' },
+  { key: 'mid',     name: '⚔️ Mid Lane',      emoji: '⚔️' },
+  { key: 'dragon',  name: '🐉 Dragon Lane',   emoji: '🐉' },
+  { key: 'support', name: '🛡️ Support',       emoji: '🛡️' },
+];
+
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildPresences],
 });
@@ -53,7 +61,20 @@ client.once('clientReady', async () => {
     for (const rank of RANKS) {
       if (role.name.toLowerCase().includes(rank.key)) roles[rank.key] = id;
     }
+    // Map lane roles
+    for (const lane of LANES) {
+      if (role.name.toLowerCase().includes(lane.key)) roles[`lane_${lane.key}`] = id;
+    }
   }
+
+  // Create any missing lane roles
+  for (const lane of LANES) {
+    if (!roles[`lane_${lane.key}`]) {
+      const newRole = await guild.roles.create({ name: lane.name, reason: 'Lane role' }).catch(() => null);
+      if (newRole) roles[`lane_${lane.key}`] = newRole.id;
+    }
+  }
+
   client.roles = roles;
   console.log('Roles mapped:', Object.keys(roles));
 
@@ -137,18 +158,26 @@ client.once('clientReady', async () => {
       .addOptions(RANKS.map(r => ({ label: r.name, value: r.key, description: `${r.minLP}–${r.maxLP === 999999 ? '∞' : r.maxLP} LP` })));
     const rankRow = new ActionRowBuilder().addComponents(rankMenu);
 
+    // Lane select menu
+    const laneMenu = new StringSelectMenuBuilder()
+      .setCustomId('lane_select')
+      .setPlaceholder('🗺️ Select your main lane')
+      .addOptions(LANES.map(l => ({ label: l.name, value: l.key })));
+    const laneRow = new ActionRowBuilder().addComponents(laneMenu);
+
     const embed = new EmbedBuilder()
       .setTitle('◈ SELECT YOUR ROLES')
       .setDescription(
         '**✅ Verified Player** — Link your The League app account\n' +
-        '**🏆 Rank Role** — Select your rank from the dropdown. Your LP in the app must match.\n\n' +
+        '**🏆 Rank Role** — Select your rank from the dropdown. Your LP in the app must match.\n' +
+        '**🗺️ Lane Role** — Pick your main lane.\n\n' +
         '> Only your exact rank will be assigned — you cannot claim a rank you haven\'t earned in the app.\n' +
         '> Rank roles update when your LP changes in the app.'
       )
       .setColor(0x00c8ff)
       .setFooter({ text: '⚠️ Admin and Moderator roles are assigned by staff only' });
 
-    await getRolesChannel.send({ embeds: [embed], components: [verifiedRow, rankRow] });
+    await getRolesChannel.send({ embeds: [embed], components: [verifiedRow, rankRow, laneRow] });
     console.log('✅ Role selector with rank dropdown posted');
   }
 
@@ -261,6 +290,25 @@ client.on('interactionCreate', async interaction => {
       new TextInputBuilder().setCustomId('username_input').setLabel('Your username or Riot ID from the app').setStyle(TextInputStyle.Short).setPlaceholder('e.g. LeftRightSleep#2735').setRequired(true).setMaxLength(60)
     ));
     return interaction.showModal(modal);
+  }
+
+  // LANE SELECT
+  if (interaction.customId === 'lane_select') {
+    const selectedLane = interaction.values[0];
+    const lane = LANES.find(l => l.key === selectedLane);
+    if (!lane) return interaction.reply({ content: '❌ Invalid lane.', ephemeral: true });
+
+    // Remove all other lane roles first
+    for (const l of LANES) {
+      const roleId = client.roles[`lane_${l.key}`];
+      if (roleId && freshMember.roles.cache.has(roleId)) {
+        await freshMember.roles.remove(roleId).catch(() => {});
+      }
+    }
+    // Assign selected lane role
+    const laneRoleId = client.roles[`lane_${selectedLane}`];
+    if (laneRoleId) await freshMember.roles.add(laneRoleId).catch(() => {});
+    return interaction.reply({ content: `${lane.emoji} You've been assigned **${lane.name}**!`, ephemeral: true });
   }
 
   // RANK SELECT
