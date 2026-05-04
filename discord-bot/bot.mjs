@@ -330,15 +330,8 @@ client.once('clientReady', async () => {
 
     // Verified Player button
     const verifiedRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('toggle_verified').setLabel('✅ Verified Player — Link your app account').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('toggle_verified').setLabel('✅ Link Your App Account').setStyle(ButtonStyle.Primary),
     );
-
-    // Rank select menu
-    const rankMenu = new StringSelectMenuBuilder()
-      .setCustomId('rank_select')
-      .setPlaceholder('🏆 Claim your rank — enter your app username to verify')
-      .addOptions(RANKS.map(r => ({ label: r.name, value: r.key, description: `${r.minLP}–${r.maxLP === 999999 ? '∞' : r.maxLP} LP` })));
-    const rankRow = new ActionRowBuilder().addComponents(rankMenu);
 
     // Lane select menu
     const laneMenu = new StringSelectMenuBuilder()
@@ -348,19 +341,19 @@ client.once('clientReady', async () => {
     const laneRow = new ActionRowBuilder().addComponents(laneMenu);
 
     const embed = new EmbedBuilder()
-      .setTitle('◈ SELECT YOUR ROLES')
+      .setTitle('◈ SET UP YOUR PROFILE')
       .setDescription(
-        '**✅ Verified Player** — Link your The League app account\n' +
-        '**🏆 Rank Role** — Select your rank from the dropdown. Your LP in the app must match.\n' +
+        '**✅ Link Your App Account** — Connect your The League app to Discord.\n' +
+        'Your rank will be assigned and kept up to date automatically.\n\n' +
         '**🗺️ Lane Role** — Pick your main lane.\n\n' +
-        '> Only your exact rank will be assigned — you cannot claim a rank you haven\'t earned in the app.\n' +
-        '> Rank roles update when your LP changes in the app.'
+        '> Rank roles sync automatically every 5 minutes from the app.\n' +
+        '> Admin and Moderator roles are assigned by staff only.'
       )
       .setColor(0x00c8ff)
-      .setFooter({ text: '⚠️ Admin and Moderator roles are assigned by staff only' });
+      .setFooter({ text: 'The League — Wild Rift Tournament Platform' });
 
-    await getRolesChannel.send({ embeds: [embed], components: [verifiedRow, rankRow, laneRow] });
-    console.log('✅ Role selector with rank dropdown posted');
+    await getRolesChannel.send({ embeds: [embed], components: [verifiedRow, laneRow] });
+    console.log('✅ Role selector posted');
   }
 
   // ── SERVER STATS CHANNELS ────────────────────────────────────────
