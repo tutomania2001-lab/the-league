@@ -1440,17 +1440,6 @@ client.on('guildMemberAdd', async member => {
     .catch(e => console.error('❌ Welcome send failed:', e.message));
 });
 
-// Member comes back online → notify announcements
-client.on('presenceUpdate', async (oldPresence, newPresence) => {
-  if (newPresence.user?.bot) return;
-  if (!client.announcementsChannel) return;
-  const wasOffline = !oldPresence || oldPresence.status === 'offline';
-  const isOnline = newPresence.status !== 'offline';
-  if (!wasOffline || !isOnline) return;
-  const name = newPresence.member?.displayName ?? newPresence.user?.username ?? 'Someone';
-  console.log(`👁️ Presence: ${name} came online`);
-  await client.announcementsChannel.send(`👋 **${name}** is back online!`).catch(() => {});
-});
 
 // ── PRIVATE ROOMS — VOICE STATE ──────────────────────────────────
 client.on('voiceStateUpdate', async (oldState, newState) => {
