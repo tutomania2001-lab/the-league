@@ -182,7 +182,7 @@ const LANE_COLORS = { Baron:'#8B4513', Jungle:'#228B22', Mid:'#4169E1', Dragon:'
 
 async function generateBuildsCard(championName, build) {
   await fontReady;
-  const W = 900, H = 400;
+  const W = 900, H = 420;
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext('2d');
   const laneColor = LANE_COLORS[build.lane] ?? '#00c8ff';
@@ -261,8 +261,18 @@ async function generateBuildsCard(championName, build) {
     // Item name below slot (truncated)
     ctx.fillStyle = i === allItems.length - 1 ? laneColor : '#aaaacc';
     ctx.font = f(10);
-    const short = itemName.length > 11 ? itemName.slice(0, 10) + '…' : itemName;
-    ctx.textAlign = 'center'; ctx.fillText(short, x + slotSize / 2, y + slotSize + 14); ctx.textAlign = 'left';
+    // Draw item name — wrap to 2 lines if needed
+    ctx.font = f(9); ctx.textAlign = 'center';
+    const words = itemName.split(' ');
+    let line1 = '', line2 = '';
+    for (const w of words) {
+      if ((line1 + ' ' + w).trim().length <= 13) line1 = (line1 + ' ' + w).trim();
+      else line2 = (line2 + ' ' + w).trim();
+    }
+    ctx.fillStyle = i === allItems.length - 1 ? laneColor : '#aaaacc';
+    ctx.fillText(line1, x + slotSize / 2, y + slotSize + 13);
+    if (line2) ctx.fillText(line2, x + slotSize / 2, y + slotSize + 24);
+    ctx.textAlign = 'left';
   }
 
   // Divider
@@ -274,7 +284,7 @@ async function generateBuildsCard(championName, build) {
   ctx.fillText('RUNES', 24, 242);
   ctx.fillStyle = '#ccccdd'; ctx.font = f(14);
   build.runes.forEach((r, i) => {
-    const dot = i === 0 ? '⬟ ' : '◈ ';
+    const dot = i === 0 ? '* ' : '- ';
     ctx.fillText(`${dot}${r}`, 24 + (i < 2 ? 0 : 220) + (i % 2) * 220, 260 + Math.floor(i / 2) * 22);
   });
 
