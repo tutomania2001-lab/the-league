@@ -937,11 +937,21 @@ client.once('clientReady', async () => {
     }
   }
 
+  // Helper: edit existing bot message or send new one (avoids notification spam)
+  async function upsertMessage(channel, payload) {
+    const msgs = await channel.messages.fetch({ limit: 20 });
+    const botMsg = msgs.find(m => m.author.id === client.user.id);
+    if (botMsg) { await botMsg.edit(payload).catch(() => {}); return; }
+    await channel.send(payload).catch(() => {});
+  }
+
   // Post Register button in #rules
   const rulesChannel = guildChannels.find(c => c.name === 'rules');
   if (rulesChannel) {
     const existing = await rulesChannel.messages.fetch({ limit: 20 });
-    for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
+    // Delete extras but keep one to edit
+    const botMsgs = [...existing.filter(m => m.author.id === client.user.id).values()];
+    for (const m of botMsgs.slice(1)) await m.delete().catch(() => {});
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('register').setLabel('✅ I have read the rules — Register').setStyle(ButtonStyle.Success),
@@ -962,7 +972,7 @@ client.once('clientReady', async () => {
       )
       .setColor(0x00c8ff)
       .setFooter({ text: 'The League — Wild Rift Tournament Platform' });
-    await rulesChannel.send({ embeds: [embed], components: [row] });
+    await upsertMessage(rulesChannel, { embeds: [embed], components: [row] });
     console.log('✅ Register button posted');
   }
 
@@ -1028,7 +1038,7 @@ client.once('clientReady', async () => {
   const getRolesChannel = guildChannels.find(c => c.name === 'get-roles');
   if (getRolesChannel) {
     const existing = await getRolesChannel.messages.fetch({ limit: 20 });
-    for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
+    // keep existing message to edit instead of repost
 
     // Verified Player button
     const verifiedRow = new ActionRowBuilder().addComponents(
@@ -1054,7 +1064,7 @@ client.once('clientReady', async () => {
       .setColor(0x00c8ff)
       .setFooter({ text: 'The League — Wild Rift Tournament Platform' });
 
-    await getRolesChannel.send({ embeds: [embed], components: [verifiedRow, laneRow] });
+    await upsertMessage(getRolesChannel, { embeds: [embed], components: [verifiedRow, laneRow] });
     console.log('✅ Role selector posted');
   }
 
@@ -1256,7 +1266,7 @@ client.once('clientReady', async () => {
     async function refreshStore() {
       if (!storeCh) return;
       const existing = await storeCh.messages.fetch({ limit: 20 });
-      for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
+      // edit existing messages instead of deleting (avoids notification spam)
 
       const categories = [
         { label: '🎨 Colour Roles', type: 'role',   color: 0x00c8ff },
@@ -1290,12 +1300,12 @@ client.once('clientReady', async () => {
       const { data } = await supabase.from('discord_economy').select('username,xp,level,coins').order('xp', { ascending: false }).limit(10);
       if (!data?.length) return;
       const existing = await lbCh.messages.fetch({ limit: 10 });
-      for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
+      // edit existing message instead of deleting
       const medals = ['🥇','🥈','🥉'];
       const embed = new EmbedBuilder().setTitle('◈ XP LEADERBOARD').setDescription(
         data.map((u, i) => `${medals[i] ?? `**${i+1}.**`} **${u.username ?? 'Unknown'}** — Lv.${u.level} • ${u.xp} XP • 🪙 ${u.coins}`).join('\n')
       ).setColor(0x00c8ff).setTimestamp();
-      await lbCh.send({ embeds: [embed] }).catch(() => {});
+      await upsertMessage(lbCh, { embeds: [embed] }).catch(() => {});
     }
 
     await refreshStore();
@@ -1320,7 +1330,8 @@ client.once('clientReady', async () => {
 
   if (faqCh) {
     const existing = await faqCh.messages.fetch({ limit: 20 });
-    for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
+    const hasFaq = existing.some(m => m.author.id === client.user.id);
+    if (hasFaq) { console.log('✅ FAQ already posted — skipping'); } else {
 
     const faqs = [
       {
@@ -1365,6 +1376,7 @@ client.once('clientReady', async () => {
       await faqCh.send({ embeds: [embed] }).catch(() => {});
     }
     console.log('✅ FAQ channel posted');
+    }
   }
 
   } catch (e) {
