@@ -2,21 +2,18 @@ import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle
 import { createClient } from '@supabase/supabase-js';
 import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
 
-// Register font at startup (downloaded from Google Fonts)
-async function registerFont() {
+// Font ready promise — awaited before generating rank cards
+const fontReady = (async () => {
   try {
-    const res = await fetch('https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxP.ttf');
-    const buf = Buffer.from(await res.arrayBuffer());
-    GlobalFonts.register(buf, 'Roboto');
-    const resB = await fetch('https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmWUlfBBc9.ttf');
-    const bufB = Buffer.from(await resB.arrayBuffer());
-    GlobalFonts.register(bufB, 'RobotoBold');
-    console.log('✅ Fonts registered for rank cards');
-  } catch (e) {
-    console.error('⚠️ Font registration failed:', e.message);
-  }
-}
-registerFont();
+    const [r1, r2] = await Promise.all([
+      fetch('https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxP.ttf'),
+      fetch('https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmWUlfBBc9.ttf'),
+    ]);
+    GlobalFonts.register(Buffer.from(await r1.arrayBuffer()), 'Roboto');
+    GlobalFonts.register(Buffer.from(await r2.arrayBuffer()), 'RobotoBold');
+    console.log('✅ Fonts registered');
+  } catch (e) { console.error('⚠️ Font load failed:', e.message); }
+})();
 const WILDRIFT_NEWS_URL = 'https://wildrift.leagueoflegends.com/en-sg/news/tags/patch-notes/';
 const WILDRIFT_BASE = 'https://wildrift.leagueoflegends.com';
 const seenArticles = new Set();
@@ -144,86 +141,98 @@ const RANK_COLORS = {
 };
 
 async function generateRankCard(member, eco, rank, position) {
-  const W = 900, H = 220;
+  await fontReady; // ensure fonts are loaded before drawing
+
+  const W = 934, H = 282;
   const canvas = createCanvas(W, H);
-  const ctx = canvas.getContext('2d');
-  const rankColor = RANK_COLORS[rank.key] ?? '#00c8ff';
+  const ctx    = canvas.getContext('2d');
+  const rc     = RANK_COLORS[rank.key] ?? '#00c8ff';
 
-  // Background
-  const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, '#0d0d1a');
-  bg.addColorStop(1, '#1a1a2e');
-  ctx.fillStyle = bg;
-  ctx.roundRect(0, 0, W, H, 16);
-  ctx.fill();
+  const f  = (size, bold = false) => `${bold ? 'bold ' : ''}${size}px ${bold ? 'RobotoBold' : 'Roboto'}, sans-serif`;
+  const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); };
 
-  // Rank colour accent bar on left
-  ctx.fillStyle = rankColor;
-  ctx.roundRect(0, 0, 6, H, [16, 0, 0, 16]);
-  ctx.fill();
+  // ── Background ──────────────────────────────────────────────────
+  const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+  bgGrad.addColorStop(0, '#0f0f1a'); bgGrad.addColorStop(1, '#1c1c2e');
+  ctx.fillStyle = bgGrad; rr(0, 0, W, H, 20); ctx.fill();
 
-  // Avatar
+  // Subtle rank-colour glow top-left
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 300);
+  glow.addColorStop(0, rc + '33'); glow.addColorStop(1, 'transparent');
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+
+  // Left accent bar
+  ctx.fillStyle = rc; rr(0, 0, 6, H, [20, 0, 0, 20]); ctx.fill();
+
+  // ── Avatar ──────────────────────────────────────────────────────
+  const cx = 100, cy = 141, cr = 68;
   try {
-    const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 128 });
-    const avatar = await loadImage(avatarUrl);
+    const url = member.user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true });
+    const img = await loadImage(url);
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(100, H / 2, 70, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.clip();
-    ctx.drawImage(avatar, 30, H / 2 - 70, 140, 140);
+    ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.clip();
+    ctx.drawImage(img, cx - cr, cy - cr, cr * 2, cr * 2);
     ctx.restore();
-    // Avatar border
-    ctx.strokeStyle = rankColor;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(100, H / 2, 70, 0, Math.PI * 2);
-    ctx.stroke();
-  } catch {}
+  } catch {
+    // Draw placeholder circle if avatar fails
+    ctx.fillStyle = '#2a2a4a';
+    ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#aaa'; ctx.font = f(40, true);
+    ctx.textAlign = 'center'; ctx.fillText(member.displayName[0].toUpperCase(), cx, cy + 14); ctx.textAlign = 'left';
+  }
+  // Avatar ring
+  ctx.strokeStyle = rc; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(cx, cy, cr + 3, 0, Math.PI * 2); ctx.stroke();
 
-  // Username
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 30px RobotoBold, sans-serif';
-  ctx.fillText(member.displayName, 200, 65);
+  // ── Text ────────────────────────────────────────────────────────
+  const tx = 195;
+  ctx.fillStyle = '#ffffff'; ctx.font = f(34, true);
+  ctx.fillText(member.displayName, tx, 72);
 
-  // Rank name
-  ctx.fillStyle = rankColor;
-  ctx.font = 'bold 22px RobotoBold, sans-serif';
-  ctx.fillText(`${rank.name}  •  ${eco.lp ?? 0} LP`, 200, 100);
+  ctx.fillStyle = rc; ctx.font = f(20, true);
+  ctx.fillText(`${rank.name}  ·  ${eco.lp ?? 0} LP`, tx, 105);
 
-  // XP bar background
-  const barX = 200, barY = 120, barW = 560, barH = 22;
-  ctx.fillStyle = '#2a2a3e';
-  ctx.roundRect(barX, barY, barW, barH, 11);
-  ctx.fill();
-
-  // XP bar fill
-  const level = eco.level ?? 0;
-  const curXP  = (eco.xp ?? 0) - totalXpForLevel(level);
+  // ── XP Bar ──────────────────────────────────────────────────────
+  const level  = eco.level ?? 0;
+  const curXP  = Math.max(0, (eco.xp ?? 0) - totalXpForLevel(level));
   const needXP = xpToNextLevel(level);
-  const fill   = Math.max(0, Math.min(1, curXP / needXP));
-  const grad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
-  grad.addColorStop(0, rankColor);
-  grad.addColorStop(1, '#00c8ff');
-  ctx.fillStyle = grad;
-  ctx.roundRect(barX, barY, barW * fill, barH, 11);
-  ctx.fill();
+  const fill   = needXP > 0 ? Math.min(1, curXP / needXP) : 0;
+  const bx = tx, by = 125, bw = W - tx - 30, bh = 20;
 
-  // XP text
-  ctx.fillStyle = '#aaaacc';
-  ctx.font = '14px Roboto, sans-serif';
-  ctx.fillText(`${curXP} / ${needXP} XP`, barX, barY + barH + 18);
+  ctx.fillStyle = '#252538'; rr(bx, by, bw, bh, 10); ctx.fill();
+  if (fill > 0) {
+    const grad = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    grad.addColorStop(0, rc); grad.addColorStop(1, '#00c8ff');
+    ctx.fillStyle = grad; rr(bx, by, Math.max(bw * fill, 20), bh, 10); ctx.fill();
+  }
 
-  // Level badge
-  ctx.fillStyle = rankColor;
-  ctx.font = 'bold 16px RobotoBold, sans-serif';
-  ctx.fillText(`LEVEL ${level}`, barX + barW - 80, barY + barH + 18);
+  // XP label
+  ctx.fillStyle = '#8888aa'; ctx.font = f(14);
+  ctx.fillText(`${curXP.toLocaleString()} / ${needXP.toLocaleString()} XP`, bx, by + bh + 18);
+  ctx.fillStyle = rc; ctx.font = f(14, true);
+  ctx.textAlign = 'right';
+  ctx.fillText(`LVL ${level}`, bx + bw, by + bh + 18);
+  ctx.textAlign = 'left';
 
-  // Stats row
-  ctx.fillStyle = '#aaaacc';
-  ctx.font = '18px Roboto, sans-serif';
-  ctx.fillText(`Coins: ${eco.coins ?? 0}`, 200, 190);
-  ctx.fillText(`Server Rank: #${position}`, 400, 190);
+  // ── Stats row ───────────────────────────────────────────────────
+  const stats = [
+    { label: 'COINS',    value: (eco.coins ?? 0).toLocaleString() },
+    { label: 'RANK',     value: `#${position} on server` },
+    { label: 'MESSAGES', value: `Earns 10–20 XP / min` },
+  ];
+  let sx = tx;
+  for (const s of stats) {
+    ctx.fillStyle = '#555577'; ctx.font = f(12, true);
+    ctx.fillText(s.label, sx, 190);
+    ctx.fillStyle = '#ffffff'; ctx.font = f(18, true);
+    ctx.fillText(s.value, sx, 212);
+    sx += 250;
+  }
+
+  // ── Bottom border ────────────────────────────────────────────────
+  const lineGrad = ctx.createLinearGradient(0, H - 4, W, H - 4);
+  lineGrad.addColorStop(0, rc); lineGrad.addColorStop(1, 'transparent');
+  ctx.fillStyle = lineGrad; ctx.fillRect(0, H - 4, W, 4);
 
   return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'rank-card.png' });
 }
@@ -673,14 +682,7 @@ client.once('clientReady', async () => {
                              { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.SendMessages] }],
     }).catch(() => null);
 
-    // Post profile button in #commands
-    const cmdCh = ecoChannels.find(c => c?.name === 'commands');
-    if (cmdCh) {
-      const profileBtn = new ButtonBuilder().setCustomId('eco_profile').setLabel('💰 My Balance & XP').setStyle(ButtonStyle.Success);
-      const existingCmd = await cmdCh.messages.fetch({ limit: 10 });
-      const hasProfBtn = existingCmd.some(m => m.author.id === client.user.id && m.components?.some(r => r.components?.some(b => b.customId === 'eco_profile')));
-      if (!hasProfBtn) await cmdCh.send({ components: [new ActionRowBuilder().addComponents(profileBtn)] }).catch(() => {});
-    }
+    // eco_profile merged into rank_card button — no separate button needed
 
     client.lbChannelId    = lbCh?.id ?? null;
     client.storeChannelId = storeCh?.id ?? null;
@@ -1008,21 +1010,7 @@ client.on('interactionCreate', async interaction => {
     return interaction.editReply({ files: [card] });
   }
 
-  if (interaction.customId === 'eco_profile') {
-    const eco = await getEconomy(interaction.user.id);
-    const level = eco.level ?? 0;
-    const embed = new EmbedBuilder()
-      .setTitle(`💰 ${freshMember.displayName}'s Profile`)
-      .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
-      .addFields(
-        { name: '🏅 Level', value: String(level), inline: true },
-        { name: '⭐ XP',    value: `${eco.xp ?? 0} XP`, inline: true },
-        { name: '🪙 Coins', value: String(eco.coins ?? 0), inline: true },
-        { name: '📊 Progress', value: xpBar(eco.xp ?? 0, level), inline: false },
-      )
-      .setColor(0x00c8ff);
-    return interaction.editReply({ embeds: [embed] });
-  }
+  // eco_profile merged into rank_card
 
   // ── STORE PURCHASE ───────────────────────────────────────────────
   if (interaction.customId.startsWith('buy_')) {
