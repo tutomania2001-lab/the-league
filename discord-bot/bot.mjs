@@ -891,6 +891,11 @@ client.on('interactionCreate', async interaction => {
 client.on('interactionCreate', async interaction => {
   if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
+  // Defer immediately for slow interactions so token doesn't expire
+  const slowInteractions = ['register', 'toggle_verified', 'eco_profile'];
+  const isSlow = slowInteractions.includes(interaction.customId) || interaction.customId.startsWith('buy_') || interaction.customId.startsWith('rank_select');
+  if (isSlow) await interaction.deferReply({ ephemeral: true }).catch(() => {});
+
   try {
   const freshMember = await interaction.guild.members.fetch(interaction.user.id);
 
@@ -908,22 +913,22 @@ client.on('interactionCreate', async interaction => {
         { name: '📊 Progress', value: xpBar(eco.xp ?? 0, level), inline: false },
       )
       .setColor(0x00c8ff);
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return interaction.editReply({ embeds: [embed] });
   }
 
   // ── STORE PURCHASE ───────────────────────────────────────────────
   if (interaction.customId.startsWith('buy_')) {
     const itemId = interaction.customId.replace('buy_', '');
     const item = STORE_ITEMS.find(i => i.id === itemId);
-    if (!item) return interaction.reply({ content: '❌ Item not found.', ephemeral: true });
+    if (!item) return interaction.editReply({ content: '❌ Item not found.' });
     const roleId = client.ecoRoles?.[`store_${itemId}`];
     if (roleId && freshMember.roles.cache.has(roleId)) {
-      return interaction.reply({ content: `✅ You already own **${item.name}**!`, ephemeral: true });
+      return interaction.editReply({ content: `✅ You already own **${item.name}**!` });
     }
     const ok = await deductCoins(interaction.user.id, item.price);
-    if (!ok) return interaction.reply({ content: `❌ Not enough coins! You need **${item.price}🪙** to buy **${item.name}**.`, ephemeral: true });
+    if (!ok) return interaction.editReply({ content: `❌ Not enough coins! You need **${item.price}🪙** to buy **${item.name}**.` });
     if (roleId) await freshMember.roles.add(roleId).catch(() => {});
-    return interaction.reply({ content: `✅ Purchased **${item.name}**! 🎉 ${roleId ? 'Role applied.' : ''}`, ephemeral: true });
+    return interaction.editReply({ content: `✅ Purchased **${item.name}**! 🎉 ${roleId ? 'Role applied.' : ''}` });
   }
 
   // ── GAME LOBBY BUTTONS ──────────────────────────────────────────
@@ -1236,7 +1241,7 @@ client.on('interactionCreate', async interaction => {
   if (interaction.customId === 'toggle_verified') {
     if (freshMember.roles.cache.has(client.roles.verified)) {
       await freshMember.roles.remove(client.roles.verified);
-      return interaction.reply({ content: '✅ Removed **Verified Player** role', ephemeral: true });
+      return interaction.editReply({ content: '✅ Removed **Verified Player** role' });
     }
     const modal = new ModalBuilder().setCustomId('verify_modal').setTitle('Link Your The League Account');
     modal.addComponents(new ActionRowBuilder().addComponents(
