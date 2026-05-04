@@ -413,18 +413,11 @@ client.once('clientReady', async () => {
     console.log('✅ Register button posted');
   }
 
-  // Post Test Welcome button in #commands (admin only)
+  // Post Rank Card button in #commands
   const commandsChannel = guildChannels.find(c => c?.name === 'commands');
   if (commandsChannel) {
     const existing = await commandsChannel.messages.fetch({ limit: 20 });
     for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('test_welcome').setLabel('🎉 Test Welcome Message').setStyle(ButtonStyle.Primary),
-    );
-    const sendResult = await commandsChannel.send({ content: '**Admin Commands**', components: [row] }).catch(e => { console.error('❌ Commands send failed:', e.message); return null; });
-    console.log(sendResult ? '✅ Admin commands posted' : '❌ Commands send failed');
-
-    // Rank card — separate message for all members
     const rankCardRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('rank_card').setLabel('🎴 View My Rank Card').setStyle(ButtonStyle.Success),
     );
