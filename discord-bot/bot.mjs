@@ -659,7 +659,7 @@ client.once('clientReady', async () => {
         color: 0x00c8ff,
         fields: [
           { name: '❓ How do I download The League app?', value: 'Visit **https://the-leagueapp.netlify.app** to register and access the app. Available on mobile and web.' },
-          { name: '❓ How do I create an account?', value: 'Go to the app, sign up with your email, and enter your **Riot ID** (e.g. `LeftRightSleep#2735`) to link your Wild Rift account.' },
+          { name: '❓ How do I create an account?', value: 'Go to the app, sign up with your email, and enter your **Riot ID** (e.g. `WildRifter#1234`) to link your Wild Rift account.' },
           { name: '❓ How is my LP tracked?', value: 'Your LP is pulled from your linked Riot ID inside the app. Keep your profile up to date to reflect your current rank.' },
           { name: '❓ How do I join a tournament?', value: 'Open the app, navigate to the **Tournaments** section, and register for any open event. Make sure your account is verified first.' },
           { name: '❓ How do I form a team?', value: 'Go to **Teams** in the app and create or join a team. You can invite friends via their username or Riot ID.' },
@@ -1245,7 +1245,7 @@ client.on('interactionCreate', async interaction => {
     }
     const modal = new ModalBuilder().setCustomId('verify_modal').setTitle('Link Your The League Account');
     modal.addComponents(new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId('username_input').setLabel('Your username or Riot ID from the app').setStyle(TextInputStyle.Short).setPlaceholder('e.g. LeftRightSleep#2735').setRequired(true).setMaxLength(60)
+      new TextInputBuilder().setCustomId('username_input').setLabel('Your username or Riot ID from the app').setStyle(TextInputStyle.Short).setPlaceholder('e.g. WildRifter#1234').setRequired(true).setMaxLength(60)
     ));
     return interaction.showModal(modal);
   }
@@ -1277,7 +1277,7 @@ client.on('interactionCreate', async interaction => {
 
     const modal = new ModalBuilder().setCustomId(`rank_modal_${selectedRank}`).setTitle(`Claim ${rank.name} Rank`);
     modal.addComponents(new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId('rank_username').setLabel('Your username or Riot ID from the app').setStyle(TextInputStyle.Short).setPlaceholder('e.g. LeftRightSleep#2735').setRequired(true).setMaxLength(60)
+      new TextInputBuilder().setCustomId('rank_username').setLabel('Your username or Riot ID from the app').setStyle(TextInputStyle.Short).setPlaceholder('e.g. WildRifter#1234').setRequired(true).setMaxLength(60)
     ));
     return interaction.showModal(modal);
   }
