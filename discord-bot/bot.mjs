@@ -635,6 +635,11 @@ client.once('clientReady', async () => {
     { name: 'buffs', description: 'Check your active perks and buffs' },
     { name: 'equip', description: 'Equip a banner you own on your rank card',
       options: [{ name: 'banner', type: 3, description: 'Banner to equip (fire/ocean/galaxy/neon/gold/default)', required: true }] },
+    { name: 'builds', description: 'Get the best build for a Wild Rift champion',
+      options: [
+        { name: 'champion', type: 3, description: 'Champion name (e.g. Ahri, Jinx, Yasuo)', required: true },
+        { name: 'lane',     type: 3, description: 'Lane: baron / jungle / mid / dragon / support', required: false },
+      ]},
     { name: 'addcoins', description: 'Admin: add coins to a user',
       options: [
         { name: 'user',   type: 6, description: 'Target user', required: true },
@@ -1388,6 +1393,64 @@ client.on('interactionCreate', async interaction => {
     } catch (e) {
       console.error('gift error:', e.message);
       interaction.editReply({ content: '❌ Gift failed.' }).catch(() => {});
+    }
+  }
+
+  // ── /builds ──────────────────────────────────────────────────────
+  if (interaction.commandName === 'builds') {
+    await interaction.deferReply();
+    try {
+      const champion = interaction.options.getString('champion').trim();
+      const lane     = interaction.options.getString('lane')?.toLowerCase().trim() ?? null;
+      const slug     = champion.toLowerCase().replace(/[^a-z0-9]/g, '').replace(/\s+/g, '-');
+      const url      = `https://www.wildriftfire.com/champion/${slug}`;
+
+      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
+      if (!res.ok) return interaction.editReply({ content: `❌ Champion **${champion}** not found. Check the spelling and try again.\n🔗 Browse manually: <https://www.wildriftfire.com>` });
+
+      const html = await res.text();
+
+      // Extract items from the HTML
+      const itemMatches  = [...html.matchAll(/alt="([^"]+)"[^>]*class="[^"]*item[^"]*"/gi)].map(m => m[1]).filter(Boolean);
+      const uniqueItems  = [...new Set(itemMatches)].slice(0, 12);
+
+      // Extract runes
+      const runeMatches  = [...html.matchAll(/alt="([^"]+)"[^>]*class="[^"]*rune[^"]*"/gi)].map(m => m[1]).filter(Boolean);
+      const uniqueRunes  = [...new Set(runeMatches)].slice(0, 6);
+
+      // Extract skill order from text like "Q W E" patterns
+      const skillMatch   = html.match(/skill[^>]*order[^<]*[QWER\s,>]+/i)?.[0]?.replace(/<[^>]+>/g, '').trim();
+
+      // Extract title/name
+      const titleMatch   = html.match(/<h1[^>]*>([^<]+)<\/h1>/i)?.[1]?.trim();
+      const displayName  = titleMatch ?? champion;
+
+      // Try to extract lane info from page
+      const laneText     = lane ? `${lane.charAt(0).toUpperCase() + lane.slice(1)} Lane` : 'All Lanes';
+
+      const embed = new EmbedBuilder()
+        .setTitle(`⚔️ ${displayName} — Best Build`)
+        .setURL(url)
+        .setColor(0x00c8ff)
+        .setFooter({ text: `Source: wildriftfire.com • ${laneText}` })
+        .setTimestamp();
+
+      if (uniqueItems.length) {
+        embed.addFields({ name: '🛡️ Recommended Items', value: uniqueItems.map(i => `• ${i}`).join('\n'), inline: false });
+      }
+      if (uniqueRunes.length) {
+        embed.addFields({ name: '💠 Runes', value: uniqueRunes.map(r => `• ${r}`).join('\n'), inline: false });
+      }
+      if (!uniqueItems.length && !uniqueRunes.length) {
+        embed.setDescription(`Could not parse build data automatically.\n\n🔗 **View full build:** ${url}`);
+      } else {
+        embed.addFields({ name: '🔗 Full Guide', value: url, inline: false });
+      }
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      console.error('builds error:', e.message);
+      interaction.editReply({ content: '❌ Failed to fetch build data. Try again later.' }).catch(() => {});
     }
   }
 
