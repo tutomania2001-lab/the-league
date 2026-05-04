@@ -261,19 +261,23 @@ client.once('clientReady', async () => {
   console.log('Roles mapped:', Object.keys(roles));
 
   // New Arrivals see ONLY #rules — everything else unlocks after registering
+  console.log('🔒 Role IDs — everyone:', roles.everyone, 'newArrival:', roles.newArrival, 'member:', roles.member);
   for (const [, channel] of guildChannels) {
     if (!channel.permissionsFor || channel.type === 4) continue;
     try {
       if (channel.name === 'rules') {
         await channel.permissionOverwrites.edit(roles.everyone,   { ViewChannel: true,  SendMessages: false });
-        await channel.permissionOverwrites.edit(roles.newArrival, { ViewChannel: true,  SendMessages: false });
-        await channel.permissionOverwrites.edit(roles.member,     { ViewChannel: true,  SendMessages: false });
+        if (roles.newArrival) await channel.permissionOverwrites.edit(roles.newArrival, { ViewChannel: true, SendMessages: false });
+        if (roles.member)     await channel.permissionOverwrites.edit(roles.member,     { ViewChannel: true, SendMessages: false });
       } else {
         await channel.permissionOverwrites.edit(roles.everyone,   { ViewChannel: false });
-        await channel.permissionOverwrites.edit(roles.newArrival, { ViewChannel: false });
-        await channel.permissionOverwrites.edit(roles.member,     { ViewChannel: true  });
+        if (roles.newArrival) await channel.permissionOverwrites.edit(roles.newArrival, { ViewChannel: false });
+        if (roles.member)     await channel.permissionOverwrites.edit(roles.member,     { ViewChannel: true });
+        if (channel.name === 'general') console.log('🔒 Locked #general — overwrites applied');
       }
-    } catch {}
+    } catch (e) {
+      if (channel.name === 'general') console.error('❌ Failed to lock #general:', e.message);
+    }
   }
 
   // Auto-assign New Arrival to members without Member role
