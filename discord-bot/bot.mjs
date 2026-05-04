@@ -714,11 +714,14 @@ client.on('messageCreate', async msg => {
 // ── VOICE XP/COINS ───────────────────────────────────────────────
 // (voice joins tracked in voiceStateUpdate below — search for voiceJoins.set)
 
-// New member → New Arrival + public welcome
+// New member → New Arrival + 5 min cooldown + public welcome
 client.on('guildMemberAdd', async member => {
   if (member.user.bot) return;
   if (client.roles?.newArrival) await member.roles.add(client.roles.newArrival).catch(() => {});
-  console.log(`👋 ${member.user.tag} joined — New Arrival assigned`);
+
+  // 5-minute chat cooldown using Discord's built-in timeout
+  await member.timeout(5 * 60 * 1000, 'New member cooldown').catch(() => {});
+  console.log(`👋 ${member.user.tag} joined — New Arrival assigned, 5min cooldown applied`);
 
   const channels = await member.guild.channels.fetch();
   const welcomeChannel =
