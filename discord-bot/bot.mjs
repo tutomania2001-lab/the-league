@@ -250,6 +250,142 @@ BUILDS_DB['kha zix']      = BUILDS_DB.khazix;
 
 const LANE_COLORS = { Baron:'#8B4513', Jungle:'#228B22', Mid:'#4169E1', Dragon:'#DC143C', Support:'#9370DB' };
 
+// ── HIDDEN ACHIEVEMENTS ───────────────────────────────────────────
+const ACHIEVEMENTS = {
+  // Leveling
+  first_step:     { name: 'First Step',         emoji: '👣', desc: 'Reach Level 1',                    tier: '🥉' },
+  level5:         { name: 'Rising Star',         emoji: '⭐', desc: 'Reach Level 5',                    tier: '🥉' },
+  level10:        { name: 'Veteran',             emoji: '🎖️', desc: 'Reach Level 10',                  tier: '🥈' },
+  level25:        { name: 'Elite Grinder',       emoji: '💪', desc: 'Reach Level 25',                   tier: '🥇' },
+  level50:        { name: 'Legend',              emoji: '💎', desc: 'Reach Level 50',                   tier: '💎' },
+  level100:       { name: 'Champion',            emoji: '👑', desc: 'Reach Level 100',                  tier: '👑' },
+  // Economy
+  first_coins:    { name: 'First Coin',          emoji: '🪙', desc: 'Earn your first coins',            tier: '🥉' },
+  piggy_bank:     { name: 'Piggy Bank',          emoji: '🐷', desc: 'Save up 1,000 coins',              tier: '🥉' },
+  getting_rich:   { name: 'Getting Rich',        emoji: '💰', desc: 'Save up 5,000 coins',              tier: '🥈' },
+  whale:          { name: 'Whale',               emoji: '🐋', desc: 'Save up 25,000 coins',             tier: '🥇' },
+  big_spender:    { name: 'Big Spender',         emoji: '💸', desc: 'Spend 10,000 coins in the store',  tier: '🥈' },
+  // Daily
+  first_daily:    { name: 'Early Bird',          emoji: '🌅', desc: 'Claim your first daily reward',    tier: '🥉' },
+  streak7:        { name: 'On a Roll',           emoji: '🔥', desc: 'Reach a 7 day daily streak',       tier: '🥈' },
+  streak30:       { name: 'Dedicated',           emoji: '📅', desc: 'Reach a 30 day daily streak',      tier: '🥇' },
+  // Gambling
+  first_bet:      { name: 'Feeling Lucky',       emoji: '🎲', desc: 'Place your first gamble',          tier: '🥉' },
+  high_roller:    { name: 'High Roller',         emoji: '🎩', desc: 'Bet 2,500+ coins in one gamble',   tier: '🥈' },
+  broke:          { name: 'Rock Bottom',         emoji: '😭', desc: 'Lose a bet and drop below 50 coins', tier: '🥉' },
+  comeback:       { name: 'Comeback Kid',        emoji: '🔄', desc: 'Win after being below 100 coins',   tier: '🥈' },
+  jackpot:        { name: 'Jackpot!!!',          emoji: '🎰', desc: 'Hit the slot machine jackpot',     tier: '💎' },
+  triple_crown:   { name: 'Royal Flush',         emoji: '👑', desc: 'Hit triple crown on slots',        tier: '🥇' },
+  lucky_number:   { name: 'Lucky Number',        emoji: '🎡', desc: 'Win on a specific number in roulette', tier: '🥈' },
+  crash_out:      { name: '100x Club',           emoji: '🚀', desc: 'Cash out at 5x or higher on crash', tier: '🥇' },
+  gamble_10:      { name: 'Risk Taker',          emoji: '😈', desc: 'Gamble 10 times',                  tier: '🥉' },
+  gamble_100:     { name: 'Addicted',            emoji: '🃏', desc: 'Gamble 100 times',                 tier: '🥈' },
+  // Social
+  first_rep:      { name: 'Good Vibes',          emoji: '👍', desc: 'Give your first reputation point', tier: '🥉' },
+  rep_10_given:   { name: 'Community Builder',   emoji: '🤝', desc: 'Give 10 reputation points',        tier: '🥈' },
+  rep_50_given:   { name: 'Pillar of Community', emoji: '🏛️', desc: 'Give 50 reputation points',       tier: '🥇' },
+  rep_10_recv:    { name: 'Well Respected',      emoji: '🌟', desc: 'Receive 10 reputation points',     tier: '🥈' },
+  rep_50_recv:    { name: 'Server Legend',       emoji: '🏅', desc: 'Receive 50 reputation points',     tier: '💎' },
+  first_gift:     { name: 'Generous Soul',       emoji: '🎁', desc: 'Gift coins to another player',     tier: '🥉' },
+  gifted_5k:      { name: 'Philanthropist',      emoji: '💝', desc: 'Gift 5,000 coins total',           tier: '🥇' },
+  // Games
+  first_duel:     { name: 'Challenger',          emoji: '⚔️', desc: 'Play your first duel',            tier: '🥉' },
+  duel_streak5:   { name: 'Undefeated',          emoji: '🥊', desc: 'Win 5 duels in a row',             tier: '🥇' },
+  gamer:          { name: 'Gamer',               emoji: '🎮', desc: 'Play 25 mini games',               tier: '🥈' },
+  flip_10:        { name: 'Coin Collector',      emoji: '🪙', desc: 'Flip a coin 10 times',             tier: '🥉' },
+  slots_50:       { name: 'Slot Addict',         emoji: '🎰', desc: 'Spin the slots 50 times',          tier: '🥈' },
+  roll_max:       { name: 'Natural 20',          emoji: '🎲', desc: 'Roll a 20 on a d20',               tier: '🥈' },
+  // Wild Rift
+  verified:       { name: 'Legit Player',        emoji: '✅', desc: 'Link your The League app account',  tier: '🥉' },
+  rank_up:        { name: 'Climbing',            emoji: '📈', desc: 'Have your rank auto-synced',        tier: '🥉' },
+  challenger_rank:{ name: 'The Best',            emoji: '⚡', desc: 'Reach Challenger rank',             tier: '💎' },
+  builds_user:    { name: 'Meta Slave',          emoji: '📖', desc: 'Use /builds 5 times',              tier: '🥉' },
+  // Clans
+  clan_founder:   { name: 'Warlord',             emoji: '🏰', desc: 'Create a clan',                    tier: '🥈' },
+  clan_member:    { name: 'Band of Brothers',    emoji: '🛡️', desc: 'Join a clan',                     tier: '🥉' },
+  // Store
+  first_purchase: { name: 'Shopaholic',          emoji: '🛒', desc: 'Buy your first store item',        tier: '🥉' },
+  banner_owner:   { name: 'Style Icon',          emoji: '🎨', desc: 'Own a rank card banner',           tier: '🥈' },
+  vip_member:     { name: 'VIP',                 emoji: '💎', desc: 'Purchase VIP access',              tier: '🥈' },
+  full_collection:{ name: 'Collector',           emoji: '🗂️', desc: 'Own all colour roles',            tier: '🥇' },
+  // Hidden secrets
+  night_owl:      { name: 'Night Owl',           emoji: '🦉', desc: 'Be active after midnight',         tier: '🥉' },
+  chatterbox:     { name: 'Chatterbox',          emoji: '💬', desc: 'Send 500 messages',                tier: '🥈' },
+  voice_hours:    { name: 'Couch Potato',        emoji: '📺', desc: 'Spend 10 hours in voice',          tier: '🥈' },
+  private_room:   { name: 'Introvert',           emoji: '🔒', desc: 'Create a private room',            tier: '🥉' },
+  broke_gambler:  { name: 'All In',              emoji: '😤', desc: 'Gamble your last coins',           tier: '🥉' },
+};
+
+async function unlockAchievement(userId, username, achievementId) {
+  const a = ACHIEVEMENTS[achievementId];
+  if (!a) return;
+  const { data: existing } = await supabase.from('achievements').select('achievement_id').eq('discord_id', userId).eq('achievement_id', achievementId).maybeSingle();
+  if (existing) return; // already unlocked
+  await supabase.from('achievements').insert({ discord_id: userId, achievement_id: achievementId });
+  // Announce in announcements channel
+  if (client.announcementsChannel) {
+    const embed = new EmbedBuilder()
+      .setTitle(`${a.tier} Achievement Unlocked!`)
+      .setDescription(`<@${userId}> unlocked **${a.emoji} ${a.name}**\n*${a.desc}*`)
+      .setColor(a.tier === '👑' ? 0xFFD700 : a.tier === '💎' ? 0xAA00FF : a.tier === '🥇' ? 0xFF8800 : a.tier === '🥈' ? 0x00c8ff : 0x888888)
+      .setTimestamp();
+    await client.announcementsChannel.send({ embeds: [embed] }).catch(() => {});
+  }
+}
+
+async function checkAchievements(userId, username, ctx = {}) {
+  const eco = await getEconomy(userId).catch(() => null);
+  if (!eco) return;
+  const coins = eco.coins ?? 0;
+  const level = eco.level ?? 0;
+
+  // Level achievements
+  if (level >= 1)   await unlockAchievement(userId, username, 'first_step');
+  if (level >= 5)   await unlockAchievement(userId, username, 'level5');
+  if (level >= 10)  await unlockAchievement(userId, username, 'level10');
+  if (level >= 25)  await unlockAchievement(userId, username, 'level25');
+  if (level >= 50)  await unlockAchievement(userId, username, 'level50');
+  if (level >= 100) await unlockAchievement(userId, username, 'level100');
+
+  // Coin milestones
+  if (coins >= 1)      await unlockAchievement(userId, username, 'first_coins');
+  if (coins >= 1000)   await unlockAchievement(userId, username, 'piggy_bank');
+  if (coins >= 5000)   await unlockAchievement(userId, username, 'getting_rich');
+  if (coins >= 25000)  await unlockAchievement(userId, username, 'whale');
+
+  // Context-based
+  if (ctx.action === 'daily')         await unlockAchievement(userId, username, 'first_daily');
+  if (ctx.action === 'daily' && (eco.streak ?? 0) >= 7)  await unlockAchievement(userId, username, 'streak7');
+  if (ctx.action === 'daily' && (eco.streak ?? 0) >= 30) await unlockAchievement(userId, username, 'streak30');
+  if (ctx.action === 'gamble')        await unlockAchievement(userId, username, 'first_bet');
+  if (ctx.action === 'gamble' && ctx.bet >= 2500) await unlockAchievement(userId, username, 'high_roller');
+  if (ctx.action === 'gamble' && ctx.won && coins < 200) await unlockAchievement(userId, username, 'comeback');
+  if (ctx.action === 'gamble' && !ctx.won && coins < 50) await unlockAchievement(userId, username, 'broke');
+  if (ctx.action === 'gamble' && ctx.lastCoins <= 15) await unlockAchievement(userId, username, 'broke_gambler');
+  if (ctx.action === 'slots_jackpot') await unlockAchievement(userId, username, 'jackpot');
+  if (ctx.action === 'slots_crown3')  await unlockAchievement(userId, username, 'triple_crown');
+  if (ctx.action === 'roulette_number') await unlockAchievement(userId, username, 'lucky_number');
+  if (ctx.action === 'crash' && ctx.mult >= 5) await unlockAchievement(userId, username, 'crash_out');
+  if (ctx.action === 'duel')          await unlockAchievement(userId, username, 'first_duel');
+  if (ctx.action === 'flip')          { const { count } = await supabase.from('achievements').select('*', { count: 'exact' }).eq('discord_id', userId).eq('achievement_id', 'flip_10'); }
+  if (ctx.action === 'rep_given')     await unlockAchievement(userId, username, 'first_rep');
+  if (ctx.action === 'gift')          await unlockAchievement(userId, username, 'first_gift');
+  if (ctx.action === 'verified')      await unlockAchievement(userId, username, 'verified');
+  if (ctx.action === 'clan_create')   await unlockAchievement(userId, username, 'clan_founder');
+  if (ctx.action === 'clan_join')     await unlockAchievement(userId, username, 'clan_member');
+  if (ctx.action === 'purchase')      await unlockAchievement(userId, username, 'first_purchase');
+  if (ctx.action === 'purchase_vip')  await unlockAchievement(userId, username, 'vip_member');
+  if (ctx.action === 'purchase_banner') await unlockAchievement(userId, username, 'banner_owner');
+  if (ctx.action === 'private_room')  await unlockAchievement(userId, username, 'private_room');
+
+  // Rep received check
+  if (ctx.action === 'rep_received') {
+    const { data: rep } = await supabase.from('reputation').select('rep').eq('discord_id', userId).maybeSingle();
+    if ((rep?.rep ?? 0) >= 10) await unlockAchievement(userId, username, 'rep_10_recv');
+    if ((rep?.rep ?? 0) >= 50) await unlockAchievement(userId, username, 'rep_50_recv');
+  }
+}
+
 // ── MILESTONE REWARDS ─────────────────────────────────────────────
 const MILESTONE_ROLES = {
   10: { name: '🌱 Level 10', color: 0x00AA44 },
@@ -1015,6 +1151,7 @@ client.once('clientReady', async () => {
       ]},
     { name: 'crash',    description: 'Bet coins on a rising multiplier — cash out before it crashes!',
       options: [{ name: 'amount', type: 4, description: 'Amount to bet', required: true }] },
+    { name: 'achievements', description: 'View your unlocked achievements' },
     { name: 'slots',    description: 'Spin the slot machine!',
       options: [{ name: 'amount', type: 4, description: 'Amount to bet', required: true }] },
     { name: 'flip',  description: 'Flip a coin — heads or tails' },
@@ -1409,6 +1546,7 @@ client.on('messageCreate', async msg => {
   if (leveledUp && newLevel) {
     const guild = client.guilds.cache.get(GUILD_ID);
     handleLevelUp(uid, msg.author.username, newLevel, guild);
+    checkAchievements(uid, msg.author.username, {}).catch(() => {});
   }
 });
 
@@ -1504,6 +1642,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     if (!room) return;
 
     await member.voice.setChannel(room).catch(() => {});
+    checkAchievements(member.id, member.user.username, { action: 'private_room' }).catch(() => {});
 
     // Post control panel in room lobby
     const lobbyChannel = client.roomLobbyChannelId ? guild.channels.cache.get(client.roomLobbyChannelId) : null;
@@ -1720,6 +1859,8 @@ client.on('interactionCreate', async interaction => {
         .setColor(0x00c8ff)
         .setTimestamp();
       await interaction.editReply({ embeds: [embed] });
+      checkAchievements(interaction.user.id, interaction.user.username, { action: 'rep_given' }).catch(() => {});
+      checkAchievements(target.id, target.username, { action: 'rep_received' }).catch(() => {});
     } catch (e) {
       console.error('rep error:', e.message);
       interaction.editReply({ content: '❌ Failed to give rep.' }).catch(() => {});
@@ -1796,6 +1937,7 @@ client.on('interactionCreate', async interaction => {
         const member = await guild.members.fetch(uid);
         if (role) await member.roles.add(role).catch(() => {});
 
+        checkAchievements(uid, interaction.user.username, { action: 'clan_create' }).catch(() => {});
         return interaction.editReply({ embeds: [new EmbedBuilder().setTitle(`🏰 Clan Created: [${tag}] ${name}`).setDescription(`You are the founder!\n\n📢 Chat: ${textCh ?? 'N/A'}\n🎙️ Voice: ${voiceCh ?? 'N/A'}\n\nInvite members with \`/clan invite @user\``).setColor(color).setTimestamp()] });
       }
 
@@ -1947,6 +2089,7 @@ client.on('interactionCreate', async interaction => {
     if (!presence || presence === 'offline') return interaction.reply({ content: `❌ **${targetMember.displayName}** is offline. You can only duel online players.`, ephemeral: true });
 
     games.set(gid, { type: 'rps', p1: interaction.user.id, p2: target.id, p1pick: null, p2pick: null, status: 'active', channelId: interaction.channelId });
+    checkAchievements(interaction.user.id, interaction.user.username, { action: 'duel' }).catch(() => {});
     await interaction.reply({ content: `⚔️ **${interaction.user} challenged ${target} to Rock Paper Scissors!**\nBoth players — pick your move!`, components: [row] });
   }
 
@@ -1987,10 +2130,8 @@ client.on('interactionCreate', async interaction => {
         .setColor(0x00c8ff)
         .setTimestamp();
       const dmSent = await target.createDM().then(dm => dm.send({ embeds: [notifyEmbed] })).catch(() => null);
-      if (!dmSent) {
-        // DMs disabled — post in the same channel instead
-        await interaction.channel?.send({ content: `${target}`, embeds: [notifyEmbed] }).catch(() => {});
-      }
+      if (!dmSent) await interaction.channel?.send({ content: `${target}`, embeds: [notifyEmbed] }).catch(() => {});
+      checkAchievements(interaction.user.id, interaction.user.username, { action: 'gift' }).catch(() => {});
     } catch (e) {
       console.error('gift error:', e.message);
       interaction.editReply({ content: '❌ Gift failed.' }).catch(() => {});
@@ -2174,6 +2315,7 @@ client.on('interactionCreate', async interaction => {
         new ButtonBuilder().setCustomId(`roulette_again_${amount}_${betInput}`).setLabel('🎡 Spin Again').setStyle(ButtonStyle.Primary),
       );
       await interaction.editReply({ embeds: [embed], components: [row] });
+      if (!isColor && win) checkAchievements(interaction.user.id, interaction.user.username, { action: 'roulette_number' }).catch(() => {});
     } catch (e) {
       console.error('roulette error:', e.message);
       interaction.editReply({ content: '❌ Roulette failed.' }).catch(() => {});
@@ -2222,6 +2364,30 @@ client.on('interactionCreate', async interaction => {
     } catch (e) {
       console.error('crash error:', e.message);
       interaction.editReply({ content: '❌ Crash game failed.' }).catch(() => {});
+    }
+  }
+
+  // ── /achievements ────────────────────────────────────────────────
+  if (interaction.commandName === 'achievements') {
+    await interaction.deferReply({ ephemeral: true });
+    try {
+      const { data: unlocked } = await supabase.from('achievements').select('achievement_id, unlocked_at').eq('discord_id', interaction.user.id).order('unlocked_at', { ascending: true });
+      const total = Object.keys(ACHIEVEMENTS).length;
+      const unlockedIds = new Set((unlocked ?? []).map(u => u.achievement_id));
+      const lines = (unlocked ?? []).map(u => {
+        const a = ACHIEVEMENTS[u.achievement_id];
+        return a ? `${a.tier} ${a.emoji} **${a.name}** — *${a.desc}*` : null;
+      }).filter(Boolean);
+      const embed = new EmbedBuilder()
+        .setTitle(`🏅 ${interaction.user.displayName}'s Achievements`)
+        .setDescription(lines.length ? lines.join('\n') : '❌ No achievements yet — go earn some!')
+        .setColor(0x00c8ff)
+        .setFooter({ text: `${unlockedIds.size} / ${total} unlocked — keep playing to discover more!` })
+        .setTimestamp();
+      await interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      console.error('achievements error:', e.message);
+      interaction.editReply({ content: '❌ Failed to load achievements.' }).catch(() => {});
     }
   }
 
@@ -2284,6 +2450,9 @@ client.on('interactionCreate', async interaction => {
         new ButtonBuilder().setCustomId(`slots_again_${bet}`).setLabel('🎰 Spin Again').setStyle(multiplier > 0 ? ButtonStyle.Success : ButtonStyle.Danger),
       );
       await interaction.editReply({ embeds: [embed], components: [row] });
+      if (r1.e === '7️⃣' && r2.e === '7️⃣' && r3.e === '7️⃣') checkAchievements(interaction.user.id, interaction.user.username, { action: 'slots_jackpot' }).catch(() => {});
+      if (r1.e === '👑' && r2.e === '👑' && r3.e === '👑') checkAchievements(interaction.user.id, interaction.user.username, { action: 'slots_crown3' }).catch(() => {});
+      checkAchievements(interaction.user.id, interaction.user.username, {}).catch(() => {});
     } catch (e) {
       console.error('slots error:', e.message);
       interaction.editReply({ content: '❌ Slots failed.' }).catch(() => {});
@@ -2342,6 +2511,7 @@ client.on('interactionCreate', async interaction => {
         new ButtonBuilder().setCustomId(`gamble_again_${bet}`).setLabel('🎰 Gamble Again').setStyle(win ? ButtonStyle.Success : ButtonStyle.Danger),
       );
       await interaction.editReply({ embeds: [embed], components: [row] });
+      checkAchievements(interaction.user.id, interaction.user.username, { action: 'gamble', bet, won: win, lastCoins: eco.coins ?? 0 }).catch(() => {});
     } catch (e) {
       console.error('gamble error:', e.message);
       interaction.editReply({ content: '❌ Gamble failed.' }).catch(() => {});
@@ -2390,6 +2560,7 @@ client.on('interactionCreate', async interaction => {
         .setFooter({ text: 'Come back in 20 hours for your next reward' })
         .setTimestamp();
       await interaction.editReply({ embeds: [embed] });
+      checkAchievements(interaction.user.id, interaction.user.username, { action: 'daily' }).catch(() => {});
     } catch (e) {
       console.error('daily error:', e.message);
       interaction.editReply({ content: '❌ Failed to claim daily reward.' }).catch(() => {});
@@ -2527,6 +2698,7 @@ client.on('interactionCreate', async interaction => {
       const ok = await deductCoins(interaction.user.id, item.price);
       if (!ok) return interaction.editReply({ content: `❌ Not enough coins! You need **${item.price}🪙** to buy **${item.name}**.` });
       if (roleId) await freshMember.roles.add(roleId).catch(() => {});
+      checkAchievements(interaction.user.id, interaction.user.username, { action: item.id === 'vip' ? 'purchase_vip' : 'purchase' }).catch(() => {});
       return interaction.editReply({ content: `✅ Purchased **${item.name}**! Role applied. 🎉` });
     }
 
@@ -2593,6 +2765,7 @@ client.on('interactionCreate', async interaction => {
     const serverGuild = client.guilds.cache.get(GUILD_ID);
     const discordMember = await serverGuild?.members.fetch(targetId).catch(() => null);
     if (discordMember && clan.role_id) await discordMember.roles.add(clan.role_id).catch(() => {});
+    checkAchievements(targetId, interaction.user.username, { action: 'clan_join' }).catch(() => {});
     return interaction.update({ content: `✅ You joined **[${clan.tag}] ${clan.name}**! Head to the server to find your clan channels.`, components: [] });
   }
 
@@ -2613,6 +2786,7 @@ client.on('interactionCreate', async interaction => {
     const winnings = Math.floor(game.bet * mult);
     const newCoins = (eco.coins ?? 0) + winnings;
     await supabase.from('discord_economy').upsert({ discord_id: userId, username: interaction.user.username, coins: newCoins, updated_at: new Date().toISOString() });
+    checkAchievements(userId, interaction.user.username, { action: 'crash', mult }).catch(() => {});
     return interaction.update({ content: `✅ **Cashed out at ${mult.toFixed(2)}x!** — ${interaction.user}\nBet: **${game.bet}🪙** → Won: **${winnings}🪙** (+${winnings - game.bet}🪙)\n\nBalance: **${newCoins}🪙**`, components: [] });
   }
 
@@ -3215,6 +3389,7 @@ client.on('interactionCreate', async interaction => {
     // Set nickname to Riot ID
     const riotId = user.riot_id ?? user.username;
     await member.setNickname(riotId).catch(() => {});
+    checkAchievements(interaction.user.id, interaction.user.username, { action: 'verified' }).catch(() => {});
     return interaction.editReply({ content: `✅ Account **${riotId}** verified!\nYour server nickname has been updated to your Riot ID. 🎉` });
   }
 
