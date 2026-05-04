@@ -260,16 +260,20 @@ client.once('clientReady', async () => {
   client.roles = roles;
   console.log('Roles mapped:', Object.keys(roles));
 
-  // Lock all channels except public ones
-  const publicChannels = ['rules', 'announcements', 'app-download', 'commands', 'get-roles', 'faq'];
+  // New Arrivals see ONLY #rules — everything else unlocks after registering
   for (const [, channel] of guildChannels) {
     if (!channel.permissionsFor || channel.type === 4) continue;
-    if (!publicChannels.includes(channel.name)) {
-      try {
-        await channel.permissionOverwrites.edit(roles.everyone, { ViewChannel: false });
-        await channel.permissionOverwrites.edit(roles.member, { ViewChannel: true });
-      } catch {}
-    }
+    try {
+      if (channel.name === 'rules') {
+        await channel.permissionOverwrites.edit(roles.everyone,   { ViewChannel: true,  SendMessages: false });
+        await channel.permissionOverwrites.edit(roles.newArrival, { ViewChannel: true,  SendMessages: false });
+        await channel.permissionOverwrites.edit(roles.member,     { ViewChannel: true,  SendMessages: false });
+      } else {
+        await channel.permissionOverwrites.edit(roles.everyone,   { ViewChannel: false });
+        await channel.permissionOverwrites.edit(roles.newArrival, { ViewChannel: false });
+        await channel.permissionOverwrites.edit(roles.member,     { ViewChannel: true  });
+      }
+    } catch {}
   }
 
   // Auto-assign New Arrival to members without Member role
