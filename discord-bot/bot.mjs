@@ -1193,6 +1193,18 @@ client.on('interactionCreate', async interaction => {
         .setColor(0x00c8ff)
         .setTimestamp();
       await interaction.editReply({ embeds: [embed] });
+
+      // Notify recipient via DM, fall back to channel mention
+      const notifyEmbed = new EmbedBuilder()
+        .setTitle('🎁 You received a gift!')
+        .setDescription(`**${interaction.user.displayName}** sent you **${amount}🪙**!\n\nNew balance: **${(targetEco.coins ?? 0) + amount}🪙**`)
+        .setColor(0x00c8ff)
+        .setTimestamp();
+      const dmSent = await target.createDM().then(dm => dm.send({ embeds: [notifyEmbed] })).catch(() => null);
+      if (!dmSent) {
+        // DMs disabled — post in the same channel instead
+        await interaction.channel?.send({ content: `${target}`, embeds: [notifyEmbed] }).catch(() => {});
+      }
     } catch (e) {
       console.error('gift error:', e.message);
       interaction.editReply({ content: '❌ Gift failed.' }).catch(() => {});
