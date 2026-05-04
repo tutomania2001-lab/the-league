@@ -3085,7 +3085,9 @@ client.on('interactionCreate', async interaction => {
     await supabase.from('users').update({ discord_id: null }).eq('discord_id', interaction.user.id);
     await supabase.from('users').update({ discord_id: interaction.user.id }).eq('id', user.id);
     await member.roles.add(client.roles.verified).catch(() => {});
-    return interaction.editReply({ content: `✅ Account relinked to **${user.riot_id ?? user.username}**!\nYour rank will sync automatically within 5 minutes.` });
+    const riotId = user.riot_id ?? user.username;
+    await member.setNickname(riotId).catch(() => {});
+    return interaction.editReply({ content: `✅ Account relinked to **${riotId}**!\nNickname updated. Rank will sync within 5 minutes.` });
   }
 
   // VERIFIED PLAYER modal
@@ -3096,9 +3098,11 @@ client.on('interactionCreate', async interaction => {
       return interaction.editReply({ content: `❌ No account found for **${input}**.\nRegister at https://the-leagueapp.netlify.app first.` });
     }
     await member.roles.add(client.roles.verified).catch(() => {});
-    // Store Discord ID for rank sync
     await supabase.from('users').update({ discord_id: interaction.user.id }).eq('id', user.id);
-    return interaction.editReply({ content: `✅ Account **${user.riot_id ?? user.username}** verified!\nYou now have the **✅ Verified Player** role 🎉` });
+    // Set nickname to Riot ID
+    const riotId = user.riot_id ?? user.username;
+    await member.setNickname(riotId).catch(() => {});
+    return interaction.editReply({ content: `✅ Account **${riotId}** verified!\nYour server nickname has been updated to your Riot ID. 🎉` });
   }
 
   // RANK modal
