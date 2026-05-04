@@ -1010,6 +1010,8 @@ client.once('clientReady', async () => {
     { name: 'rep',      description: 'Give +1 reputation to a player (once per day)',
       options: [{ name: 'user', type: 6, description: 'Player to rep', required: true }] },
     { name: 'repboard', description: 'Show the reputation leaderboard' },
+    { name: 'checkrep', description: 'Check anyone\'s reputation',
+      options: [{ name: 'user', type: 6, description: 'User to check (leave empty for yourself)', required: false }] },
     { name: 'duel',  description: 'Challenge someone to Rock Paper Scissors',
       options: [{ name: 'user', type: 6, description: 'Player to challenge (leave empty to play vs Bot)', required: false }] },
   ]).then(cmds => console.log(`✅ Slash commands registered: ${cmds.map(c=>c.name).join(', ')}`))
@@ -1734,6 +1736,32 @@ client.on('interactionCreate', async interaction => {
     } catch (e) {
       console.error('repboard error:', e.message);
       interaction.editReply({ content: '❌ Failed to load leaderboard.' }).catch(() => {});
+    }
+  }
+
+  // ── /checkrep ────────────────────────────────────────────────────
+  if (interaction.commandName === 'checkrep') {
+    await interaction.deferReply();
+    try {
+      const target = interaction.options.getUser('user') ?? interaction.user;
+      const { data } = await supabase.from('reputation').select('rep').eq('discord_id', target.id).maybeSingle();
+      const rep = data?.rep ?? 0;
+      const { data: all } = await supabase.from('reputation').select('discord_id').order('rep', { ascending: false });
+      const rank = (all ?? []).findIndex(u => u.discord_id === target.id) + 1 || '—';
+      const embed = new EmbedBuilder()
+        .setTitle(`⭐ ${target.displayName ?? target.username}'s Reputation`)
+        .setThumbnail(target.displayAvatarURL({ size: 64 }))
+        .addFields(
+          { name: '⭐ Rep',        value: String(rep),           inline: true },
+          { name: '📊 Board Rank', value: rank === '—' ? 'Not ranked yet' : `#${rank}`, inline: true },
+        )
+        .setColor(rep > 0 ? 0x00c8ff : 0x555555)
+        .setFooter({ text: 'Earn rep with /rep from other members' })
+        .setTimestamp();
+      await interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      console.error('checkrep error:', e.message);
+      interaction.editReply({ content: '❌ Failed to check rep.' }).catch(() => {});
     }
   }
 
