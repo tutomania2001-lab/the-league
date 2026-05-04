@@ -316,13 +316,13 @@ const ACHIEVEMENTS = {
   broke_gambler:  { name: 'All In',              emoji: '😤', desc: 'Gamble your last coins',           tier: '🥉' },
 };
 
-async function unlockAchievement(userId, username, achievementId) {
+async function unlockAchievement(userId, username, achievementId, silent = false) {
   const a = ACHIEVEMENTS[achievementId];
   if (!a) return;
   const { data: existing } = await supabase.from('achievements').select('achievement_id').eq('discord_id', userId).eq('achievement_id', achievementId).maybeSingle();
   if (existing) return; // already unlocked
   await supabase.from('achievements').insert({ discord_id: userId, achievement_id: achievementId });
-  // Announce in announcements channel
+  if (silent) return; // retroactive check — no announcement
   if (client.announcementsChannel) {
     const embed = new EmbedBuilder()
       .setTitle(`${a.tier} Achievement Unlocked!`)
@@ -333,56 +333,57 @@ async function unlockAchievement(userId, username, achievementId) {
   }
 }
 
-async function checkAchievements(userId, username, ctx = {}) {
+async function checkAchievements(userId, username, ctx = {}, silent = false) {
+  const ua = (id) => unlockAchievement(userId, username, id, silent);
   const eco = await getEconomy(userId).catch(() => null);
   if (!eco) return;
   const coins = eco.coins ?? 0;
   const level = eco.level ?? 0;
 
   // Level achievements
-  if (level >= 1)   await unlockAchievement(userId, username, 'first_step');
-  if (level >= 5)   await unlockAchievement(userId, username, 'level5');
-  if (level >= 10)  await unlockAchievement(userId, username, 'level10');
-  if (level >= 25)  await unlockAchievement(userId, username, 'level25');
-  if (level >= 50)  await unlockAchievement(userId, username, 'level50');
-  if (level >= 100) await unlockAchievement(userId, username, 'level100');
+  if (level >= 1)   await ua('first_step');
+  if (level >= 5)   await ua('level5');
+  if (level >= 10)  await ua('level10');
+  if (level >= 25)  await ua('level25');
+  if (level >= 50)  await ua('level50');
+  if (level >= 100) await ua('level100');
 
   // Coin milestones
-  if (coins >= 1)      await unlockAchievement(userId, username, 'first_coins');
-  if (coins >= 1000)   await unlockAchievement(userId, username, 'piggy_bank');
-  if (coins >= 5000)   await unlockAchievement(userId, username, 'getting_rich');
-  if (coins >= 25000)  await unlockAchievement(userId, username, 'whale');
+  if (coins >= 1)      await ua('first_coins');
+  if (coins >= 1000)   await ua('piggy_bank');
+  if (coins >= 5000)   await ua('getting_rich');
+  if (coins >= 25000)  await ua('whale');
 
   // Context-based
-  if (ctx.action === 'daily')         await unlockAchievement(userId, username, 'first_daily');
-  if (ctx.action === 'daily' && (eco.streak ?? 0) >= 7)  await unlockAchievement(userId, username, 'streak7');
-  if (ctx.action === 'daily' && (eco.streak ?? 0) >= 30) await unlockAchievement(userId, username, 'streak30');
-  if (ctx.action === 'gamble')        await unlockAchievement(userId, username, 'first_bet');
-  if (ctx.action === 'gamble' && ctx.bet >= 2500) await unlockAchievement(userId, username, 'high_roller');
-  if (ctx.action === 'gamble' && ctx.won && coins < 200) await unlockAchievement(userId, username, 'comeback');
-  if (ctx.action === 'gamble' && !ctx.won && coins < 50) await unlockAchievement(userId, username, 'broke');
-  if (ctx.action === 'gamble' && ctx.lastCoins <= 15) await unlockAchievement(userId, username, 'broke_gambler');
-  if (ctx.action === 'slots_jackpot') await unlockAchievement(userId, username, 'jackpot');
-  if (ctx.action === 'slots_crown3')  await unlockAchievement(userId, username, 'triple_crown');
-  if (ctx.action === 'roulette_number') await unlockAchievement(userId, username, 'lucky_number');
-  if (ctx.action === 'crash' && ctx.mult >= 5) await unlockAchievement(userId, username, 'crash_out');
-  if (ctx.action === 'duel')          await unlockAchievement(userId, username, 'first_duel');
+  if (ctx.action === 'daily')         await ua('first_daily');
+  if (ctx.action === 'daily' && (eco.streak ?? 0) >= 7)  await ua('streak7');
+  if (ctx.action === 'daily' && (eco.streak ?? 0) >= 30) await ua('streak30');
+  if (ctx.action === 'gamble')        await ua('first_bet');
+  if (ctx.action === 'gamble' && ctx.bet >= 2500) await ua('high_roller');
+  if (ctx.action === 'gamble' && ctx.won && coins < 200) await ua('comeback');
+  if (ctx.action === 'gamble' && !ctx.won && coins < 50) await ua('broke');
+  if (ctx.action === 'gamble' && ctx.lastCoins <= 15) await ua('broke_gambler');
+  if (ctx.action === 'slots_jackpot') await ua('jackpot');
+  if (ctx.action === 'slots_crown3')  await ua('triple_crown');
+  if (ctx.action === 'roulette_number') await ua('lucky_number');
+  if (ctx.action === 'crash' && ctx.mult >= 5) await ua('crash_out');
+  if (ctx.action === 'duel')          await ua('first_duel');
   if (ctx.action === 'flip')          { const { count } = await supabase.from('achievements').select('*', { count: 'exact' }).eq('discord_id', userId).eq('achievement_id', 'flip_10'); }
-  if (ctx.action === 'rep_given')     await unlockAchievement(userId, username, 'first_rep');
-  if (ctx.action === 'gift')          await unlockAchievement(userId, username, 'first_gift');
-  if (ctx.action === 'verified')      await unlockAchievement(userId, username, 'verified');
-  if (ctx.action === 'clan_create')   await unlockAchievement(userId, username, 'clan_founder');
-  if (ctx.action === 'clan_join')     await unlockAchievement(userId, username, 'clan_member');
-  if (ctx.action === 'purchase')      await unlockAchievement(userId, username, 'first_purchase');
-  if (ctx.action === 'purchase_vip')  await unlockAchievement(userId, username, 'vip_member');
-  if (ctx.action === 'purchase_banner') await unlockAchievement(userId, username, 'banner_owner');
-  if (ctx.action === 'private_room')  await unlockAchievement(userId, username, 'private_room');
+  if (ctx.action === 'rep_given')     await ua('first_rep');
+  if (ctx.action === 'gift')          await ua('first_gift');
+  if (ctx.action === 'verified')      await ua('verified');
+  if (ctx.action === 'clan_create')   await ua('clan_founder');
+  if (ctx.action === 'clan_join')     await ua('clan_member');
+  if (ctx.action === 'purchase')      await ua('first_purchase');
+  if (ctx.action === 'purchase_vip')  await ua('vip_member');
+  if (ctx.action === 'purchase_banner') await ua('banner_owner');
+  if (ctx.action === 'private_room')  await ua('private_room');
 
   // Rep received check
   if (ctx.action === 'rep_received') {
     const { data: rep } = await supabase.from('reputation').select('rep').eq('discord_id', userId).maybeSingle();
-    if ((rep?.rep ?? 0) >= 10) await unlockAchievement(userId, username, 'rep_10_recv');
-    if ((rep?.rep ?? 0) >= 50) await unlockAchievement(userId, username, 'rep_50_recv');
+    if ((rep?.rep ?? 0) >= 10) await ua('rep_10_recv');
+    if ((rep?.rep ?? 0) >= 50) await ua('rep_50_recv');
   }
 }
 
@@ -3496,7 +3497,7 @@ client.once('ready', async () => {
       if (!users?.length) return;
       console.log(`🏅 Checking achievements for ${users.length} existing users...`);
       for (const u of users) {
-        await checkAchievements(u.discord_id, u.username ?? 'Unknown', {}).catch(() => {});
+        await checkAchievements(u.discord_id, u.username ?? 'Unknown', {}, true).catch(() => {});
       }
       console.log('✅ Retroactive achievement check complete');
     } catch (e) { console.error('Retroactive achievements error:', e.message); }
