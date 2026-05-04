@@ -1801,9 +1801,16 @@ client.on('interactionCreate', async interaction => {
           new ButtonBuilder().setCustomId(`clan_accept_${target.id}`).setLabel('✅ Accept').setStyle(ButtonStyle.Success),
           new ButtonBuilder().setCustomId(`clan_decline_${target.id}`).setLabel('❌ Decline').setStyle(ButtonStyle.Danger),
         );
-        await interaction.editReply({ content: `📨 Invite sent to ${target}!` });
-        await interaction.channel.send({ content: `⚔️ ${target}, you've been invited to join **[${clan.tag}] ${clan.name}** by ${interaction.user}!`, components: [row] });
-        return;
+        const dmSent = await target.createDM()
+          .then(dm => dm.send({ content: `⚔️ You've been invited to join **[${clan.tag}] ${clan.name}** by **${interaction.user.displayName}** in **${guild.name}**!\n\nAccept or decline below — expires in 10 minutes.`, components: [row] }))
+          .catch(() => null);
+        if (!dmSent) {
+          // DMs disabled — fall back to ephemeral reply only visible to inviter
+          await interaction.editReply({ content: `❌ Could not DM ${target} — they may have DMs disabled. Ask them to enable DMs from server members.` });
+          clanInvites.delete(target.id);
+          return;
+        }
+        return interaction.editReply({ content: `📨 Invite sent to ${target} via DM!` });
       }
 
       // ── LEAVE ───────────────────────────────────────────────────
@@ -2503,9 +2510,11 @@ client.on('interactionCreate', async interaction => {
     const { data: clan } = await supabase.from('discord_clans').select('*').eq('id', invite.clanId).maybeSingle();
     if (!clan) return interaction.update({ content: '❌ Clan no longer exists.', components: [] });
     await supabase.from('clan_members').insert({ discord_id: targetId, clan_id: clan.id, clan_role: 'member' });
-    const discordMember = await interaction.guild.members.fetch(targetId).catch(() => null);
+    // Apply role in the guild
+    const serverGuild = client.guilds.cache.get(GUILD_ID);
+    const discordMember = await serverGuild?.members.fetch(targetId).catch(() => null);
     if (discordMember && clan.role_id) await discordMember.roles.add(clan.role_id).catch(() => {});
-    return interaction.update({ content: `✅ ${interaction.user} joined **[${clan.tag}] ${clan.name}**! Welcome!`, components: [] });
+    return interaction.update({ content: `✅ You joined **[${clan.tag}] ${clan.name}**! Head to the server to find your clan channels.`, components: [] });
   }
 
   // ── CRASH CASH OUT ───────────────────────────────────────────────
