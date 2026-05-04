@@ -435,6 +435,8 @@ client.once('clientReady', async () => {
       options: [{ name: 'user', type: 6, description: 'Player to compare with', required: true }] },
     { name: 'patch',  description: 'Show the latest Wild Rift patch notes' },
     { name: 'relink', description: 'Change your linked The League app account' },
+    { name: 'daily',  description: 'Claim your daily coins reward' },
+    { name: 'streak', description: 'Check your daily login streak' },
     { name: 'flip',  description: 'Flip a coin — heads or tails' },
     { name: 'roll',  description: 'Roll a dice',
       options: [{ name: 'sides', type: 4, description: 'Number of sides (default 6)', required: false }] },
@@ -1125,6 +1127,89 @@ client.on('interactionCreate', async interaction => {
       new TextInputBuilder().setCustomId('relink_input').setLabel('New username or Riot ID from the app').setStyle(TextInputStyle.Short).setPlaceholder('e.g. WildRifter#1234').setRequired(true).setMaxLength(60)
     ));
     return interaction.showModal(modal);
+  }
+
+  // ── /daily ───────────────────────────────────────────────────────
+  if (interaction.commandName === 'daily') {
+    await interaction.deferReply();
+    try {
+      const eco = await getEconomy(interaction.user.id);
+      const now = new Date();
+      const last = eco.last_daily ? new Date(eco.last_daily) : null;
+      const hoursSinceLast = last ? (now - last) / 3600000 : Infinity;
+
+      if (hoursSinceLast < 20) {
+        const nextTime = new Date(last.getTime() + 20 * 3600000);
+        const hoursLeft = Math.ceil((nextTime - now) / 3600000);
+        return interaction.editReply({ content: `⏳ You already claimed your daily reward! Come back in **${hoursLeft}h**.` });
+      }
+
+      // Calculate streak
+      const isConsecutive = hoursSinceLast < 48;
+      const newStreak = isConsecutive ? (eco.streak ?? 0) + 1 : 1;
+      const streakBonus = Math.min(newStreak - 1, 6) * 10; // +10 coins per streak day, max +60
+      const baseCoins = 100;
+      const baseXP = 50;
+      const totalCoins = baseCoins + streakBonus;
+
+      await supabase.from('discord_economy').upsert({
+        discord_id: interaction.user.id,
+        username: interaction.user.username,
+        coins: (eco.coins ?? 0) + totalCoins,
+        xp: (eco.xp ?? 0) + baseXP,
+        level: levelFromXP((eco.xp ?? 0) + baseXP),
+        last_daily: now.toISOString(),
+        streak: newStreak,
+        updated_at: now.toISOString(),
+      });
+
+      const streakMsg = newStreak > 1 ? `🔥 **${newStreak} day streak!** (+${streakBonus} bonus coins)` : '🌟 Start a streak by claiming again tomorrow for bonus coins!';
+      const embed = new EmbedBuilder()
+        .setTitle('🎁 Daily Reward Claimed!')
+        .setDescription(`${interaction.user} claimed their daily reward!\n\n🪙 **+${totalCoins} coins** ${streakBonus > 0 ? `(${baseCoins} base + ${streakBonus} streak bonus)` : ''}\n⭐ **+${baseXP} XP**\n\n${streakMsg}`)
+        .setColor(0x00c8ff)
+        .setFooter({ text: 'Come back in 20 hours for your next reward' })
+        .setTimestamp();
+      await interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      console.error('daily error:', e.message);
+      interaction.editReply({ content: '❌ Failed to claim daily reward.' }).catch(() => {});
+    }
+  }
+
+  // ── /streak ──────────────────────────────────────────────────────
+  if (interaction.commandName === 'streak') {
+    await interaction.deferReply();
+    try {
+      const eco = await getEconomy(interaction.user.id);
+      const streak = eco.streak ?? 0;
+      const last = eco.last_daily ? new Date(eco.last_daily) : null;
+      const now = new Date();
+      const hoursSinceLast = last ? (now - last) / 3600000 : Infinity;
+      const hoursUntilNext = last ? Math.max(0, Math.ceil(20 - hoursSinceLast)) : 0;
+      const streakAtRisk = hoursSinceLast > 48;
+      const nextBonus = Math.min(streak, 6) * 10;
+
+      const embed = new EmbedBuilder()
+        .setTitle(`🔥 ${interaction.user.displayName}'s Streak`)
+        .addFields(
+          { name: '🔥 Current Streak', value: `${streak} day${streak !== 1 ? 's' : ''}`, inline: true },
+          { name: '🪙 Daily Bonus',    value: `+${nextBonus} coins`, inline: true },
+          { name: '⏰ Next Claim',     value: hoursUntilNext > 0 ? `In ${hoursUntilNext}h` : '**Ready now!**', inline: true },
+        )
+        .setColor(streakAtRisk ? 0xFF4444 : 0x00c8ff)
+        .setDescription(
+          streak === 0 ? 'Use `/daily` to start your streak!' :
+          streakAtRisk ? '⚠️ Claim your daily reward soon or your streak will reset!' :
+          streak >= 7 ? '🏆 Max streak bonus reached! Keep it up!' :
+          `Claim daily for ${7 - streak} more day${7 - streak !== 1 ? 's' : ''} to reach max bonus!`
+        )
+        .setTimestamp();
+      await interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      console.error('streak error:', e.message);
+      interaction.editReply({ content: '❌ Failed to fetch streak.' }).catch(() => {});
+    }
   }
 
   // ── /patch ───────────────────────────────────────────────────────
