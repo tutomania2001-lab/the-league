@@ -447,6 +447,11 @@ client.once('clientReady', async () => {
     { name: 'streak',  description: 'Check your daily login streak' },
     { name: 'gamble',   description: 'Bet your coins — double or nothing',
       options: [{ name: 'amount', type: 4, description: 'Amount of coins to bet', required: true }] },
+    { name: 'addcoins', description: 'Admin: add coins to a user',
+      options: [
+        { name: 'user',   type: 6, description: 'Target user', required: true },
+        { name: 'amount', type: 4, description: 'Coins to add', required: true },
+      ]},
     { name: 'roulette', description: 'Spin the roulette wheel',
       options: [
         { name: 'amount', type: 4, description: 'Amount to bet', required: true },
@@ -1144,6 +1149,20 @@ client.on('interactionCreate', async interaction => {
       new TextInputBuilder().setCustomId('relink_input').setLabel('New username or Riot ID from the app').setStyle(TextInputStyle.Short).setPlaceholder('e.g. WildRifter#1234').setRequired(true).setMaxLength(60)
     ));
     return interaction.showModal(modal);
+  }
+
+  // ── /addcoins (admin) ────────────────────────────────────────────
+  if (interaction.commandName === 'addcoins') {
+    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
+    }
+    await interaction.deferReply({ ephemeral: true });
+    const target = interaction.options.getUser('user');
+    const amount = interaction.options.getInteger('amount');
+    const eco = await getEconomy(target.id);
+    const newCoins = (eco.coins ?? 0) + amount;
+    await supabase.from('discord_economy').upsert({ discord_id: target.id, username: target.username, coins: newCoins, xp: eco.xp ?? 0, level: eco.level ?? 0, updated_at: new Date().toISOString() });
+    return interaction.editReply({ content: `✅ Added **${amount}🪙** to ${target}. New balance: **${newCoins}🪙**` });
   }
 
   // ── /roulette ────────────────────────────────────────────────────
