@@ -1,6 +1,22 @@
 import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, UserSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType, AttachmentBuilder } from 'discord.js';
 import { createClient } from '@supabase/supabase-js';
 import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
+
+// Register font at startup (downloaded from Google Fonts)
+async function registerFont() {
+  try {
+    const res = await fetch('https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxP.ttf');
+    const buf = Buffer.from(await res.arrayBuffer());
+    GlobalFonts.register(buf, 'Roboto');
+    const resB = await fetch('https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmWUlfBBc9.ttf');
+    const bufB = Buffer.from(await resB.arrayBuffer());
+    GlobalFonts.register(bufB, 'RobotoBold');
+    console.log('✅ Fonts registered for rank cards');
+  } catch (e) {
+    console.error('⚠️ Font registration failed:', e.message);
+  }
+}
+registerFont();
 const WILDRIFT_NEWS_URL = 'https://wildrift.leagueoflegends.com/en-sg/news/tags/patch-notes/';
 const WILDRIFT_BASE = 'https://wildrift.leagueoflegends.com';
 const seenArticles = new Set();
@@ -166,13 +182,13 @@ async function generateRankCard(member, eco, rank, position) {
 
   // Username
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 30px sans-serif';
+  ctx.font = 'bold 30px RobotoBold, sans-serif';
   ctx.fillText(member.displayName, 200, 65);
 
   // Rank name
   ctx.fillStyle = rankColor;
-  ctx.font = 'bold 22px sans-serif';
-  ctx.fillText(`${rank.name}  •  ${eco.lp ?? eco.xp ?? 0} LP`, 200, 100);
+  ctx.font = 'bold 22px RobotoBold, sans-serif';
+  ctx.fillText(`${rank.name}  •  ${eco.lp ?? 0} LP`, 200, 100);
 
   // XP bar background
   const barX = 200, barY = 120, barW = 560, barH = 22;
@@ -193,20 +209,20 @@ async function generateRankCard(member, eco, rank, position) {
   ctx.fill();
 
   // XP text
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '14px sans-serif';
+  ctx.fillStyle = '#aaaacc';
+  ctx.font = '14px Roboto, sans-serif';
   ctx.fillText(`${curXP} / ${needXP} XP`, barX, barY + barH + 18);
 
   // Level badge
   ctx.fillStyle = rankColor;
-  ctx.font = 'bold 16px sans-serif';
+  ctx.font = 'bold 16px RobotoBold, sans-serif';
   ctx.fillText(`LEVEL ${level}`, barX + barW - 80, barY + barH + 18);
 
   // Stats row
   ctx.fillStyle = '#aaaacc';
-  ctx.font = '18px sans-serif';
-  ctx.fillText(`🪙 ${eco.coins ?? 0} coins`, 200, 190);
-  ctx.fillText(`🏆 Rank #${position} on server`, 380, 190);
+  ctx.font = '18px Roboto, sans-serif';
+  ctx.fillText(`Coins: ${eco.coins ?? 0}`, 200, 190);
+  ctx.fillText(`Server Rank: #${position}`, 400, 190);
 
   return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'rank-card.png' });
 }
