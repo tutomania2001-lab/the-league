@@ -1134,7 +1134,10 @@ client.on('interactionCreate', async interaction => {
   // ── /flip ────────────────────────────────────────────────────────
   if (interaction.commandName === 'flip') {
     const result = Math.random() < 0.5 ? '🪙 **Heads!**' : '🪙 **Tails!**';
-    await interaction.reply({ content: `${interaction.user} flipped a coin — ${result}` });
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('rematch_flip').setLabel('🔄 Flip Again').setStyle(ButtonStyle.Secondary),
+    );
+    await interaction.reply({ content: `${interaction.user} flipped a coin — ${result}`, components: [row] });
   }
 
   // ── /roll ────────────────────────────────────────────────────────
@@ -1142,7 +1145,10 @@ client.on('interactionCreate', async interaction => {
     const sides = interaction.options.getInteger('sides') ?? 6;
     if (sides < 2 || sides > 1000) return interaction.reply({ content: '❌ Sides must be between 2 and 1000.', ephemeral: true });
     const result = Math.floor(Math.random() * sides) + 1;
-    await interaction.reply({ content: `🎲 ${interaction.user} rolled a **${result}** (d${sides})` });
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`rematch_roll_${sides}`).setLabel('🎲 Roll Again').setStyle(ButtonStyle.Secondary),
+    );
+    await interaction.reply({ content: `🎲 ${interaction.user} rolled a **${result}** (d${sides})`, components: [row] });
   }
 });
 
@@ -1185,6 +1191,40 @@ client.on('interactionCreate', async interaction => {
     if (!ok) return interaction.editReply({ content: `❌ Not enough coins! You need **${item.price}🪙** to buy **${item.name}**.` });
     if (roleId) await freshMember.roles.add(roleId).catch(() => {});
     return interaction.editReply({ content: `✅ Purchased **${item.name}**! 🎉 ${roleId ? 'Role applied.' : ''}` });
+  }
+
+  // ── REMATCH BUTTONS ──────────────────────────────────────────────
+  if (interaction.customId === 'rematch_flip') {
+    const result = Math.random() < 0.5 ? '🪙 **Heads!**' : '🪙 **Tails!**';
+    const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('rematch_flip').setLabel('🔄 Flip Again').setStyle(ButtonStyle.Secondary));
+    return interaction.update({ content: `${interaction.user} flipped a coin — ${result}`, components: [row] });
+  }
+
+  if (interaction.customId.startsWith('rematch_roll_')) {
+    const sides = parseInt(interaction.customId.replace('rematch_roll_', '')) || 6;
+    const result = Math.floor(Math.random() * sides) + 1;
+    const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`rematch_roll_${sides}`).setLabel('🎲 Roll Again').setStyle(ButtonStyle.Secondary));
+    return interaction.update({ content: `🎲 ${interaction.user} rolled a **${result}** (d${sides})`, components: [row] });
+  }
+
+  if (interaction.customId.startsWith('rematch_duel_')) {
+    const parts = interaction.customId.split('_');
+    const p1id = parts[2], p2id = parts[3];
+    if (interaction.user.id !== p1id && interaction.user.id !== p2id) {
+      return interaction.reply({ content: '❌ Only the original players can rematch.', ephemeral: true });
+    }
+    const gid = newGid();
+    const rpsRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`rps_${gid}_r`).setLabel('✊ Rock').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`rps_${gid}_p`).setLabel('✋ Paper').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`rps_${gid}_s`).setLabel('✌️ Scissors').setStyle(ButtonStyle.Secondary),
+    );
+    if (p2id === BOT_ID) {
+      games.set(gid, { type: 'rps', p1: p1id, p2: BOT_ID, p1pick: null, p2pick: botRPS(), status: 'active', channelId: interaction.channelId });
+      return interaction.update({ content: `⚔️ **Rematch! <@${p1id}> vs 🤖 Bot**\nPick your move!`, components: [rpsRow] });
+    }
+    games.set(gid, { type: 'rps', p1: p1id, p2: p2id, p1pick: null, p2pick: null, status: 'active', channelId: interaction.channelId });
+    return interaction.update({ content: `⚔️ **Rematch! <@${p1id}> vs <@${p2id}>**\nBoth players — pick your move!`, components: [rpsRow] });
   }
 
   // ── GAME LOBBY BUTTONS ──────────────────────────────────────────
@@ -1312,8 +1352,12 @@ client.on('interactionCreate', async interaction => {
     if (g.p1pick === g.p2pick) result = "It's a **draw**!";
     else if (beats[g.p1pick] === g.p2pick) result = `🏆 **${p1m.displayName}** wins!`;
     else result = `🏆 **${p2Name}** wins!`;
+    const p1id = g.p1, p2id = g.p2;
     games.delete(gid);
-    return interaction.update({ content: `✊ **Rock Paper Scissors Result**\n${p1m}: ${names[g.p1pick]}\n${p2Name}: ${names[g.p2pick]}\n\n${result}`, components: [] });
+    const rematchRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`rematch_duel_${p1id}_${p2id}`).setLabel('⚔️ Rematch').setStyle(ButtonStyle.Primary),
+    );
+    return interaction.update({ content: `✊ **Rock Paper Scissors Result**\n${p1m}: ${names[g.p1pick]}\n${p2Name}: ${names[g.p2pick]}\n\n${result}`, components: [rematchRow] });
   }
 
   // TTT MOVE
