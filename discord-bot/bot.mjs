@@ -413,17 +413,11 @@ client.once('clientReady', async () => {
     console.log('✅ Register button posted');
   }
 
-  // Post Rank Card button in #commands
-  const commandsChannel = guildChannels.find(c => c?.name === 'commands');
-  if (commandsChannel) {
-    const existing = await commandsChannel.messages.fetch({ limit: 20 });
-    for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
-    const rankCardRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('rank_card').setLabel('🎴 View My Rank Card').setStyle(ButtonStyle.Success),
-    );
-    await commandsChannel.send({ content: '**🎴 Generate your personal rank card:**', components: [rankCardRow] }).catch(e => console.error('❌ Rank card button failed:', e.message));
-    console.log('✅ Rank card button posted');
-  }
+  // Register /rankcard slash command
+  await guild.commands.set([
+    { name: 'rankcard', description: 'Display your rank card' },
+  ]).catch(e => console.error('⚠️ Slash command registration failed:', e.message));
+  console.log('✅ /rankcard command registered');
 
   // Post role selector in #get-roles
   const getRolesChannel = guildChannels.find(c => c.name === 'get-roles');
@@ -978,6 +972,28 @@ client.on('interactionCreate', async interaction => {
   games.set(gid, { type, p1: interaction.user.id, p2: opponent, status: 'pending' });
 });
 
+// ── SLASH COMMANDS ───────────────────────────────────────────────
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+  if (interaction.commandName === 'rankcard') {
+    await interaction.deferReply();
+    try {
+      const member = await interaction.guild.members.fetch(interaction.user.id);
+      const eco = await getEconomy(interaction.user.id);
+      const { data: appUser } = await supabase.from('users').select('lp').eq('discord_id', interaction.user.id).maybeSingle();
+      eco.lp = appUser?.lp ?? null;
+      const rank = getRankForLP(appUser?.lp ?? 0);
+      const { data: lb } = await supabase.from('discord_economy').select('discord_id').order('xp', { ascending: false });
+      const position = (lb ?? []).findIndex(u => u.discord_id === interaction.user.id) + 1 || '?';
+      const card = await generateRankCard(member, eco, rank, position);
+      await interaction.editReply({ files: [card] });
+    } catch (e) {
+      console.error('rankcard error:', e.message);
+      interaction.editReply({ content: '❌ Failed to generate rank card.' }).catch(() => {});
+    }
+  }
+});
+
 // ── BUTTON INTERACTIONS ──────────────────────────────────────────
 client.on('interactionCreate', async interaction => {
   if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
@@ -990,7 +1006,6 @@ client.on('interactionCreate', async interaction => {
   try {
   const freshMember = await interaction.guild.members.fetch(interaction.user.id);
 
-  // ── ECONOMY PROFILE ──────────────────────────────────────────────
   // ── RANK CARD ─────────────────────────────────────────────────────
   if (interaction.customId === 'rank_card') {
     const eco = await getEconomy(interaction.user.id);
