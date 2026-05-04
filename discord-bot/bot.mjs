@@ -433,7 +433,8 @@ client.once('clientReady', async () => {
     { name: 'leaderboard', description: 'Show the top 10 XP leaderboard' },
     { name: 'compare',     description: 'Compare your rank with another player',
       options: [{ name: 'user', type: 6, description: 'Player to compare with', required: true }] },
-    { name: 'patch', description: 'Show the latest Wild Rift patch notes' },
+    { name: 'patch',  description: 'Show the latest Wild Rift patch notes' },
+    { name: 'relink', description: 'Change your linked The League app account' },
     { name: 'flip',  description: 'Flip a coin — heads or tails' },
     { name: 'roll',  description: 'Roll a dice',
       options: [{ name: 'sides', type: 4, description: 'Number of sides (default 6)', required: false }] },
@@ -1117,6 +1118,15 @@ client.on('interactionCreate', async interaction => {
     await interaction.reply({ content: `⚔️ **${interaction.user} challenged ${target} to Rock Paper Scissors!**\nBoth players — pick your move!`, components: [row] });
   }
 
+  // ── /relink ──────────────────────────────────────────────────────
+  if (interaction.commandName === 'relink') {
+    const modal = new ModalBuilder().setCustomId('relink_modal').setTitle('Change Linked App Account');
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('relink_input').setLabel('New username or Riot ID from the app').setStyle(TextInputStyle.Short).setPlaceholder('e.g. WildRifter#1234').setRequired(true).setMaxLength(60)
+    ));
+    return interaction.showModal(modal);
+  }
+
   // ── /patch ───────────────────────────────────────────────────────
   if (interaction.commandName === 'patch') {
     await interaction.deferReply();
@@ -1558,11 +1568,10 @@ client.on('interactionCreate', async interaction => {
     return interaction.reply({ content: '❌ You must register first in **#rules**.', ephemeral: true });
   }
 
-  // VERIFIED PLAYER
+  // VERIFIED PLAYER — link only, no removal (use /relink to change)
   if (interaction.customId === 'toggle_verified') {
     if (freshMember.roles.cache.has(client.roles.verified)) {
-      await freshMember.roles.remove(client.roles.verified);
-      return interaction.reply({ content: '✅ Removed **Verified Player** role', ephemeral: true });
+      return interaction.reply({ content: '✅ Already verified! Use **/relink** if you want to change your linked app account.', ephemeral: true });
     }
     const modal = new ModalBuilder().setCustomId('verify_modal').setTitle('Link Your The League Account');
     modal.addComponents(new ActionRowBuilder().addComponents(
@@ -1691,6 +1700,20 @@ client.on('interactionCreate', async interaction => {
       ViewChannel: true, Connect: true,
     }).catch(() => {});
     return interaction.editReply({ content: `✅ Access granted! Join **${voiceChannel.name}** in the Private Rooms section.` });
+  }
+
+  // RELINK modal
+  if (interaction.customId === 'relink_modal') {
+    const input = interaction.fields.getTextInputValue('relink_input').trim();
+    const user = await findUser(input);
+    if (!user) {
+      return interaction.editReply({ content: `❌ No account found for **${input}**.\nRegister at https://the-leagueapp.netlify.app first.` });
+    }
+    // Remove old discord_id link, set new one
+    await supabase.from('users').update({ discord_id: null }).eq('discord_id', interaction.user.id);
+    await supabase.from('users').update({ discord_id: interaction.user.id }).eq('id', user.id);
+    await member.roles.add(client.roles.verified).catch(() => {});
+    return interaction.editReply({ content: `✅ Account relinked to **${user.riot_id ?? user.username}**!\nYour rank will sync automatically within 5 minutes.` });
   }
 
   // VERIFIED PLAYER modal
