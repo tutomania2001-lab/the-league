@@ -1015,6 +1015,8 @@ client.once('clientReady', async () => {
       ]},
     { name: 'crash',    description: 'Bet coins on a rising multiplier — cash out before it crashes!',
       options: [{ name: 'amount', type: 4, description: 'Amount to bet', required: true }] },
+    { name: 'slots',    description: 'Spin the slot machine!',
+      options: [{ name: 'amount', type: 4, description: 'Amount to bet', required: true }] },
     { name: 'flip',  description: 'Flip a coin — heads or tails' },
     { name: 'roll',  description: 'Roll a dice',
       options: [{ name: 'sides', type: 4, description: 'Number of sides (default 6)', required: false }] },
@@ -2223,6 +2225,71 @@ client.on('interactionCreate', async interaction => {
     }
   }
 
+  // ── /slots ───────────────────────────────────────────────────────
+  if (interaction.commandName === 'slots') {
+    await interaction.deferReply();
+    try {
+      const bet = interaction.options.getInteger('amount');
+      if (bet < 10)    return interaction.editReply({ content: '❌ Minimum bet is **10 coins**.' });
+      if (bet > 5000)  return interaction.editReply({ content: '❌ Maximum bet is **5,000 coins**.' });
+      const eco = await getEconomy(interaction.user.id);
+      if ((eco.coins ?? 0) < bet) return interaction.editReply({ content: `❌ Not enough coins! You have **${eco.coins ?? 0}🪙**.` });
+
+      // Symbols: weight, emoji, name
+      const SYMBOLS = [
+        { e: '🍋', w: 30, name: 'Lemon' },
+        { e: '🍇', w: 25, name: 'Grape' },
+        { e: '🍊', w: 20, name: 'Orange' },
+        { e: '⚡', w: 12, name: 'Wild Rift' },
+        { e: '💎', w:  8, name: 'Diamond' },
+        { e: '👑', w:  4, name: 'Crown' },
+        { e: '7️⃣', w:  1, name: 'Jackpot' },
+      ];
+      const totalWeight = SYMBOLS.reduce((s, x) => s + x.w, 0);
+      const spin = () => {
+        let r = Math.random() * totalWeight;
+        for (const s of SYMBOLS) { r -= s.w; if (r <= 0) return s; }
+        return SYMBOLS[0];
+      };
+
+      const [r1, r2, r3] = [spin(), spin(), spin()];
+      const reels = `[ ${r1.e} | ${r2.e} | ${r3.e} ]`;
+
+      // Payout rules
+      let multiplier = 0, resultText = '💀 No match — better luck next time!';
+      if (r1.e === r2.e && r2.e === r3.e) {
+        const payouts = { '7️⃣': 50, '👑': 20, '💎': 10, '⚡': 7, '🍊': 4, '🍇': 3, '🍋': 2 };
+        multiplier = payouts[r1.e] ?? 2;
+        resultText = r1.e === '7️⃣' ? '🎰 **JACKPOT!!! 50x!!**' : r1.e === '👑' ? `👑 **TRIPLE CROWN! ${multiplier}x!**` : `🎉 **Three of a kind! ${multiplier}x!**`;
+      } else if (r1.e === r2.e || r2.e === r3.e || r1.e === r3.e) {
+        const matched = r1.e === r2.e ? r1 : r2.e === r3.e ? r2 : r1;
+        const miniPay = { '7️⃣': 5, '👑': 4, '💎': 3, '⚡': 2 };
+        multiplier = miniPay[matched.e] ?? 0;
+        resultText = multiplier > 0 ? `✨ **Two ${matched.name}s! ${multiplier}x**` : `🔸 Two ${matched.name}s — no payout`;
+      }
+
+      const payout   = multiplier > 0 ? bet * multiplier : 0;
+      const net      = payout - bet;
+      const newCoins = (eco.coins ?? 0) + net;
+      await supabase.from('discord_economy').upsert({ discord_id: interaction.user.id, username: interaction.user.username, coins: newCoins, updated_at: new Date().toISOString() });
+
+      const color = multiplier === 0 ? 0xFF4444 : multiplier >= 20 ? 0xFFD700 : multiplier >= 7 ? 0x00FF88 : 0x00c8ff;
+      const embed = new EmbedBuilder()
+        .setTitle(`🎰 Slot Machine`)
+        .setDescription(`${reels}\n\n${resultText}\n\n${net >= 0 ? `**+${payout}🪙** won!` : `**-${bet}🪙** lost`} — Balance: **${newCoins}🪙**`)
+        .setColor(color)
+        .setFooter({ text: `Bet: ${bet}🪙 • 7️⃣=50x 👑=20x 💎=10x ⚡=7x` })
+        .setTimestamp();
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`slots_again_${bet}`).setLabel('🎰 Spin Again').setStyle(multiplier > 0 ? ButtonStyle.Success : ButtonStyle.Danger),
+      );
+      await interaction.editReply({ embeds: [embed], components: [row] });
+    } catch (e) {
+      console.error('slots error:', e.message);
+      interaction.editReply({ content: '❌ Slots failed.' }).catch(() => {});
+    }
+  }
+
   // ── /gamble ──────────────────────────────────────────────────────
   if (interaction.commandName === 'gamble') {
     await interaction.deferReply();
@@ -2547,6 +2614,40 @@ client.on('interactionCreate', async interaction => {
     const newCoins = (eco.coins ?? 0) + winnings;
     await supabase.from('discord_economy').upsert({ discord_id: userId, username: interaction.user.username, coins: newCoins, updated_at: new Date().toISOString() });
     return interaction.update({ content: `✅ **Cashed out at ${mult.toFixed(2)}x!** — ${interaction.user}\nBet: **${game.bet}🪙** → Won: **${winnings}🪙** (+${winnings - game.bet}🪙)\n\nBalance: **${newCoins}🪙**`, components: [] });
+  }
+
+  // ── SLOTS AGAIN ──────────────────────────────────────────────────
+  if (interaction.customId.startsWith('slots_again_')) {
+    const bet = parseInt(interaction.customId.replace('slots_again_', ''));
+    const eco = await getEconomy(interaction.user.id);
+    if ((eco.coins ?? 0) < bet) return interaction.update({ content: `❌ Not enough coins to bet **${bet}🪙** again!`, embeds: [], components: [] });
+    const SYMBOLS = [
+      { e: '🍋', w: 30 }, { e: '🍇', w: 25 }, { e: '🍊', w: 20 },
+      { e: '⚡', w: 12 }, { e: '💎', w:  8 }, { e: '👑', w:  4 }, { e: '7️⃣', w: 1 },
+    ];
+    const tw = SYMBOLS.reduce((s, x) => s + x.w, 0);
+    const spin = () => { let r = Math.random() * tw; for (const s of SYMBOLS) { r -= s.w; if (r <= 0) return s; } return SYMBOLS[0]; };
+    const [r1, r2, r3] = [spin(), spin(), spin()];
+    const reels = `[ ${r1.e} | ${r2.e} | ${r3.e} ]`;
+    let multiplier = 0, resultText = '💀 No match — better luck next time!';
+    if (r1.e === r2.e && r2.e === r3.e) {
+      const p = { '7️⃣': 50, '👑': 20, '💎': 10, '⚡': 7, '🍊': 4, '🍇': 3, '🍋': 2 };
+      multiplier = p[r1.e] ?? 2;
+      resultText = r1.e === '7️⃣' ? '🎰 **JACKPOT!!! 50x!!**' : `🎉 **Three of a kind! ${multiplier}x!**`;
+    } else if (r1.e === r2.e || r2.e === r3.e || r1.e === r3.e) {
+      const matched = r1.e === r2.e ? r1 : r2.e === r3.e ? r2 : r1;
+      const mp = { '7️⃣': 5, '👑': 4, '💎': 3, '⚡': 2 };
+      multiplier = mp[matched.e] ?? 0;
+      resultText = multiplier > 0 ? `✨ **Two ${matched.e}s! ${multiplier}x**` : `🔸 Two ${matched.e}s — no payout`;
+    }
+    const payout = multiplier > 0 ? bet * multiplier : 0;
+    const net = payout - bet;
+    const newCoins = (eco.coins ?? 0) + net;
+    await supabase.from('discord_economy').upsert({ discord_id: interaction.user.id, username: interaction.user.username, coins: newCoins, updated_at: new Date().toISOString() });
+    const color = multiplier === 0 ? 0xFF4444 : multiplier >= 20 ? 0xFFD700 : multiplier >= 7 ? 0x00FF88 : 0x00c8ff;
+    const embed = new EmbedBuilder().setTitle('🎰 Slot Machine').setDescription(`${reels}\n\n${resultText}\n\n${net >= 0 ? `**+${payout}🪙** won!` : `**-${bet}🪙** lost`} — Balance: **${newCoins}🪙**`).setColor(color).setFooter({ text: `Bet: ${bet}🪙 • 7️⃣=50x 👑=20x 💎=10x ⚡=7x` }).setTimestamp();
+    const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`slots_again_${bet}`).setLabel('🎰 Spin Again').setStyle(multiplier > 0 ? ButtonStyle.Success : ButtonStyle.Danger));
+    return interaction.update({ embeds: [embed], components: [row] });
   }
 
   // ── ROULETTE AGAIN ───────────────────────────────────────────────
