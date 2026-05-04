@@ -1402,11 +1402,13 @@ client.on('interactionCreate', async interaction => {
     try {
       const champion = interaction.options.getString('champion').trim();
       const lane     = interaction.options.getString('lane')?.toLowerCase().trim() ?? null;
-      const slug     = champion.toLowerCase().replace(/[^a-z0-9]/g, '').replace(/\s+/g, '-');
+      const slug     = champion.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       const url      = `https://www.wildriftfire.com/champion/${slug}`;
+      console.log(`🔍 Builds fetch: ${url}`);
 
-      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } });
-      if (!res.ok) return interaction.editReply({ content: `❌ Champion **${champion}** not found. Check the spelling and try again.\n🔗 Browse manually: <https://www.wildriftfire.com>` });
+      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': 'text/html' } });
+      console.log(`🔍 Builds response: ${res.status} for ${url}`);
+      if (!res.ok) return interaction.editReply({ content: `❌ Champion **${champion}** not found (tried: \`${url}\`).\nCheck spelling — use the in-game name e.g. \`Miss Fortune\`, \`Twisted Fate\`.\n🔗 Browse: <https://www.wildriftfire.com>` });
 
       const html = await res.text();
 
