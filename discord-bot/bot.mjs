@@ -724,25 +724,35 @@ client.on('guildMemberAdd', async member => {
   console.log(`👋 ${member.user.tag} joined — New Arrival assigned, 5min cooldown applied`);
 
   const channels = await member.guild.channels.fetch();
+  const textChannels = [...channels.values()].filter(c => c?.type === ChannelType.GuildText);
+  console.log('Available text channels:', textChannels.map(c => c.name));
+
   const welcomeChannel =
-    channels.find(c => c?.name === 'welcome') ??
-    channels.find(c => c?.name === 'announcements') ??
-    channels.find(c => c?.name === 'general');
+    textChannels.find(c => c.name === 'welcome') ??
+    textChannels.find(c => c.name === 'announcements') ??
+    textChannels.find(c => c.name === 'general');
+
+  console.log('Welcome channel found:', welcomeChannel?.name ?? 'NONE');
   if (!welcomeChannel) return;
+
+  const rulesId   = textChannels.find(c => c.name === 'rules')?.id ?? '';
+  const getRolesId = textChannels.find(c => c.name === 'get-roles')?.id ?? '';
 
   const embed = new EmbedBuilder()
     .setTitle('◈ A NEW CHALLENGER APPROACHES')
     .setDescription(
       `Welcome ${member}, to **The League**! 🎉\n\n` +
-      `→ Read the rules and register in <#${channels.find(c => c?.name === 'rules')?.id ?? ''}>\n` +
-      `→ Pick your roles in <#${channels.find(c => c?.name === 'get-roles')?.id ?? ''}>`
+      `→ Read the rules and register in <#${rulesId}>\n` +
+      `→ Pick your roles in <#${getRolesId}>`
     )
     .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
     .setColor(0x00c8ff)
     .setFooter({ text: `Member #${member.guild.memberCount}` })
     .setTimestamp();
 
-  await welcomeChannel.send({ content: `👋 ${member}`, embeds: [embed] }).catch(() => {});
+  await welcomeChannel.send({ content: `👋 ${member}`, embeds: [embed] })
+    .then(() => console.log('✅ Welcome message sent'))
+    .catch(e => console.error('❌ Welcome send failed:', e.message));
 });
 
 // Member comes back online → notify announcements
