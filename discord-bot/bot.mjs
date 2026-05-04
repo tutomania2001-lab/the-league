@@ -467,6 +467,7 @@ client.once('clientReady', async () => {
         { name: 'amount', type: 4, description: 'Amount to send',        required: true },
       ]},
     { name: 'store', description: 'Browse the server store and buy items' },
+    { name: 'buffs', description: 'Check your active perks and buffs' },
     { name: 'addcoins', description: 'Admin: add coins to a user',
       options: [
         { name: 'user',   type: 6, description: 'Target user', required: true },
@@ -1196,6 +1197,32 @@ client.on('interactionCreate', async interaction => {
       console.error('gift error:', e.message);
       interaction.editReply({ content: '❌ Gift failed.' }).catch(() => {});
     }
+  }
+
+  // ── /buffs ───────────────────────────────────────────────────────
+  if (interaction.commandName === 'buffs') {
+    const uid = interaction.user.id;
+    const perks = getPerks(uid);
+    const now = new Date();
+
+    const shield   = hasShield(uid);
+    const charm    = hasCharm(uid);
+    const xpBoost  = hasXPBoost(uid);
+
+    const charmLeft   = charm   ? Math.ceil((new Date(perks.charmExpires)    - now) / 60000) : 0;
+    const xpBoostLeft = xpBoost ? Math.ceil((new Date(perks.xpBoostExpires)  - now) / 60000) : 0;
+
+    const lines = [];
+    if (shield)  lines.push('🛡️ **Gamble Shield** — Active (blocks next loss)');
+    if (charm)   lines.push(`🔮 **Lucky Charm** — Active for **${charmLeft >= 60 ? `${Math.floor(charmLeft/60)}h ${charmLeft%60}m` : `${charmLeft}m`}**`);
+    if (xpBoost) lines.push(`💎 **XP Boost** — Active for **${xpBoostLeft >= 60 ? `${Math.floor(xpBoostLeft/60)}h ${xpBoostLeft%60}m` : `${xpBoostLeft}m`}** (2x XP)`);
+
+    const embed = new EmbedBuilder()
+      .setTitle(`⚡ ${interaction.user.displayName}'s Active Buffs`)
+      .setDescription(lines.length ? lines.join('\n') : '❌ No active buffs.\nBuy perks from `/store` to get started!')
+      .setColor(lines.length ? 0x00c8ff : 0x555555)
+      .setTimestamp();
+    return interaction.reply({ embeds: [embed], ephemeral: true });
   }
 
   // ── /store ───────────────────────────────────────────────────────
