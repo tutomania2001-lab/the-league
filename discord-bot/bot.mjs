@@ -261,7 +261,7 @@ client.once('clientReady', async () => {
   console.log('Roles mapped:', Object.keys(roles));
 
   // Lock all channels except public ones
-  const publicChannels = ['rules', 'announcements', 'app-download', 'commands'];
+  const publicChannels = ['rules', 'announcements', 'app-download', 'commands', 'get-roles', 'faq'];
   for (const [, channel] of guildChannels) {
     if (!channel.permissionsFor || channel.type === 4) continue;
     if (!publicChannels.includes(channel.name)) {
