@@ -101,8 +101,9 @@ const LANES = [
 ];
 
 // ── ECONOMY ───────────────────────────────────────────────────────
-const msgCooldowns  = new Map(); // userId → last XP timestamp
-const voiceJoins    = new Map(); // userId → voice join timestamp
+const msgCooldowns      = new Map(); // userId → last XP timestamp
+const voiceJoins        = new Map(); // userId → voice join timestamp
+const newMemberCooldowns = new Map(); // userId → join timestamp (5 min block)
 
 const STORE_ITEMS = [
   { id: 'red',    name: '🔴 Red',    desc: 'Red username color',    price: 200, color: 0xFF4444 },
@@ -699,6 +700,15 @@ client.once('clientReady', async () => {
 // ── MESSAGE XP/COINS ─────────────────────────────────────────────
 client.on('messageCreate', async msg => {
   if (msg.author.bot || !msg.guild) return;
+
+  // 5-minute new member cooldown
+  if (newMemberCooldowns.has(msg.author.id)) {
+    const remaining = Math.ceil((5 * 60 * 1000 - (Date.now() - newMemberCooldowns.get(msg.author.id))) / 1000);
+    await msg.delete().catch(() => {});
+    const warn = await msg.channel.send(`⏳ <@${msg.author.id}> Please wait **${remaining}s** before chatting.`).catch(() => null);
+    if (warn) setTimeout(() => warn.delete().catch(() => {}), 4000);
+    return;
+  }
   const uid = msg.author.id;
   const now = Date.now();
   if (msgCooldowns.has(uid) && now - msgCooldowns.get(uid) < 60_000) return;
@@ -719,9 +729,10 @@ client.on('guildMemberAdd', async member => {
   if (member.user.bot) return;
   if (client.roles?.newArrival) await member.roles.add(client.roles.newArrival).catch(() => {});
 
-  // 5-minute chat cooldown using Discord's built-in timeout
-  await member.timeout(5 * 60 * 1000, 'New member cooldown').catch(() => {});
-  console.log(`👋 ${member.user.tag} joined — New Arrival assigned, 5min cooldown applied`);
+  // Track join time for 5-min message cooldown
+  newMemberCooldowns.set(member.id, Date.now());
+  setTimeout(() => newMemberCooldowns.delete(member.id), 5 * 60 * 1000);
+  console.log(`👋 ${member.user.tag} joined — New Arrival assigned, 5min message cooldown started`);
 
   const channels = await member.guild.channels.fetch();
   const textChannels = [...channels.values()].filter(c => c?.type === ChannelType.GuildText);
