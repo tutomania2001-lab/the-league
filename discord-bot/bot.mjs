@@ -258,6 +258,13 @@ const client = new Client({
 // In-memory store for private rooms: channelId → { ownerId, password, lobbyMessageId }
 const privateRooms = new Map();
 
+// Crash game state: userId → { bet, multiplier, crashAt, interval, coins, msg }
+const crashGames = new Map();
+
+// Roulette wheel — 0=green, 1-18 odd=red even=black, 19-36 odd=black even=red
+const ROULETTE_RED = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+function rouletteColor(n) { return n === 0 ? 'green' : ROULETTE_RED.has(n) ? 'red' : 'black'; }
+
 // ── MINI GAMES ────────────────────────────────────────────────────
 const games = new Map();
 let gCount = 0;
@@ -438,8 +445,15 @@ client.once('clientReady', async () => {
     { name: 'relink', description: 'Change your linked The League app account' },
     { name: 'daily',   description: 'Claim your daily coins reward' },
     { name: 'streak',  description: 'Check your daily login streak' },
-    { name: 'gamble',  description: 'Bet your coins — double or nothing',
+    { name: 'gamble',   description: 'Bet your coins — double or nothing',
       options: [{ name: 'amount', type: 4, description: 'Amount of coins to bet', required: true }] },
+    { name: 'roulette', description: 'Spin the roulette wheel',
+      options: [
+        { name: 'amount', type: 4, description: 'Amount to bet', required: true },
+        { name: 'bet',    type: 3, description: 'red / black / green / 0-36', required: true },
+      ]},
+    { name: 'crash',    description: 'Bet coins on a rising multiplier — cash out before it crashes!',
+      options: [{ name: 'amount', type: 4, description: 'Amount to bet', required: true }] },
     { name: 'flip',  description: 'Flip a coin — heads or tails' },
     { name: 'roll',  description: 'Roll a dice',
       options: [{ name: 'sides', type: 4, description: 'Number of sides (default 6)', required: false }] },
@@ -1132,6 +1146,99 @@ client.on('interactionCreate', async interaction => {
     return interaction.showModal(modal);
   }
 
+  // ── /roulette ────────────────────────────────────────────────────
+  if (interaction.commandName === 'roulette') {
+    await interaction.deferReply();
+    try {
+      const amount = interaction.options.getInteger('amount');
+      const betInput = interaction.options.getString('bet').toLowerCase().trim();
+      if (amount < 10) return interaction.editReply({ content: '❌ Minimum bet is **10 coins**.' });
+
+      const eco = await getEconomy(interaction.user.id);
+      if ((eco.coins ?? 0) < amount) return interaction.editReply({ content: `❌ Not enough coins! You have **${eco.coins ?? 0}🪙**.` });
+
+      // Validate bet
+      const isColor = ['red','black','green'].includes(betInput);
+      const isNumber = !isNaN(betInput) && parseInt(betInput) >= 0 && parseInt(betInput) <= 36;
+      if (!isColor && !isNumber) return interaction.editReply({ content: '❌ Bet must be `red`, `black`, `green`, or a number 0–36.' });
+
+      // Spin
+      const spin = Math.floor(Math.random() * 37);
+      const spinColor = rouletteColor(spin);
+      const colorEmoji = { red: '🔴', black: '⚫', green: '🟢' };
+
+      let multiplier = 0;
+      if (isColor) {
+        if (betInput === spinColor) multiplier = betInput === 'green' ? 14 : 2;
+      } else {
+        if (parseInt(betInput) === spin) multiplier = 35;
+      }
+
+      const win = multiplier > 0;
+      const payout = win ? amount * multiplier - amount : -amount;
+      const newCoins = (eco.coins ?? 0) + payout;
+      await supabase.from('discord_economy').upsert({ discord_id: interaction.user.id, username: interaction.user.username, coins: newCoins, updated_at: new Date().toISOString() });
+
+      const embed = new EmbedBuilder()
+        .setTitle(`🎡 Roulette — ${colorEmoji[spinColor]} **${spin}** ${spinColor.toUpperCase()}`)
+        .setDescription(`${interaction.user} bet **${amount}🪙** on **${betInput}**\n\n${win ? `🏆 **WIN!** ${multiplier}x — **+${payout}🪙**` : `💀 **LOSE** — **-${amount}🪙**`}\n\nBalance: **${newCoins}🪙**`)
+        .setColor(spinColor === 'red' ? 0xFF4444 : spinColor === 'green' ? 0x00FF88 : 0x333333)
+        .setTimestamp();
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`roulette_again_${amount}_${betInput}`).setLabel('🎡 Spin Again').setStyle(ButtonStyle.Primary),
+      );
+      await interaction.editReply({ embeds: [embed], components: [row] });
+    } catch (e) {
+      console.error('roulette error:', e.message);
+      interaction.editReply({ content: '❌ Roulette failed.' }).catch(() => {});
+    }
+  }
+
+  // ── /crash ───────────────────────────────────────────────────────
+  if (interaction.commandName === 'crash') {
+    await interaction.deferReply();
+    try {
+      const amount = interaction.options.getInteger('amount');
+      if (amount < 10) return interaction.editReply({ content: '❌ Minimum bet is **10 coins**.' });
+      if (crashGames.has(interaction.user.id)) return interaction.editReply({ content: '❌ You already have a crash game running! Cash out first.' });
+
+      const eco = await getEconomy(interaction.user.id);
+      if ((eco.coins ?? 0) < amount) return interaction.editReply({ content: `❌ Not enough coins! You have **${eco.coins ?? 0}🪙**.` });
+
+      // Deduct bet upfront
+      await supabase.from('discord_economy').upsert({ discord_id: interaction.user.id, username: interaction.user.username, coins: (eco.coins ?? 0) - amount, updated_at: new Date().toISOString() });
+
+      // Generate crash point (exponential distribution)
+      const crashAt = Math.max(1.1, 1 / (1 - Math.random() * 0.98));
+      let current = 1.0;
+
+      const cashOutRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`crash_cashout_${interaction.user.id}`).setLabel('💰 Cash Out').setStyle(ButtonStyle.Success),
+      );
+
+      const msg = await interaction.editReply({ content: `🚀 **CRASH** — ${interaction.user}\nBet: **${amount}🪙** | Multiplier: **1.00x**\n\n*Click Cash Out before it crashes!*`, components: [cashOutRow] });
+
+      const interval = setInterval(async () => {
+        current = parseFloat((current * 1.07).toFixed(2));
+        const game = crashGames.get(interaction.user.id);
+        if (!game) return;
+
+        if (current >= game.crashAt) {
+          clearInterval(interval);
+          crashGames.delete(interaction.user.id);
+          await interaction.editReply({ content: `💥 **CRASHED at ${current.toFixed(2)}x!** — ${interaction.user}\nBet: **${amount}🪙** | You lost it all.\n\nBalance: **${(eco.coins ?? 0) - amount}🪙**`, components: [] }).catch(() => {});
+          return;
+        }
+        await interaction.editReply({ content: `🚀 **CRASH** — ${interaction.user}\nBet: **${amount}🪙** | Multiplier: **${current.toFixed(2)}x** 📈\n\n*Click Cash Out before it crashes!*`, components: [cashOutRow] }).catch(() => {});
+      }, 1500);
+
+      crashGames.set(interaction.user.id, { bet: amount, crashAt, interval, coins: eco.coins ?? 0, userId: interaction.user.id, interactionRef: interaction });
+    } catch (e) {
+      console.error('crash error:', e.message);
+      interaction.editReply({ content: '❌ Crash game failed.' }).catch(() => {});
+    }
+  }
+
   // ── /gamble ──────────────────────────────────────────────────────
   if (interaction.commandName === 'gamble') {
     await interaction.deferReply();
@@ -1358,6 +1465,55 @@ client.on('interactionCreate', async interaction => {
     if (!ok) return interaction.editReply({ content: `❌ Not enough coins! You need **${item.price}🪙** to buy **${item.name}**.` });
     if (roleId) await freshMember.roles.add(roleId).catch(() => {});
     return interaction.editReply({ content: `✅ Purchased **${item.name}**! 🎉 ${roleId ? 'Role applied.' : ''}` });
+  }
+
+  // ── CRASH CASH OUT ───────────────────────────────────────────────
+  if (interaction.customId.startsWith('crash_cashout_')) {
+    const userId = interaction.customId.replace('crash_cashout_', '');
+    if (interaction.user.id !== userId) return interaction.reply({ content: '❌ This is not your game.', ephemeral: true });
+    const game = crashGames.get(userId);
+    if (!game) return interaction.update({ content: '💥 Too late — already crashed!', components: [] });
+    clearInterval(game.interval);
+    crashGames.delete(userId);
+    const eco = await getEconomy(userId);
+    const current = parseFloat(((game.coins - game.bet + game.bet) / game.coins * (eco.coins + game.bet) / game.bet).toFixed(2));
+    // Get current multiplier from message content
+    const msgContent = interaction.message.content;
+    const multMatch = msgContent.match(/\*\*([\d.]+)x\*\*/);
+    const mult = multMatch ? parseFloat(multMatch[1]) : 1.0;
+    const winnings = Math.floor(game.bet * mult);
+    const newCoins = (eco.coins ?? 0) + winnings;
+    await supabase.from('discord_economy').upsert({ discord_id: userId, username: interaction.user.username, coins: newCoins, updated_at: new Date().toISOString() });
+    return interaction.update({ content: `✅ **Cashed out at ${mult.toFixed(2)}x!** — ${interaction.user}\nBet: **${game.bet}🪙** → Won: **${winnings}🪙** (+${winnings - game.bet}🪙)\n\nBalance: **${newCoins}🪙**`, components: [] });
+  }
+
+  // ── ROULETTE AGAIN ───────────────────────────────────────────────
+  if (interaction.customId.startsWith('roulette_again_')) {
+    const parts = interaction.customId.split('_');
+    const amount = parseInt(parts[2]);
+    const betInput = parts.slice(3).join('_');
+    const eco = await getEconomy(interaction.user.id);
+    if ((eco.coins ?? 0) < amount) return interaction.update({ content: `❌ Not enough coins to bet **${amount}🪙** again! You have **${eco.coins ?? 0}🪙**.`, embeds: [], components: [] });
+
+    const spin = Math.floor(Math.random() * 37);
+    const spinColor = rouletteColor(spin);
+    const colorEmoji = { red: '🔴', black: '⚫', green: '🟢' };
+    const isColor = ['red','black','green'].includes(betInput);
+    let multiplier = 0;
+    if (isColor) { if (betInput === spinColor) multiplier = betInput === 'green' ? 14 : 2; }
+    else { if (parseInt(betInput) === spin) multiplier = 35; }
+    const win = multiplier > 0;
+    const payout = win ? amount * multiplier - amount : -amount;
+    const newCoins = (eco.coins ?? 0) + payout;
+    await supabase.from('discord_economy').upsert({ discord_id: interaction.user.id, username: interaction.user.username, coins: newCoins, updated_at: new Date().toISOString() });
+    const embed = new EmbedBuilder()
+      .setTitle(`🎡 Roulette — ${colorEmoji[spinColor]} **${spin}** ${spinColor.toUpperCase()}`)
+      .setDescription(`${interaction.user} bet **${amount}🪙** on **${betInput}**\n\n${win ? `🏆 **WIN!** ${multiplier}x — **+${payout}🪙**` : `💀 **LOSE** — **-${amount}🪙**`}\n\nBalance: **${newCoins}🪙**`)
+      .setColor(spinColor === 'red' ? 0xFF4444 : spinColor === 'green' ? 0x00FF88 : 0x333333).setTimestamp();
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`roulette_again_${amount}_${betInput}`).setLabel('🎡 Spin Again').setStyle(ButtonStyle.Primary),
+    );
+    return interaction.update({ embeds: [embed], components: [row] });
   }
 
   // ── GAMBLE AGAIN ─────────────────────────────────────────────────
