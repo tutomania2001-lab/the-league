@@ -171,12 +171,82 @@ const BUILDS_DB = {
   seraphine:{ lane:'Support', items:["Shard of True Ice","Ardent Censer","Staff of Flowing Water","Redemption","Locket of the Iron Solari","Mikael's Blessing"], boots:"Ionian Boots of Lucidity", runes:['Summon Aery','Manaflow Band','Transcendence','Gathering Storm'], skills:'R > E > Q > W' },
   volibear: { lane:'Baron',  items:["Trinity Force","Sterak's Gage","Black Cleaver","Dead Man's Plate","Spirit Visage","Gargoyle Stoneplate"],      boots:"Plated Steelcaps",   runes:['Grasp of the Undying','Shield Bash','Bone Plating','Overgrowth'], skills:'R > Q > E > W' },
 };
+// ── BARON LANE (additional) ──────────────────────────────────────
+Object.assign(BUILDS_DB, {
+  irelia:     { lane:'Baron',  items:["Trinity Force","Sterak's Gage","Death's Dance","Blade of the Ruined King","Guardian Angel","Black Cleaver"],      boots:"Plated Steelcaps",   runes:['Conqueror','Triumph','Legend: Alacrity','Coup de Grace'],      skills:'R > Q > E > W' },
+  tryndamere: { lane:'Baron',  items:["Blade of the Ruined King","Trinity Force","Guinsoo's Rageblade","Phantom Dancer","Mortal Reminder","Death's Dance"], boots:"Plated Steelcaps",  runes:['Lethal Tempo','Triumph','Legend: Alacrity','Last Stand'],       skills:'R > E > Q > W' },
+  renekton:   { lane:'Baron',  items:["Black Cleaver","Sterak's Gage","Death's Dance","Sunfire Aegis","Dead Man's Plate","Gargoyle Stoneplate"],            boots:"Plated Steelcaps",   runes:['Conqueror','Triumph','Legend: Tenacity','Last Stand'],           skills:'R > W > Q > E' },
+  nasus:      { lane:'Baron',  items:["Frostfire Gauntlet","Warmog's Armor","Spirit Visage","Heartsteel","Dead Man's Plate","Sterak's Gage"],               boots:"Plated Steelcaps",   runes:['Grasp of the Undying','Shield Bash','Bone Plating','Overgrowth'],skills:'R > Q > W > E' },
+  wukong:     { lane:'Baron',  items:["Trinity Force","Black Cleaver","Death's Dance","Sterak's Gage","Dead Man's Plate","Gargoyle Stoneplate"],            boots:"Plated Steelcaps",   runes:['Conqueror','Triumph','Legend: Tenacity','Last Stand'],           skills:'R > Q > E > W' },
+  urgot:      { lane:'Baron',  items:["Frostfire Gauntlet","Sterak's Gage","Titanic Hydra","Warmog's Armor","Dead Man's Plate","Sunfire Aegis"],            boots:"Plated Steelcaps",   runes:['Grasp of the Undying','Demolish','Bone Plating','Overgrowth'],  skills:'R > W > E > Q' },
+  mundo:      { lane:'Baron',  items:["Warmog's Armor","Spirit Visage","Heartsteel","Gargoyle Stoneplate","Frostfire Gauntlet","Dead Man's Plate"],         boots:"Plated Steelcaps",   runes:['Grasp of the Undying','Shield Bash','Conditioning','Overgrowth'],skills:'R > E > Q > W' },
+  pantheon:   { lane:'Baron',  items:["Duskblade of Draktharr","Youmuu's Ghostblade","Edge of Night","Black Cleaver","Death's Dance","Sterak's Gage"],     boots:"Plated Steelcaps",   runes:['Conqueror','Sudden Impact','Eyeball Collection','Relentless Hunter'],skills:'R > W > Q > E' },
+  singed:     { lane:'Baron',  items:["Rylai's Crystal Scepter","Warmog's Armor","Sunfire Aegis","Spirit Visage","Frostfire Gauntlet","Dead Man's Plate"],  boots:"Plated Steelcaps",   runes:['Phase Rush','Nimbus Cloak','Conditioning','Overgrowth'],        skills:'R > E > Q > W' },
+  sion:       { lane:'Baron',  items:["Frostfire Gauntlet","Warmog's Armor","Thornmail","Dead Man's Plate","Gargoyle Stoneplate","Spirit Visage"],           boots:"Plated Steelcaps",   runes:['Grasp of the Undying','Demolish','Bone Plating','Overgrowth'],  skills:'R > Q > W > E' },
+});
+// ── JUNGLE (additional) ───────────────────────────────────────────
+Object.assign(BUILDS_DB, {
+  amumu:      { lane:'Jungle', items:["Sunfire Aegis","Warmog's Armor","Thornmail","Abyssal Mask","Gargoyle Stoneplate","Frostfire Gauntlet"],              boots:"Plated Steelcaps",   runes:['Aftershock','Demolish','Bone Plating','Overgrowth'],             skills:'R > W > Q > E' },
+  diana:      { lane:'Jungle', items:["Luden's Tempest","Rabadon's Deathcap","Void Staff","Zhonya's Hourglass","Shadowflame","Cryptbloom"],                 boots:"Sorcerer's Shoes",   runes:['Electrocute','Sudden Impact','Eyeball Collection','Ultimate Hunter'],skills:'R > Q > W > E' },
+  graves:     { lane:'Jungle', items:["Duskblade of Draktharr","Youmuu's Ghostblade","Edge of Night","Black Cleaver","Death's Dance","Serpent's Fang"],     boots:"Ionian Boots of Lucidity", runes:['Electrocute','Sudden Impact','Eyeball Collection','Relentless Hunter'],skills:'R > Q > E > W' },
+  jarvaniv:   { lane:'Jungle', items:["Trinity Force","Black Cleaver","Death's Dance","Sterak's Gage","Dead Man's Plate","Gargoyle Stoneplate"],            boots:"Plated Steelcaps",   runes:['Conqueror','Triumph','Legend: Tenacity','Last Stand'],           skills:'R > E > Q > W' },
+  khazix:     { lane:'Jungle', items:["Duskblade of Draktharr","Youmuu's Ghostblade","Edge of Night","Serpent's Fang","Black Cleaver","Ravenous Hydra"],    boots:"Ionian Boots of Lucidity", runes:['Electrocute','Sudden Impact','Eyeball Collection','Relentless Hunter'],skills:'R > Q > W > E' },
+  olaf:       { lane:'Jungle', items:["Black Cleaver","Sterak's Gage","Death's Dance","Ravenous Hydra","Dead Man's Plate","Warmog's Armor"],                boots:"Plated Steelcaps",   runes:['Conqueror','Triumph','Legend: Tenacity','Last Stand'],           skills:'R > E > Q > W' },
+  hecarim:    { lane:'Jungle', items:["Trinity Force","Sterak's Gage","Death's Dance","Dead Man's Plate","Gargoyle Stoneplate","Spirit Visage"],            boots:"Plated Steelcaps",   runes:['Conqueror','Triumph','Legend: Tenacity','Last Stand'],           skills:'R > W > Q > E' },
+  nocturne:   { lane:'Jungle', items:["Duskblade of Draktharr","Edge of Night","Black Cleaver","Death's Dance","Sterak's Gage","Serpent's Fang"],           boots:"Ionian Boots of Lucidity", runes:['Electrocute','Sudden Impact','Eyeball Collection','Relentless Hunter'],skills:'R > Q > E > W' },
+  nidalee:    { lane:'Jungle', items:["Luden's Tempest","Shadowflame","Rabadon's Deathcap","Void Staff","Zhonya's Hourglass","Cryptbloom"],                 boots:"Sorcerer's Shoes",   runes:['Electrocute','Cheap Shot','Eyeball Collection','Relentless Hunter'],skills:'R > Q > W > E' },
+  rengar:     { lane:'Jungle', items:["Duskblade of Draktharr","Youmuu's Ghostblade","Edge of Night","Ravenous Hydra","Black Cleaver","Serpent's Fang"],    boots:"Ionian Boots of Lucidity", runes:['Electrocute','Sudden Impact','Eyeball Collection','Relentless Hunter'],skills:'R > Q > E > W' },
+});
+// ── MID (additional) ─────────────────────────────────────────────
+Object.assign(BUILDS_DB, {
+  fizz:       { lane:'Mid',    items:["Luden's Tempest","Shadowflame","Rabadon's Deathcap","Void Staff","Zhonya's Hourglass","Cryptbloom"],                 boots:"Sorcerer's Shoes",   runes:['Electrocute','Cheap Shot','Eyeball Collection','Relentless Hunter'],skills:'R > E > Q > W' },
+  katarina:   { lane:'Mid',    items:["Luden's Tempest","Shadowflame","Rabadon's Deathcap","Void Staff","Riftmaker","Zhonya's Hourglass"],                  boots:"Sorcerer's Shoes",   runes:['Electrocute','Sudden Impact','Eyeball Collection','Ultimate Hunter'],skills:'R > E > Q > W' },
+  veigar:     { lane:'Mid',    items:["Luden's Tempest","Shadowflame","Rabadon's Deathcap","Void Staff","Horizon Focus","Zhonya's Hourglass"],               boots:"Sorcerer's Shoes",   runes:['Arcane Comet','Manaflow Band','Transcendence','Gathering Storm'],  skills:'R > E > W > Q' },
+  ziggs:      { lane:'Mid',    items:["Luden's Tempest","Shadowflame","Rabadon's Deathcap","Void Staff","Horizon Focus","Zhonya's Hourglass"],               boots:"Sorcerer's Shoes",   runes:['Arcane Comet','Manaflow Band','Transcendence','Gathering Storm'],  skills:'R > Q > W > E' },
+  syndra:     { lane:'Mid',    items:["Luden's Tempest","Shadowflame","Rabadon's Deathcap","Void Staff","Horizon Focus","Zhonya's Hourglass"],               boots:"Sorcerer's Shoes",   runes:['Arcane Comet','Manaflow Band','Transcendence','Scorch'],           skills:'R > Q > E > W' },
+  irelia:     { lane:'Mid',    items:["Trinity Force","Sterak's Gage","Death's Dance","Blade of the Ruined King","Guardian Angel","Black Cleaver"],          boots:"Plated Steelcaps",   runes:['Conqueror','Triumph','Legend: Alacrity','Coup de Grace'],          skills:'R > Q > E > W' },
+  corki:      { lane:'Mid',    items:["Trinity Force","Essence Reaver","Infinity Edge","Navori Quickblades","Rapid Firecannon","Mortal Reminder"],           boots:"Sorcerer's Shoes",   runes:['Arcane Comet','Manaflow Band','Transcendence','Gathering Storm'],  skills:'R > Q > E > W' },
+  brand:      { lane:'Mid',    items:["Luden's Tempest","Shadowflame","Rabadon's Deathcap","Void Staff","Horizon Focus","Morellonomicon"],                   boots:"Sorcerer's Shoes",   runes:['Electrocute','Cheap Shot','Eyeball Collection','Ultimate Hunter'], skills:'R > W > E > Q' },
+});
+// ── DRAGON LANE (additional) ─────────────────────────────────────
+Object.assign(BUILDS_DB, {
+  ashe:       { lane:'Dragon', items:["Kraken Slayer","Runaan's Hurricane","Infinity Edge","Bloodthirster","Mortal Reminder","Phantom Dancer"],              boots:"Gluttonous Greaves", runes:['Lethal Tempo','Triumph','Legend: Alacrity','Coup de Grace'],      skills:'R > W > Q > E' },
+  draven:     { lane:'Dragon', items:["Kraken Slayer","Infinity Edge","Essence Reaver","Bloodthirster","Mortal Reminder","Navori Quickblades"],              boots:"Gluttonous Greaves", runes:['Lethal Tempo','Triumph','Legend: Bloodline','Coup de Grace'],     skills:'R > Q > W > E' },
+  lucian:     { lane:'Dragon', items:["Kraken Slayer","Essence Reaver","Infinity Edge","Navori Quickblades","Mortal Reminder","Bloodthirster"],              boots:"Gluttonous Greaves", runes:['Lethal Tempo','Triumph','Legend: Alacrity','Coup de Grace'],      skills:'R > Q > E > W' },
+  sivir:      { lane:'Dragon', items:["Kraken Slayer","Runaan's Hurricane","Essence Reaver","Infinity Edge","Mortal Reminder","Bloodthirster"],              boots:"Gluttonous Greaves", runes:['Lethal Tempo','Triumph','Legend: Alacrity','Coup de Grace'],      skills:'R > W > Q > E' },
+  tristana:   { lane:'Dragon', items:["Kraken Slayer","Guinsoo's Rageblade","Infinity Edge","Phantom Dancer","Mortal Reminder","Bloodthirster"],             boots:"Gluttonous Greaves", runes:['Lethal Tempo','Triumph','Legend: Alacrity','Coup de Grace'],      skills:'R > E > W > Q' },
+  varus:      { lane:'Dragon', items:["Kraken Slayer","Mortal Reminder","Guinsoo's Rageblade","Runaan's Hurricane","Infinity Edge","Bloodthirster"],         boots:"Gluttonous Greaves", runes:['Lethal Tempo','Triumph','Legend: Alacrity','Coup de Grace'],      skills:'R > Q > W > E' },
+  xayah:      { lane:'Dragon', items:["Kraken Slayer","Infinity Edge","Phantom Dancer","Mortal Reminder","Bloodthirster","Navori Quickblades"],              boots:"Gluttonous Greaves", runes:['Lethal Tempo','Triumph','Legend: Bloodline','Coup de Grace'],     skills:'R > W > Q > E' },
+  caitlyn:    { lane:'Dragon', items:["Galeforce","Infinity Edge","Rapid Firecannon","Mortal Reminder","Phantom Dancer","Bloodthirster"],                    boots:"Gluttonous Greaves", runes:['Fleet Footwork','Triumph','Legend: Bloodline','Coup de Grace'],   skills:'R > Q > W > E' },
+  vayne:      { lane:'Dragon', items:["Blade of the Ruined King","Guinsoo's Rageblade","Kraken Slayer","Phantom Dancer","Mortal Reminder","Wit's End"],      boots:"Gluttonous Greaves", runes:['Lethal Tempo','Triumph','Legend: Alacrity','Last Stand'],         skills:'R > Q > E > W' },
+});
+// ── SUPPORT (additional) ─────────────────────────────────────────
+Object.assign(BUILDS_DB, {
+  blitzcrank: { lane:'Support', items:["Knight's Vow","Warmog's Armor","Dead Man's Plate","Thornmail","Frostfire Gauntlet","Gargoyle Stoneplate"],           boots:"Plated Steelcaps",   runes:['Aftershock','Font of Life','Bone Plating','Revitalize'],          skills:'R > Q > W > E' },
+  braum:      { lane:'Support', items:["Knight's Vow","Warmog's Armor","Dead Man's Plate","Thornmail","Frozen Heart","Gargoyle Stoneplate"],                 boots:"Plated Steelcaps",   runes:['Aftershock','Font of Life','Bone Plating','Revitalize'],          skills:'R > E > Q > W' },
+  janna:      { lane:'Support', items:["Shard of True Ice","Ardent Censer","Staff of Flowing Water","Redemption","Knight's Vow","Mikael's Blessing"],        boots:"Ionian Boots of Lucidity", runes:['Summon Aery','Manaflow Band','Transcendence','Gathering Storm'], skills:'R > W > Q > E' },
+  karma:      { lane:'Support', items:["Luden's Tempest","Shard of True Ice","Ardent Censer","Staff of Flowing Water","Redemption","Rabadon's Deathcap"],    boots:"Ionian Boots of Lucidity", runes:['Summon Aery','Manaflow Band','Transcendence','Scorch'],          skills:'R > W > Q > E' },
+  leona:      { lane:'Support', items:["Knight's Vow","Frostfire Gauntlet","Warmog's Armor","Thornmail","Dead Man's Plate","Gargoyle Stoneplate"],           boots:"Plated Steelcaps",   runes:['Aftershock','Font of Life','Bone Plating','Revitalize'],          skills:'R > E > Q > W' },
+  morgana:    { lane:'Support', items:["Shard of True Ice","Luden's Tempest","Shadowflame","Void Staff","Zhonya's Hourglass","Cryptbloom"],                  boots:"Sorcerer's Shoes",   runes:['Arcane Comet','Manaflow Band','Transcendence','Scorch'],          skills:'R > W > Q > E' },
+  soraka:     { lane:'Support', items:["Shard of True Ice","Ardent Censer","Staff of Flowing Water","Redemption","Mikael's Blessing","Knight's Vow"],        boots:"Ionian Boots of Lucidity", runes:['Summon Aery','Manaflow Band','Transcendence','Revitalize'],     skills:'R > W > Q > E' },
+  sona:       { lane:'Support', items:["Shard of True Ice","Ardent Censer","Staff of Flowing Water","Redemption","Shurelya's Battlesong","Mikael's Blessing"], boots:"Ionian Boots of Lucidity", runes:['Summon Aery','Manaflow Band','Transcendence','Revitalize'],   skills:'R > W > Q > E' },
+  yuumi:      { lane:'Support', items:["Shard of True Ice","Ardent Censer","Staff of Flowing Water","Redemption","Mikael's Blessing","Rabadon's Deathcap"],  boots:"Ionian Boots of Lucidity", runes:['Summon Aery','Manaflow Band','Transcendence','Revitalize'],     skills:'R > W > Q > E' },
+  pyke:       { lane:'Support', items:["Duskblade of Draktharr","Youmuu's Ghostblade","Edge of Night","Serpent's Fang","Black Cleaver","Umbral Glaive"],     boots:"Ionian Boots of Lucidity", runes:['Electrocute','Sudden Impact','Eyeball Collection','Relentless Hunter'],skills:'R > Q > E > W' },
+  zyra:       { lane:'Support', items:["Imperial Mandate","Luden's Tempest","Shadowflame","Void Staff","Rabadon's Deathcap","Rylai's Crystal Scepter"],      boots:"Sorcerer's Shoes",   runes:['Arcane Comet','Manaflow Band','Transcendence','Gathering Storm'], skills:'R > E > Q > W' },
+  rakan:      { lane:'Support', items:["Knight's Vow","Shurelya's Battlesong","Redemption","Locket of the Iron Solari","Ardent Censer","Staff of Flowing Water"], boots:"Ionian Boots of Lucidity", runes:['Summon Aery','Font of Life','Bone Plating','Revitalize'],      skills:'R > W > Q > E' },
+});
 // Key aliases
 BUILDS_DB['miss fortune'] = BUILDS_DB.missfortune;
 BUILDS_DB['master yi']    = BUILDS_DB.masteryi;
 BUILDS_DB['twisted fate'] = BUILDS_DB.twisted_fate;
 BUILDS_DB['xin zhao']     = BUILDS_DB.xinzhao;
 BUILDS_DB['lee sin']      = BUILDS_DB.leesin;
+BUILDS_DB['dr mundo']     = BUILDS_DB.mundo;
+BUILDS_DB['dr. mundo']    = BUILDS_DB.mundo;
+BUILDS_DB['jarvan iv']    = BUILDS_DB.jarvaniv;
+BUILDS_DB['jarvan']       = BUILDS_DB.jarvaniv;
+BUILDS_DB["kha'zix"]      = BUILDS_DB.khazix;
+BUILDS_DB['kha zix']      = BUILDS_DB.khazix;
 
 const LANE_COLORS = { Baron:'#8B4513', Jungle:'#228B22', Mid:'#4169E1', Dragon:'#DC143C', Support:'#9370DB' };
 
