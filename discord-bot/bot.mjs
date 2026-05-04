@@ -121,7 +121,80 @@ const STORE_ITEMS = [
   { id: 'shield',   name: '🛡️ Gamble Shield', desc: 'Block one gambling loss',            price: 250,  type: 'perk' },
   { id: 'charm',    name: '🔮 Lucky Charm',   desc: 'Boost gamble win rate for 1 hour',   price: 500,  type: 'perk' },
   { id: 'xpboost',  name: '💎 XP Boost',      desc: '2x XP earned for 24 hours',         price: 750,  type: 'perk' },
+  // Rank card banners
+  { id: 'banner_fire',   name: '🔥 Fire Banner',   desc: 'Fiery rank card background',          price: 500,  type: 'banner' },
+  { id: 'banner_ocean',  name: '🌊 Ocean Banner',  desc: 'Deep ocean rank card background',     price: 500,  type: 'banner' },
+  { id: 'banner_galaxy', name: '🌌 Galaxy Banner', desc: 'Galaxy stars rank card background',   price: 750,  type: 'banner' },
+  { id: 'banner_neon',   name: '⚡ Neon Banner',   desc: 'Cyberpunk neon rank card background', price: 750,  type: 'banner' },
+  { id: 'banner_gold',   name: '✨ Gold Banner',   desc: 'Premium gold rank card background',   price: 1000, type: 'banner' },
 ];
+
+// Banner background renderers
+function drawBanner(ctx, W, H, bannerId) {
+  let bg;
+  switch (bannerId) {
+    case 'banner_fire': {
+      bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, '#1a0500'); bg.addColorStop(0.5, '#3d1000'); bg.addColorStop(1, '#1a0800');
+      ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
+      // Fire glow
+      const g = ctx.createRadialGradient(W/2, H, 0, W/2, H, H);
+      g.addColorStop(0, '#FF440055'); g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      break;
+    }
+    case 'banner_ocean': {
+      bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, '#001428'); bg.addColorStop(1, '#002a3d');
+      ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
+      const wave = ctx.createLinearGradient(0, H*0.6, 0, H);
+      wave.addColorStop(0, '#00BFFF22'); wave.addColorStop(1, '#0077AA44');
+      ctx.fillStyle = wave; ctx.fillRect(0, H*0.5, W, H*0.5);
+      break;
+    }
+    case 'banner_galaxy': {
+      bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, '#060010'); bg.addColorStop(1, '#150028');
+      ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
+      // Stars
+      ctx.fillStyle = '#ffffff';
+      for (let i = 0; i < 80; i++) {
+        const x = Math.random() * W, y = Math.random() * H, r = Math.random() * 1.5;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+      }
+      const nebula = ctx.createRadialGradient(W*0.7, H*0.3, 0, W*0.7, H*0.3, 150);
+      nebula.addColorStop(0, '#9B59B633'); nebula.addColorStop(1, 'transparent');
+      ctx.fillStyle = nebula; ctx.fillRect(0, 0, W, H);
+      break;
+    }
+    case 'banner_neon': {
+      bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, '#000d1a'); bg.addColorStop(1, '#001a10');
+      ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
+      const n1 = ctx.createRadialGradient(0, H, 0, 0, H, 200);
+      n1.addColorStop(0, '#00FFFF22'); n1.addColorStop(1, 'transparent');
+      ctx.fillStyle = n1; ctx.fillRect(0, 0, W, H);
+      const n2 = ctx.createRadialGradient(W, 0, 0, W, 0, 200);
+      n2.addColorStop(0, '#FF00FF22'); n2.addColorStop(1, 'transparent');
+      ctx.fillStyle = n2; ctx.fillRect(0, 0, W, H);
+      break;
+    }
+    case 'banner_gold': {
+      bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, '#1a1200'); bg.addColorStop(0.5, '#2e2000'); bg.addColorStop(1, '#1a1500');
+      ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
+      const shine = ctx.createLinearGradient(0, 0, W, H);
+      shine.addColorStop(0, '#FFD70000'); shine.addColorStop(0.4, '#FFD70015'); shine.addColorStop(0.6, '#FFD70030'); shine.addColorStop(1, '#FFD70000');
+      ctx.fillStyle = shine; ctx.fillRect(0, 0, W, H);
+      break;
+    }
+    default: {
+      bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, '#0f0f1a'); bg.addColorStop(1, '#1c1c2e');
+      ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
+    }
+  }
+}
 
 // Active perk tracking (in-memory — resets on bot restart)
 const activePerks = new Map(); // userId → { shield: bool, charmExpires: Date, xpBoostExpires: Date }
@@ -179,10 +252,8 @@ async function generateRankCard(member, eco, rank, position) {
   const f  = (size, bold = false) => `${bold ? 'bold ' : ''}${size}px ${bold ? 'RobotoBold' : 'Roboto'}, sans-serif`;
   const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); };
 
-  // ── Background ──────────────────────────────────────────────────
-  const bgGrad = ctx.createLinearGradient(0, 0, W, H);
-  bgGrad.addColorStop(0, '#0f0f1a'); bgGrad.addColorStop(1, '#1c1c2e');
-  ctx.fillStyle = bgGrad; rr(0, 0, W, H, 20); ctx.fill();
+  // ── Background (uses equipped banner) ────────────────────────────
+  drawBanner(ctx, W, H, eco.active_banner ?? 'default');
 
   // Subtle rank-colour glow top-left
   const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 300);
@@ -475,6 +546,8 @@ client.once('clientReady', async () => {
       ]},
     { name: 'store', description: 'Browse the server store and buy items' },
     { name: 'buffs', description: 'Check your active perks and buffs' },
+    { name: 'equip', description: 'Equip a banner you own on your rank card',
+      options: [{ name: 'banner', type: 3, description: 'Banner to equip (fire/ocean/galaxy/neon/gold/default)', required: true }] },
     { name: 'addcoins', description: 'Admin: add coins to a user',
       options: [
         { name: 'user',   type: 6, description: 'Target user', required: true },
@@ -1218,6 +1291,30 @@ client.on('interactionCreate', async interaction => {
     }
   }
 
+  // ── /equip ───────────────────────────────────────────────────────
+  if (interaction.commandName === 'equip') {
+    await interaction.deferReply({ ephemeral: true });
+    try {
+      const input = interaction.options.getString('banner').toLowerCase().trim();
+      const bannerId = input === 'default' ? 'default' : `banner_${input}`;
+      const validBanners = ['default', ...STORE_ITEMS.filter(i => i.type === 'banner').map(i => i.id)];
+      if (!validBanners.includes(bannerId)) {
+        return interaction.editReply({ content: `❌ Unknown banner. Valid options: \`default\`, \`fire\`, \`ocean\`, \`galaxy\`, \`neon\`, \`gold\`` });
+      }
+      if (bannerId !== 'default') {
+        const eco = await getEconomy(interaction.user.id);
+        const owned = eco.owned_banners ?? [];
+        if (!owned.includes(bannerId)) return interaction.editReply({ content: `❌ You don't own **${bannerId}**. Buy it from \`/store\` first!` });
+      }
+      await supabase.from('discord_economy').update({ active_banner: bannerId }).eq('discord_id', interaction.user.id);
+      const item = STORE_ITEMS.find(i => i.id === bannerId);
+      return interaction.editReply({ content: `✅ Equipped **${item?.name ?? '🎨 Default'}** on your rank card! Use \`/rankcard\` to see it.` });
+    } catch (e) {
+      console.error('equip error:', e.message);
+      interaction.editReply({ content: '❌ Failed to equip banner.' }).catch(() => {});
+    }
+  }
+
   // ── /buffs ───────────────────────────────────────────────────────
   if (interaction.commandName === 'buffs') {
     const uid = interaction.user.id;
@@ -1620,6 +1717,17 @@ client.on('interactionCreate', async interaction => {
       if (!ok) return interaction.editReply({ content: `❌ Not enough coins! You need **${item.price}🪙** to buy **${item.name}**.` });
       if (roleId) await freshMember.roles.add(roleId).catch(() => {});
       return interaction.editReply({ content: `✅ Purchased **${item.name}**! Role applied. 🎉` });
+    }
+
+    // Banner items
+    if (item.type === 'banner') {
+      const eco = await getEconomy(interaction.user.id);
+      const owned = eco.owned_banners ?? [];
+      if (owned.includes(item.id)) return interaction.editReply({ content: `✅ You already own **${item.name}**! Use \`/equip ${item.id.replace('banner_','')}\` to activate it.` });
+      const ok = await deductCoins(interaction.user.id, item.price);
+      if (!ok) return interaction.editReply({ content: `❌ Not enough coins! You need **${item.price}🪙** to buy **${item.name}**.` });
+      await supabase.from('discord_economy').update({ owned_banners: [...owned, item.id] }).eq('discord_id', interaction.user.id);
+      return interaction.editReply({ content: `✅ Purchased **${item.name}**! Use \`/equip ${item.id.replace('banner_','')}\` to activate it on your rank card. 🎨` });
     }
 
     // Perk items
