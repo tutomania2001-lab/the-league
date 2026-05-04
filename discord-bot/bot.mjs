@@ -41,20 +41,33 @@ async function fetchWildRiftArticles() {
     return null;
   }
 
+  // Log full top-level structure to diagnose
+  console.log('📰 Top-level keys:', Object.keys(data));
+
   const blades = findBlades(data);
-  console.log('📰 findBlades result:', blades ? `found ${blades.length} blades` : 'null');
+  console.log('📰 findBlades result:', blades ? `found ${blades.length} blades: ${blades.map(b=>b?.type).join(',')}` : 'null');
+
   if (blades) {
-    console.log('📰 Blade types:', blades.map(b => b?.type).join(', '));
     const grid = blades.find(b => b?.type === 'articleCardGrid');
-    console.log('📰 grid found:', !!grid, 'items length:', grid?.items?.length ?? 'n/a');
+    console.log('📰 grid found:', !!grid, '| items:', grid?.items?.length ?? 'none');
     if (grid?.items?.length) {
-      console.log('📰 Sample item keys:', Object.keys(grid.items[0]));
-      console.log('📰 Sample item:', JSON.stringify(grid.items[0]).slice(0, 400));
+      console.log('📰 First item keys:', Object.keys(grid.items[0]));
+      console.log('📰 First item sample:', JSON.stringify(grid.items[0]).slice(0, 600));
       return grid.items.slice(0, 10);
+    }
+    // Try 'cards' or other field names
+    for (const blade of blades) {
+      for (const [key, val] of Object.entries(blade ?? {})) {
+        if (Array.isArray(val) && val.length > 0 && val[0]?.title) {
+          console.log(`📰 Found articles in blade.${key}:`, val.length, 'items, keys:', Object.keys(val[0]));
+          return val.slice(0, 10);
+        }
+      }
     }
   }
 
-  console.error('📰 No articles found — data top-level keys:', Object.keys(data));
+  // Last resort: dump data structure to diagnose
+  console.error('📰 No articles found. Full data (truncated):', JSON.stringify(data).slice(0, 1000));
   return [];
 }
 
@@ -420,6 +433,7 @@ client.once('clientReady', async () => {
     { name: 'leaderboard', description: 'Show the top 10 XP leaderboard' },
     { name: 'compare',     description: 'Compare your rank with another player',
       options: [{ name: 'user', type: 6, description: 'Player to compare with', required: true }] },
+    { name: 'patch', description: 'Show the latest Wild Rift patch notes' },
     { name: 'flip',  description: 'Flip a coin — heads or tails' },
     { name: 'roll',  description: 'Roll a dice',
       options: [{ name: 'sides', type: 4, description: 'Number of sides (default 6)', required: false }] },
@@ -1129,6 +1143,38 @@ client.on('interactionCreate', async interaction => {
 
     games.set(gid, { type: 'rps', p1: interaction.user.id, p2: target.id, p1pick: null, p2pick: null, status: 'active', channelId: interaction.channelId });
     await interaction.reply({ content: `⚔️ **${interaction.user} challenged ${target} to Rock Paper Scissors!**\nBoth players — pick your move!`, components: [row] });
+  }
+
+  // ── /patch ───────────────────────────────────────────────────────
+  if (interaction.commandName === 'patch') {
+    await interaction.deferReply();
+    try {
+      const articles = await fetchWildRiftArticles();
+      const item = articles[0];
+      if (!item) return interaction.editReply({ content: '❌ Could not fetch patch notes right now. Check <https://wildrift.leagueoflegends.com/en-sg/news/tags/patch-notes/>' });
+
+      const title = item.title ?? item.header ?? item.heading ?? 'Latest Patch Notes';
+      const rawUrl = item.link ?? item.url ?? item.articleUrl ?? (item.slug ? `${WILDRIFT_BASE}/en-sg/news/${item.slug}/` : null);
+      const url = rawUrl ? (rawUrl.startsWith('http') ? rawUrl : `${WILDRIFT_BASE}${rawUrl}`) : WILDRIFT_NEWS_URL;
+      const desc = (item.description ?? item.summary ?? item.excerpt ?? item.blurb ?? '').slice(0, 500);
+      const imageObj = item.image ?? item.banner ?? item.thumbnail ?? item.backgroundImage ?? item.featuredImage ?? item.headerImage;
+      const imageUrl = typeof imageObj === 'string' ? imageObj : imageObj?.url ?? imageObj?.src ?? null;
+      const date = item.date ?? item.publishedAt ?? item.updatedAt ?? null;
+
+      const embed = new EmbedBuilder()
+        .setTitle(`📋 ${title}`)
+        .setURL(url)
+        .setDescription(desc || 'Click the title to read the full patch notes.')
+        .setColor(0x00c8ff)
+        .setFooter({ text: '🎮 Wild Rift Official Patch Notes' });
+      if (imageUrl) embed.setImage(imageUrl.startsWith('http') ? imageUrl : `${WILDRIFT_BASE}${imageUrl}`);
+      if (date) embed.setTimestamp(new Date(date));
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      console.error('patch error:', e.message);
+      interaction.editReply({ content: '❌ Failed to fetch patch notes.' }).catch(() => {});
+    }
   }
 
   // ── /flip ────────────────────────────────────────────────────────
