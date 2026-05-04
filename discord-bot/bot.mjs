@@ -801,18 +801,31 @@ client.once('clientReady', async () => {
       if (!storeCh) return;
       const existing = await storeCh.messages.fetch({ limit: 20 });
       for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
-      const embed = new EmbedBuilder().setTitle('◈ THE LEAGUE STORE').setDescription(
-        STORE_ITEMS.map(i => `${i.name} **${i.desc}** — 🪙 **${i.price} coins**`).join('\n')
-      ).setColor(0x00c8ff).setFooter({ text: 'Earn coins by chatting and spending time in voice channels' });
-      const rows = [];
-      for (let i = 0; i < STORE_ITEMS.length; i += 3) {
-        const row = new ActionRowBuilder();
-        for (const item of STORE_ITEMS.slice(i, i + 3)) {
-          row.addComponents(new ButtonBuilder().setCustomId(`buy_${item.id}`).setLabel(`${item.name} — ${item.price}🪙`).setStyle(ButtonStyle.Primary));
+
+      const categories = [
+        { label: '🎨 Colour Roles', type: 'role',   color: 0x00c8ff },
+        { label: '⚡ Server Perks', type: 'perk',   color: 0xFF8800 },
+        { label: '🖼️ Rank Card Banners', type: 'banner', color: 0x9B59B6 },
+      ];
+
+      for (const cat of categories) {
+        const items = STORE_ITEMS.filter(i => i.type === cat.type);
+        if (!items.length) continue;
+        const embed = new EmbedBuilder()
+          .setTitle(`◈ THE LEAGUE STORE — ${cat.label}`)
+          .setDescription(items.map(i => `${i.name} **${i.desc}** — 🪙 **${i.price} coins**`).join('\n'))
+          .setColor(cat.color)
+          .setFooter({ text: 'Earn coins by chatting and spending time in voice channels' });
+        const rows = [];
+        for (let i = 0; i < items.length; i += 3) {
+          const row = new ActionRowBuilder();
+          for (const item of items.slice(i, i + 3)) {
+            row.addComponents(new ButtonBuilder().setCustomId(`buy_${item.id}`).setLabel(`${item.name} — ${item.price}🪙`).setStyle(ButtonStyle.Primary));
+          }
+          rows.push(row);
         }
-        rows.push(row);
+        await storeCh.send({ embeds: [embed], components: rows }).catch(() => {});
       }
-      await storeCh.send({ embeds: [embed], components: rows }).catch(() => {});
     }
 
     // Post/refresh leaderboard
@@ -1346,26 +1359,41 @@ client.on('interactionCreate', async interaction => {
     await interaction.deferReply({ ephemeral: true });
     try {
       const eco = await getEconomy(interaction.user.id);
-      const embed = new EmbedBuilder()
-        .setTitle('◈ THE LEAGUE STORE')
-        .setDescription(STORE_ITEMS.map(i => `${i.name} **${i.desc}** — 🪙 **${i.price} coins**`).join('\n'))
-        .setColor(0x00c8ff)
-        .addFields({ name: '🪙 Your Balance', value: `${eco.coins ?? 0} coins`, inline: true })
-        .setFooter({ text: 'Click a button to purchase' });
-      const rows = [];
-      for (let i = 0; i < STORE_ITEMS.length; i += 3) {
-        const row = new ActionRowBuilder();
-        for (const item of STORE_ITEMS.slice(i, i + 3)) {
-          const canAfford = (eco.coins ?? 0) >= item.price;
-          row.addComponents(new ButtonBuilder()
-            .setCustomId(`buy_${item.id}`)
-            .setLabel(`${item.name} — ${item.price}🪙`)
-            .setStyle(canAfford ? ButtonStyle.Primary : ButtonStyle.Secondary)
-            .setDisabled(!canAfford));
+      const owned = eco.owned_banners ?? [];
+      const categories = [
+        { label: '🎨 Colour Roles',       type: 'role',   color: 0x00c8ff },
+        { label: '⚡ Server Perks',        type: 'perk',   color: 0xFF8800 },
+        { label: '🖼️ Rank Card Banners',  type: 'banner', color: 0x9B59B6 },
+      ];
+      let first = true;
+      for (const cat of categories) {
+        const items = STORE_ITEMS.filter(i => i.type === cat.type);
+        const embed = new EmbedBuilder()
+          .setTitle(`◈ STORE — ${cat.label}`)
+          .setDescription(items.map(i => `${i.name} ${i.desc} — **${i.price}🪙**`).join('\n'))
+          .setColor(cat.color)
+          .setFooter({ text: `Balance: ${eco.coins ?? 0}🪙` });
+        if (first) { embed.addFields({ name: '🪙 Your Balance', value: `${eco.coins ?? 0} coins`, inline: true }); first = false; }
+        const rows = [];
+        for (let i = 0; i < items.length; i += 3) {
+          const row = new ActionRowBuilder();
+          for (const item of items.slice(i, i + 3)) {
+            const canAfford = (eco.coins ?? 0) >= item.price;
+            const alreadyOwned = item.type === 'banner' && owned.includes(item.id);
+            row.addComponents(new ButtonBuilder()
+              .setCustomId(`buy_${item.id}`)
+              .setLabel(`${item.name} — ${item.price}🪙${alreadyOwned ? ' ✓' : ''}`)
+              .setStyle(alreadyOwned ? ButtonStyle.Success : canAfford ? ButtonStyle.Primary : ButtonStyle.Secondary)
+              .setDisabled(alreadyOwned));
+          }
+          rows.push(row);
         }
-        rows.push(row);
+        if (first === false && cat === categories[0]) {
+          await interaction.editReply({ embeds: [embed], components: rows });
+        } else {
+          await interaction.followUp({ embeds: [embed], components: rows, ephemeral: true });
+        }
       }
-      await interaction.editReply({ embeds: [embed], components: rows });
     } catch (e) {
       console.error('store error:', e.message);
       interaction.editReply({ content: '❌ Store failed to load.' }).catch(() => {});
