@@ -891,9 +891,9 @@ client.on('interactionCreate', async interaction => {
 client.on('interactionCreate', async interaction => {
   if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
-  // Defer immediately for slow interactions so token doesn't expire
-  const slowInteractions = ['register', 'toggle_verified', 'eco_profile'];
-  const isSlow = slowInteractions.includes(interaction.customId) || interaction.customId.startsWith('buy_') || interaction.customId.startsWith('rank_select');
+  // Defer immediately for slow interactions (excludes anything that shows a modal)
+  const slowInteractions = ['register', 'eco_profile'];
+  const isSlow = slowInteractions.includes(interaction.customId) || interaction.customId.startsWith('buy_');
   if (isSlow) await interaction.deferReply({ ephemeral: true }).catch(() => {});
 
   try {
@@ -1240,7 +1240,7 @@ client.on('interactionCreate', async interaction => {
   if (interaction.customId === 'toggle_verified') {
     if (freshMember.roles.cache.has(client.roles.verified)) {
       await freshMember.roles.remove(client.roles.verified);
-      return interaction.editReply({ content: '✅ Removed **Verified Player** role' });
+      return interaction.reply({ content: '✅ Removed **Verified Player** role', ephemeral: true });
     }
     const modal = new ModalBuilder().setCustomId('verify_modal').setTitle('Link Your The League Account');
     modal.addComponents(new ActionRowBuilder().addComponents(
@@ -1283,7 +1283,9 @@ client.on('interactionCreate', async interaction => {
 
   } catch (e) {
     console.error('Button handler error:', e);
-    interaction.reply({ content: '❌ Something went wrong — check Railway logs.', ephemeral: true }).catch(() => {});
+    const errMsg = { content: '❌ Something went wrong.', ephemeral: true };
+    if (isSlow) interaction.editReply(errMsg).catch(() => {});
+    else interaction.reply(errMsg).catch(() => {});
   }
 });
 
