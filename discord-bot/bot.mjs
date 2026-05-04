@@ -1010,6 +1010,12 @@ client.once('clientReady', async () => {
     { name: 'rep',      description: 'Give +1 reputation to a player (once per day)',
       options: [{ name: 'user', type: 6, description: 'Player to rep', required: true }] },
     { name: 'repboard', description: 'Show the reputation leaderboard' },
+    { name: 'clan', description: 'Clan management',
+      options: [
+        { name: 'action', type: 3, description: 'create / invite / leave / info / disband / kick', required: true },
+        { name: 'value',  type: 3, description: 'Clan name, tag, or @mention depending on action', required: false },
+        { name: 'user',   type: 6, description: 'User to invite or kick', required: false },
+      ]},
     { name: 'checkrep', description: 'Check anyone\'s reputation',
       options: [{ name: 'user', type: 6, description: 'User to check (leave empty for yourself)', required: false }] },
     { name: 'duel',  description: 'Challenge someone to Rock Paper Scissors',
@@ -1725,6 +1731,138 @@ client.on('interactionCreate', async interaction => {
     } catch (e) {
       console.error('repboard error:', e.message);
       interaction.editReply({ content: '❌ Failed to load leaderboard.' }).catch(() => {});
+    }
+  }
+
+  // ── /clan ────────────────────────────────────────────────────────
+  if (interaction.commandName === 'clan') {
+    await interaction.deferReply();
+    try {
+      const action = interaction.options.getString('action').toLowerCase().trim();
+      const value  = interaction.options.getString('value')?.trim() ?? null;
+      const target = interaction.options.getUser('user') ?? null;
+      const uid    = interaction.user.id;
+      const guild  = interaction.guild;
+
+      // Helper: get user's clan membership
+      const getMembership = async (id) => {
+        const { data } = await supabase.from('clan_members').select('clan_id, clan_role').eq('discord_id', id).maybeSingle();
+        return data;
+      };
+      const getClan = async (id) => {
+        const { data } = await supabase.from('discord_clans').select('*').eq('id', id).maybeSingle();
+        return data;
+      };
+
+      // ── CREATE ──────────────────────────────────────────────────
+      if (action === 'create') {
+        const existing = await getMembership(uid);
+        if (existing) return interaction.editReply({ content: '❌ You\'re already in a clan. Leave first with `/clan leave`.' });
+
+        const parts = value?.split(' ') ?? [];
+        const tag = parts.pop()?.toUpperCase().slice(0, 4);
+        const name = parts.join(' ') || value;
+        if (!name || !tag) return interaction.editReply({ content: '❌ Usage: `/clan create <Name> <TAG>` e.g. `/clan create The League TL`' });
+
+        const { data: existing2 } = await supabase.from('discord_clans').select('id').or(`name.eq.${name},tag.eq.${tag}`).maybeSingle();
+        if (existing2) return interaction.editReply({ content: `❌ A clan with that name or tag already exists.` });
+
+        // Create Discord role + channels
+        const color = Math.floor(Math.random() * 0xFFFFFF);
+        const role = await guild.roles.create({ name: `[${tag}] ${name}`, color, reason: 'Clan created' }).catch(() => null);
+        let clanCat = guild.channels.cache.find(c => c.name === '🏰 Clans' && c.type === ChannelType.GuildCategory);
+        if (!clanCat) clanCat = await guild.channels.create({ name: '🏰 Clans', type: ChannelType.GuildCategory, permissionOverwrites: [{ id: guild.roles.everyone, deny: [PermissionFlagsBits.ViewChannel] }] }).catch(() => null);
+        const noPerms = [{ id: guild.roles.everyone, deny: [PermissionFlagsBits.ViewChannel] }, { id: role?.id, allow: [PermissionFlagsBits.ViewChannel] }].filter(p => p.id);
+        const textCh  = await guild.channels.create({ name: `${tag.toLowerCase()}-chat`, type: ChannelType.GuildText,  parent: clanCat?.id, permissionOverwrites: noPerms }).catch(() => null);
+        const voiceCh = await guild.channels.create({ name: `${tag} Voice`,               type: ChannelType.GuildVoice, parent: clanCat?.id, permissionOverwrites: noPerms }).catch(() => null);
+
+        const { data: clan } = await supabase.from('discord_clans').insert({ name, tag, owner_id: uid, color, role_id: role?.id ?? null, channel_id: textCh?.id ?? null, voice_id: voiceCh?.id ?? null }).select().maybeSingle();
+        await supabase.from('clan_members').insert({ discord_id: uid, clan_id: clan.id, clan_role: 'owner' });
+        const member = await guild.members.fetch(uid);
+        if (role) await member.roles.add(role).catch(() => {});
+
+        return interaction.editReply({ embeds: [new EmbedBuilder().setTitle(`🏰 Clan Created: [${tag}] ${name}`).setDescription(`You are the founder!\n\n📢 Chat: ${textCh ?? 'N/A'}\n🎙️ Voice: ${voiceCh ?? 'N/A'}\n\nInvite members with \`/clan invite @user\``).setColor(color).setTimestamp()] });
+      }
+
+      // ── INVITE ──────────────────────────────────────────────────
+      if (action === 'invite') {
+        if (!target) return interaction.editReply({ content: '❌ Specify a user: `/clan invite @user`' });
+        const mem = await getMembership(uid);
+        if (!mem || !['owner','officer'].includes(mem.clan_role)) return interaction.editReply({ content: '❌ You must be a clan owner or officer to invite.' });
+        const targetMem = await getMembership(target.id);
+        if (targetMem) return interaction.editReply({ content: `❌ ${target} is already in a clan.` });
+        const clan = await getClan(mem.clan_id);
+        await supabase.from('clan_members').insert({ discord_id: target.id, clan_id: clan.id, clan_role: 'member' });
+        const discordMember = await guild.members.fetch(target.id).catch(() => null);
+        if (discordMember && clan.role_id) await discordMember.roles.add(clan.role_id).catch(() => {});
+        return interaction.editReply({ content: `✅ ${target} has been added to **[${clan.tag}] ${clan.name}**!` });
+      }
+
+      // ── LEAVE ───────────────────────────────────────────────────
+      if (action === 'leave') {
+        const mem = await getMembership(uid);
+        if (!mem) return interaction.editReply({ content: '❌ You\'re not in a clan.' });
+        if (mem.clan_role === 'owner') return interaction.editReply({ content: '❌ You\'re the owner. Disband the clan with `/clan disband` or transfer ownership first.' });
+        const clan = await getClan(mem.clan_id);
+        await supabase.from('clan_members').delete().eq('discord_id', uid);
+        const discordMember = await guild.members.fetch(uid).catch(() => null);
+        if (discordMember && clan?.role_id) await discordMember.roles.remove(clan.role_id).catch(() => {});
+        return interaction.editReply({ content: `✅ You left **[${clan?.tag}] ${clan?.name}**.` });
+      }
+
+      // ── KICK ────────────────────────────────────────────────────
+      if (action === 'kick') {
+        if (!target) return interaction.editReply({ content: '❌ Specify a user: `/clan kick @user`' });
+        const mem = await getMembership(uid);
+        if (!mem || !['owner','officer'].includes(mem.clan_role)) return interaction.editReply({ content: '❌ Only clan owners/officers can kick.' });
+        const targetMem = await getMembership(target.id);
+        if (!targetMem || targetMem.clan_id !== mem.clan_id) return interaction.editReply({ content: '❌ That user is not in your clan.' });
+        if (targetMem.clan_role === 'owner') return interaction.editReply({ content: '❌ Cannot kick the owner.' });
+        const clan = await getClan(mem.clan_id);
+        await supabase.from('clan_members').delete().eq('discord_id', target.id);
+        const discordMember = await guild.members.fetch(target.id).catch(() => null);
+        if (discordMember && clan?.role_id) await discordMember.roles.remove(clan.role_id).catch(() => {});
+        return interaction.editReply({ content: `✅ Kicked ${target} from **[${clan?.tag}] ${clan?.name}**.` });
+      }
+
+      // ── INFO ────────────────────────────────────────────────────
+      if (action === 'info') {
+        const mem = await getMembership(uid);
+        if (!mem) return interaction.editReply({ content: '❌ You\'re not in a clan. Create one with `/clan create <Name> <TAG>`.' });
+        const clan = await getClan(mem.clan_id);
+        const { data: members } = await supabase.from('clan_members').select('discord_id, clan_role').eq('clan_id', clan.id);
+        const owner = members?.find(m => m.clan_role === 'owner');
+        const embed = new EmbedBuilder()
+          .setTitle(`🏰 [${clan.tag}] ${clan.name}`)
+          .addFields(
+            { name: '👑 Owner',   value: `<@${owner?.discord_id ?? clan.owner_id}>`, inline: true },
+            { name: '👥 Members', value: String(members?.length ?? 1), inline: true },
+            { name: '🎭 Your Role', value: mem.clan_role, inline: true },
+            { name: '👥 Roster',  value: members?.map(m => `<@${m.discord_id}> — ${m.clan_role}`).join('\n') || 'None' },
+          )
+          .setColor(clan.color ?? 0x00c8ff)
+          .setTimestamp();
+        return interaction.editReply({ embeds: [embed] });
+      }
+
+      // ── DISBAND ─────────────────────────────────────────────────
+      if (action === 'disband') {
+        const mem = await getMembership(uid);
+        if (!mem || mem.clan_role !== 'owner') return interaction.editReply({ content: '❌ Only the clan owner can disband.' });
+        const clan = await getClan(mem.clan_id);
+        // Delete Discord channels + role
+        if (clan.channel_id) await guild.channels.fetch(clan.channel_id).then(c => c.delete()).catch(() => {});
+        if (clan.voice_id)   await guild.channels.fetch(clan.voice_id).then(c => c.delete()).catch(() => {});
+        if (clan.role_id)    await guild.roles.fetch(clan.role_id).then(r => r.delete()).catch(() => {});
+        await supabase.from('clan_members').delete().eq('clan_id', clan.id);
+        await supabase.from('discord_clans').delete().eq('id', clan.id);
+        return interaction.editReply({ content: `✅ Clan **[${clan.tag}] ${clan.name}** has been disbanded.` });
+      }
+
+      return interaction.editReply({ content: '❌ Unknown action. Use: `create`, `invite`, `leave`, `kick`, `info`, `disband`' });
+    } catch (e) {
+      console.error('clan error:', e.message);
+      interaction.editReply({ content: '❌ Clan command failed.' }).catch(() => {});
     }
   }
 
