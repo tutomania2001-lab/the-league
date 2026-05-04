@@ -131,65 +131,152 @@ const STORE_ITEMS = [
 
 // Banner background renderers
 function drawBanner(ctx, W, H, bannerId) {
-  let bg;
+  // Seeded pseudo-random for consistent visuals per banner
+  let seed = 42;
+  const rand = () => { seed = (seed * 16807 + 0) % 2147483647; return (seed - 1) / 2147483646; };
+
   switch (bannerId) {
+
     case 'banner_fire': {
-      bg = ctx.createLinearGradient(0, 0, W, H);
-      bg.addColorStop(0, '#1a0500'); bg.addColorStop(0.5, '#3d1000'); bg.addColorStop(1, '#1a0800');
+      // Deep black-red background
+      const bg = ctx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, '#0a0000'); bg.addColorStop(1, '#1a0300');
       ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
-      // Fire glow
-      const g = ctx.createRadialGradient(W/2, H, 0, W/2, H, H);
-      g.addColorStop(0, '#FF440055'); g.addColorStop(1, 'transparent');
-      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-      break;
-    }
-    case 'banner_ocean': {
-      bg = ctx.createLinearGradient(0, 0, W, H);
-      bg.addColorStop(0, '#001428'); bg.addColorStop(1, '#002a3d');
-      ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
-      const wave = ctx.createLinearGradient(0, H*0.6, 0, H);
-      wave.addColorStop(0, '#00BFFF22'); wave.addColorStop(1, '#0077AA44');
-      ctx.fillStyle = wave; ctx.fillRect(0, H*0.5, W, H*0.5);
-      break;
-    }
-    case 'banner_galaxy': {
-      bg = ctx.createLinearGradient(0, 0, W, H);
-      bg.addColorStop(0, '#060010'); bg.addColorStop(1, '#150028');
-      ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
-      // Stars
-      ctx.fillStyle = '#ffffff';
-      for (let i = 0; i < 80; i++) {
-        const x = Math.random() * W, y = Math.random() * H, r = Math.random() * 1.5;
+      // Multiple fire columns rising from bottom
+      for (let col = 0; col < 12; col++) {
+        const cx = (W / 12) * col + W/24;
+        const flameH = H * (0.4 + rand() * 0.6);
+        const g = ctx.createRadialGradient(cx, H, 8, cx, H - flameH, 2);
+        g.addColorStop(0, `rgba(255,${60 + Math.floor(rand()*80)},0,0.7)`);
+        g.addColorStop(0.4, `rgba(200,30,0,0.3)`);
+        g.addColorStop(1, 'transparent');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      }
+      // Embers
+      for (let i = 0; i < 40; i++) {
+        const x = rand() * W, y = rand() * H * 0.7;
+        const r = rand() * 2 + 0.5;
+        const bright = rand() > 0.5;
+        ctx.fillStyle = bright ? '#FFAA00' : '#FF4400';
         ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
       }
-      const nebula = ctx.createRadialGradient(W*0.7, H*0.3, 0, W*0.7, H*0.3, 150);
-      nebula.addColorStop(0, '#9B59B633'); nebula.addColorStop(1, 'transparent');
-      ctx.fillStyle = nebula; ctx.fillRect(0, 0, W, H);
       break;
     }
+
+    case 'banner_ocean': {
+      // Deep ocean background
+      const bg = ctx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, '#000d1a'); bg.addColorStop(1, '#001e2e');
+      ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
+      // Animated wave layers
+      for (let layer = 0; layer < 4; layer++) {
+        const yBase = H * (0.3 + layer * 0.18);
+        const amp = 12 - layer * 2;
+        const freq = 0.008 + layer * 0.002;
+        const alpha = 0.15 + layer * 0.08;
+        ctx.beginPath();
+        ctx.moveTo(0, H);
+        for (let x = 0; x <= W; x += 4) {
+          const y = yBase + Math.sin(x * freq + layer) * amp + Math.cos(x * freq * 0.7) * (amp * 0.5);
+          x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
+        const wg = ctx.createLinearGradient(0, yBase, 0, H);
+        wg.addColorStop(0, `rgba(0,180,255,${alpha})`);
+        wg.addColorStop(1, `rgba(0,80,140,${alpha * 0.5})`);
+        ctx.fillStyle = wg; ctx.fill();
+      }
+      // Surface shimmer dots
+      for (let i = 0; i < 30; i++) {
+        ctx.fillStyle = `rgba(180,240,255,${0.2 + rand() * 0.4})`;
+        ctx.beginPath(); ctx.arc(rand() * W, rand() * H * 0.5, rand() * 1.5, 0, Math.PI*2); ctx.fill();
+      }
+      break;
+    }
+
+    case 'banner_galaxy': {
+      const bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, '#060010'); bg.addColorStop(1, '#150028');
+      ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
+      // Stars of varying brightness
+      for (let i = 0; i < 120; i++) {
+        const x = rand() * W, y = rand() * H, r = rand() * 1.8;
+        const bright = rand();
+        ctx.fillStyle = bright > 0.9 ? '#ffffff' : bright > 0.6 ? '#aaaaff' : '#666688';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+      }
+      // Nebula clouds
+      const nebColours = ['#9B59B6', '#3498DB', '#E91E63'];
+      for (let n = 0; n < 3; n++) {
+        const nx = rand() * W, ny = rand() * H;
+        const ng = ctx.createRadialGradient(nx, ny, 0, nx, ny, 80 + rand() * 80);
+        ng.addColorStop(0, nebColours[n] + '44'); ng.addColorStop(1, 'transparent');
+        ctx.fillStyle = ng; ctx.fillRect(0, 0, W, H);
+      }
+      break;
+    }
+
     case 'banner_neon': {
-      bg = ctx.createLinearGradient(0, 0, W, H);
-      bg.addColorStop(0, '#000d1a'); bg.addColorStop(1, '#001a10');
-      ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
-      const n1 = ctx.createRadialGradient(0, H, 0, 0, H, 200);
-      n1.addColorStop(0, '#00FFFF22'); n1.addColorStop(1, 'transparent');
-      ctx.fillStyle = n1; ctx.fillRect(0, 0, W, H);
-      const n2 = ctx.createRadialGradient(W, 0, 0, W, 0, 200);
-      n2.addColorStop(0, '#FF00FF22'); n2.addColorStop(1, 'transparent');
-      ctx.fillStyle = n2; ctx.fillRect(0, 0, W, H);
+      // Dark base
+      ctx.fillStyle = '#020810'; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
+      // Perspective grid lines
+      const vp = { x: W/2, y: H*0.4 };
+      ctx.strokeStyle = '#00FFFF18'; ctx.lineWidth = 1;
+      for (let i = -8; i <= 8; i++) {
+        ctx.beginPath(); ctx.moveTo(vp.x + i * 60, vp.y);
+        ctx.lineTo(vp.x + i * 300, H); ctx.stroke();
+      }
+      for (let y = 0; y <= 6; y++) {
+        const t = y / 6;
+        const yPos = vp.y + (H - vp.y) * t;
+        const spread = 60 + 240 * t;
+        ctx.beginPath(); ctx.moveTo(vp.x - spread, yPos);
+        ctx.lineTo(vp.x + spread, yPos); ctx.stroke();
+      }
+      // Neon glow edges
+      const e1 = ctx.createLinearGradient(0, 0, W, 0);
+      e1.addColorStop(0, '#00FFFF33'); e1.addColorStop(0.5, 'transparent'); e1.addColorStop(1, '#FF00FF33');
+      ctx.fillStyle = e1; ctx.fillRect(0, 0, W, H);
+      // Scan line
+      const sl = ctx.createLinearGradient(0, H*0.3, 0, H*0.5);
+      sl.addColorStop(0, 'transparent'); sl.addColorStop(0.5, '#00FFFF15'); sl.addColorStop(1, 'transparent');
+      ctx.fillStyle = sl; ctx.fillRect(0, H*0.2, W, H*0.4);
       break;
     }
+
     case 'banner_gold': {
-      bg = ctx.createLinearGradient(0, 0, W, H);
-      bg.addColorStop(0, '#1a1200'); bg.addColorStop(0.5, '#2e2000'); bg.addColorStop(1, '#1a1500');
+      // Rich dark gold base
+      const bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, '#120e00'); bg.addColorStop(0.5, '#241a00'); bg.addColorStop(1, '#120f00');
       ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
-      const shine = ctx.createLinearGradient(0, 0, W, H);
-      shine.addColorStop(0, '#FFD70000'); shine.addColorStop(0.4, '#FFD70015'); shine.addColorStop(0.6, '#FFD70030'); shine.addColorStop(1, '#FFD70000');
-      ctx.fillStyle = shine; ctx.fillRect(0, 0, W, H);
+      // Diagonal shine streaks
+      for (let i = -4; i < 8; i++) {
+        const x = i * 140;
+        const g = ctx.createLinearGradient(x, 0, x + 80, H);
+        g.addColorStop(0, 'transparent'); g.addColorStop(0.5, '#FFD70018'); g.addColorStop(1, 'transparent');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      }
+      // Gold sparkle particles
+      for (let i = 0; i < 50; i++) {
+        const x = rand() * W, y = rand() * H;
+        const size = rand() * 3 + 0.5;
+        ctx.fillStyle = rand() > 0.5 ? '#FFD700' : '#FFA500';
+        ctx.globalAlpha = 0.3 + rand() * 0.5;
+        ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      // Corner ornaments
+      ['#FFD700', '#FFD700'].forEach((c, i) => {
+        const ox = i === 0 ? 20 : W - 20, oy = 20;
+        const og = ctx.createRadialGradient(ox, oy, 0, ox, oy, 60);
+        og.addColorStop(0, c + '44'); og.addColorStop(1, 'transparent');
+        ctx.fillStyle = og; ctx.fillRect(0, 0, W, H);
+      });
       break;
     }
+
     default: {
-      bg = ctx.createLinearGradient(0, 0, W, H);
+      const bg = ctx.createLinearGradient(0, 0, W, H);
       bg.addColorStop(0, '#0f0f1a'); bg.addColorStop(1, '#1c1c2e');
       ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 20); ctx.fill();
     }
