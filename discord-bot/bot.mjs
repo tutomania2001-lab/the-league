@@ -781,6 +781,7 @@ const client = new Client({
 
 // In-memory store for private rooms: channelId → { ownerId, password, lobbyMessageId }
 const privateRooms = new Map();
+const clanInvites  = new Map(); // targetId → { clanId, inviterId }
 
 // Crash game state: userId → { bet, multiplier, crashAt, interval, coins, msg }
 const crashGames = new Map();
@@ -1791,11 +1792,18 @@ client.on('interactionCreate', async interaction => {
         if (!mem || !['owner','officer'].includes(mem.clan_role)) return interaction.editReply({ content: '❌ You must be a clan owner or officer to invite.' });
         const targetMem = await getMembership(target.id);
         if (targetMem) return interaction.editReply({ content: `❌ ${target} is already in a clan.` });
+        if (clanInvites.has(target.id)) return interaction.editReply({ content: `❌ ${target} already has a pending clan invite.` });
         const clan = await getClan(mem.clan_id);
-        await supabase.from('clan_members').insert({ discord_id: target.id, clan_id: clan.id, clan_role: 'member' });
-        const discordMember = await guild.members.fetch(target.id).catch(() => null);
-        if (discordMember && clan.role_id) await discordMember.roles.add(clan.role_id).catch(() => {});
-        return interaction.editReply({ content: `✅ ${target} has been added to **[${clan.tag}] ${clan.name}**!` });
+        clanInvites.set(target.id, { clanId: clan.id, inviterId: uid });
+        // Auto-expire invite after 10 minutes
+        setTimeout(() => clanInvites.delete(target.id), 10 * 60 * 1000);
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`clan_accept_${target.id}`).setLabel('✅ Accept').setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId(`clan_decline_${target.id}`).setLabel('❌ Decline').setStyle(ButtonStyle.Danger),
+        );
+        await interaction.editReply({ content: `📨 Invite sent to ${target}!` });
+        await interaction.channel.send({ content: `⚔️ ${target}, you've been invited to join **[${clan.tag}] ${clan.name}** by ${interaction.user}!`, components: [row] });
+        return;
       }
 
       // ── LEAVE ───────────────────────────────────────────────────
@@ -2476,6 +2484,28 @@ client.on('interactionCreate', async interaction => {
         return interaction.editReply({ content: '💎 **XP Boost** activated! You\'ll earn **2x XP** for the next **24 hours**.' });
       }
     }
+  }
+
+  // ── CLAN INVITE RESPONSE ─────────────────────────────────────────
+  if (interaction.customId.startsWith('clan_accept_') || interaction.customId.startsWith('clan_decline_')) {
+    const targetId = interaction.customId.replace('clan_accept_', '').replace('clan_decline_', '');
+    if (interaction.user.id !== targetId) return interaction.reply({ content: '❌ This invite isn\'t for you.', ephemeral: true });
+    const invite = clanInvites.get(targetId);
+    if (!invite) return interaction.update({ content: '❌ This invite has expired.', components: [] });
+
+    if (interaction.customId.startsWith('clan_decline_')) {
+      clanInvites.delete(targetId);
+      return interaction.update({ content: `❌ ${interaction.user} declined the clan invite.`, components: [] });
+    }
+
+    // Accept
+    clanInvites.delete(targetId);
+    const { data: clan } = await supabase.from('discord_clans').select('*').eq('id', invite.clanId).maybeSingle();
+    if (!clan) return interaction.update({ content: '❌ Clan no longer exists.', components: [] });
+    await supabase.from('clan_members').insert({ discord_id: targetId, clan_id: clan.id, clan_role: 'member' });
+    const discordMember = await interaction.guild.members.fetch(targetId).catch(() => null);
+    if (discordMember && clan.role_id) await discordMember.roles.add(clan.role_id).catch(() => {});
+    return interaction.update({ content: `✅ ${interaction.user} joined **[${clan.tag}] ${clan.name}**! Welcome!`, components: [] });
   }
 
   // ── CRASH CASH OUT ───────────────────────────────────────────────
