@@ -211,7 +211,7 @@ async function generateBuildsCard(championName, build) {
   ctx.fillStyle = '#ffffff'; ctx.font = f(36, true);
   ctx.fillText(championName.charAt(0).toUpperCase() + championName.slice(1), 24, 52);
   ctx.fillStyle = laneColor; ctx.font = f(16, true);
-  ctx.fillText(`⚔ ${build.lane.toUpperCase()} LANE  ·  WILD RIFT`, 24, 74);
+  ctx.fillText(`${build.lane.toUpperCase()} LANE  -  WILD RIFT`, 24, 74);
 
   // Divider
   ctx.strokeStyle = '#333345'; ctx.lineWidth = 1;
@@ -284,15 +284,9 @@ async function generateBuildsCard(championName, build) {
   ctx.fillText('RUNES', 24, 242);
   ctx.fillStyle = '#ccccdd'; ctx.font = f(14);
   build.runes.forEach((r, i) => {
-    const dot = i === 0 ? '* ' : '- ';
-    ctx.fillText(`${dot}${r}`, 24 + (i < 2 ? 0 : 220) + (i % 2) * 220, 260 + Math.floor(i / 2) * 22);
+    const prefix = `${i + 1}. `;
+    ctx.fillText(`${prefix}${r}`, 24 + (i < 2 ? 0 : 280) + (i % 2) * 0, 260 + (i % 2) * 22);
   });
-
-  // Skill order
-  ctx.fillStyle = '#888899'; ctx.font = f(13, true);
-  ctx.fillText('SKILL ORDER', 500, 242);
-  ctx.fillStyle = '#ccccdd'; ctx.font = f(18, true);
-  ctx.fillText(build.skills, 500, 268);
 
   // Divider
   ctx.strokeStyle = '#333345'; ctx.lineWidth = 1;
@@ -300,7 +294,7 @@ async function generateBuildsCard(championName, build) {
 
   // Footer
   ctx.fillStyle = '#555566'; ctx.font = f(12);
-  ctx.fillText('The League • Wild Rift Build Guide', 24, 330);
+  ctx.fillText('The League  -  Wild Rift Build Guide', 24, 330);
 
   // Bottom accent
   const line = ctx.createLinearGradient(0, H - 4, W, H - 4);
