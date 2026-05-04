@@ -1194,7 +1194,7 @@ client.on('interactionCreate', async interaction => {
       }
 
       const win = multiplier > 0;
-      const payout = win ? amount * multiplier - amount : -amount;
+      const payout = win ? amount * multiplier : -amount;
       const newCoins = (eco.coins ?? 0) + payout;
       await supabase.from('discord_economy').upsert({ discord_id: interaction.user.id, username: interaction.user.username, coins: newCoins, updated_at: new Date().toISOString() });
 
@@ -1273,7 +1273,7 @@ client.on('interactionCreate', async interaction => {
       const win = roll > 0.45; // 55% lose, 45% win to favour the house slightly
       const bigWin = roll > 0.9; // 10% chance of 3x
       const multiplier = bigWin ? 3 : win ? 2 : 0;
-      const newCoins = (eco.coins ?? 0) + (win ? bet * (multiplier - 1) : -bet);
+      const newCoins = (eco.coins ?? 0) + (win ? bet * multiplier : -bet);
 
       await supabase.from('discord_economy').upsert({
         discord_id: interaction.user.id,
@@ -1522,7 +1522,7 @@ client.on('interactionCreate', async interaction => {
     if (isColor) { if (betInput === spinColor) multiplier = betInput === 'green' ? 14 : 2; }
     else { if (parseInt(betInput) === spin) multiplier = 35; }
     const win = multiplier > 0;
-    const payout = win ? amount * multiplier - amount : -amount;
+    const payout = win ? amount * multiplier : -amount;
     const newCoins = (eco.coins ?? 0) + payout;
     await supabase.from('discord_economy').upsert({ discord_id: interaction.user.id, username: interaction.user.username, coins: newCoins, updated_at: new Date().toISOString() });
     const embed = new EmbedBuilder()
@@ -1546,7 +1546,7 @@ client.on('interactionCreate', async interaction => {
     const win = roll > 0.45;
     const bigWin = roll > 0.9;
     const multiplier = bigWin ? 3 : win ? 2 : 0;
-    const newCoins = (eco.coins ?? 0) + (win ? bet * (multiplier - 1) : -bet);
+    const newCoins = (eco.coins ?? 0) + (win ? bet * multiplier : -bet);
     await supabase.from('discord_economy').upsert({
       discord_id: interaction.user.id, username: interaction.user.username,
       coins: newCoins, updated_at: new Date().toISOString(),
