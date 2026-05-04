@@ -1424,20 +1424,24 @@ client.on('interactionCreate', async interaction => {
 
       const html = await res.text();
 
-      // Extract items from the HTML
-      const itemMatches  = [...html.matchAll(/alt="([^"]+)"[^>]*class="[^"]*item[^"]*"/gi)].map(m => m[1]).filter(Boolean);
-      const uniqueItems  = [...new Set(itemMatches)].slice(0, 12);
+      // Log sample HTML to understand structure
+      console.log('🔍 HTML sample (metasrc):', html.slice(0, 3000));
 
-      // Extract runes
-      const runeMatches  = [...html.matchAll(/alt="([^"]+)"[^>]*class="[^"]*rune[^"]*"/gi)].map(m => m[1]).filter(Boolean);
-      const uniqueRunes  = [...new Set(runeMatches)].slice(0, 6);
+      // metasrc.com item extraction — items appear as alt text on img tags
+      const allImgAlts = [...html.matchAll(/alt="([^"]{3,40})"/gi)].map(m => m[1]);
+      console.log('🔍 All img alts:', allImgAlts.slice(0, 30));
 
-      // Extract skill order from text like "Q W E" patterns
-      const skillMatch   = html.match(/skill[^>]*order[^<]*[QWER\s,>]+/i)?.[0]?.replace(/<[^>]+>/g, '').trim();
+      // Try JSON data embedded in page
+      const jsonMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*({[\s\S]+?});?\s*<\/script>/);
+      if (jsonMatch) console.log('🔍 Found __INITIAL_STATE__, length:', jsonMatch[1].length);
 
-      // Extract title/name
-      const titleMatch   = html.match(/<h1[^>]*>([^<]+)<\/h1>/i)?.[1]?.trim();
-      const displayName  = titleMatch ?? champion;
+      // Generic item-looking strings (capitalised words, not nav/UI)
+      const itemMatches = allImgAlts.filter(a => /^[A-Z][a-z]/.test(a) && !['Wild', 'Rift', 'Home', 'Back', 'Next', 'Prev', 'Logo', 'Menu', 'Search', 'Share'].includes(a));
+      const uniqueItems = [...new Set(itemMatches)].slice(0, 12);
+
+      const uniqueRunes = [];
+      const titleMatch  = html.match(/<h1[^>]*>([^<]+)<\/h1>/i)?.[1]?.trim();
+      const displayName = titleMatch ?? champion;
 
       // Try to extract lane info from page
       const laneText     = lane ? `${lane.charAt(0).toUpperCase() + lane.slice(1)} Lane` : 'All Lanes';
