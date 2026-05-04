@@ -96,6 +96,210 @@ function getRankForLP(lp) {
   return RANKS.slice().reverse().find(r => lp >= r.minLP) ?? RANKS[0];
 }
 
+// ── WILD RIFT BUILDS DATABASE ─────────────────────────────────────
+const ITEM_ICONS = {
+  // Attack items
+  "Infinity Edge":        3031, "Kraken Slayer":       6672, "Blade of the Ruined King": 3153,
+  "Phantom Dancer":       3046, "Runaan's Hurricane":  3085, "Guinsoo's Rageblade":      3124,
+  "Essence Reaver":       3508, "Bloodthirster":       3072, "Mortal Reminder":          3033,
+  "Navori Quickblades":   6035, "Galeforce":           6671,
+  // Bruiser/Fighter
+  "Trinity Force":        3078, "Black Cleaver":       3071, "Death's Dance":            6333,
+  "Sterak's Gage":        3053, "Maw of Malmortius":   3156, "Goredrinker":              6630,
+  "Stridebreaker":        6632, "Titanic Hydra":       3748, "Ravenous Hydra":           3074,
+  // Tank
+  "Sunfire Aegis":        3068, "Warmog's Armor":      3083, "Thornmail":                3075,
+  "Dead Man's Plate":     3742, "Gargoyle Stoneplate": 3193, "Frostfire Gauntlet":       6664,
+  "Heartsteel":           3181, "Abyssal Mask":        3001, "Frozen Heart":             3110,
+  "Spirit Visage":        3065, "Force of Nature":     4401,
+  // Assassin
+  "Duskblade of Draktharr": 6691, "Edge of Night":    6693, "Youmuu's Ghostblade":      3142,
+  "Serpent's Fang":       6694, "Shadowflame":         4645,
+  // Mage
+  "Luden's Tempest":      6655, "Rabadon's Deathcap":  3089, "Void Staff":               3135,
+  "Zhonya's Hourglass":   3157, "Horizon Focus":       4628, "Cryptbloom":               6618,
+  "Riftmaker":            4633, "Rod of Ages":         3001, "Rylai's Crystal Scepter":  3116,
+  "Morellonomicon":       3165,
+  // Support
+  "Knight's Vow":         3109, "Redemption":          3107, "Ardent Censer":            3504,
+  "Staff of Flowing Water": 6616, "Locket of the Iron Solari": 3190, "Shurelya's Battlesong": 2065,
+  "Shard of True Ice":    3850, "Imperial Mandate":    4636, "Mikael's Blessing":        3222,
+  // Boots
+  "Plated Steelcaps":     3047, "Sorcerer's Shoes":    3020, "Ionian Boots of Lucidity": 3158,
+  "Mercury's Treads":     3111, "Boots of Swiftness":  3009, "Gluttonous Greaves":       3047,
+  "Stasis Enchant":       3157, "Teleport Enchant":    3158, "Spectral Sickle":          3850,
+  // Jungle
+  "Kraken Slayer":        6672, "Wit's End":           3091, "Guinsoo's Rageblade":      3124,
+  "Serylda's Grudge":     6694,
+};
+
+const BUILDS_DB = {
+  // ── BARON LANE ──────────────────────────────────────────────────
+  garen:    { lane:'Baron',  items:["Sunfire Aegis","Thornmail","Spirit Visage","Warmog's Armor","Dead Man's Plate","Sterak's Gage"],            boots:"Plated Steelcaps",   runes:['Phase Rush','Triumph','Legend: Tenacity','Last Stand'], skills:'R > Q > E > W' },
+  darius:   { lane:'Baron',  items:["Trinity Force","Sterak's Gage","Dead Man's Plate","Black Cleaver","Sunfire Aegis","Gargoyle Stoneplate"],   boots:"Plated Steelcaps",   runes:['Conqueror','Triumph','Legend: Tenacity','Last Stand'],  skills:'R > E > Q > W' },
+  fiora:    { lane:'Baron',  items:["Trinity Force","Death's Dance","Sterak's Gage","Ravenous Hydra","Maw of Malmortius","Gargoyle Stoneplate"],  boots:"Ionian Boots of Lucidity", runes:['Conqueror','Triumph','Legend: Alacrity','Coup de Grace'], skills:'R > Q > W > E' },
+  camille:  { lane:'Baron',  items:["Trinity Force","Sterak's Gage","Death's Dance","Black Cleaver","Ravenous Hydra","Gargoyle Stoneplate"],     boots:"Plated Steelcaps",   runes:['Conqueror','Triumph','Legend: Tenacity','Coup de Grace'], skills:'R > Q > E > W' },
+  malphite: { lane:'Baron',  items:["Sunfire Aegis","Frostfire Gauntlet","Warmog's Armor","Thornmail","Abyssal Mask","Gargoyle Stoneplate"],     boots:"Plated Steelcaps",   runes:['Grasp of the Undying','Shield Bash','Bone Plating','Overgrowth'], skills:'R > E > Q > W' },
+  jayce:    { lane:'Baron',  items:["Trinity Force","Black Cleaver","Serylda's Grudge","Death's Dance","Sterak's Gage","Edge of Night"],          boots:"Ionian Boots of Lucidity", runes:['Lethal Tempo','Triumph','Legend: Alacrity','Coup de Grace'], skills:'R > Q > E > W' },
+  kennen:   { lane:'Baron',  items:["Luden's Tempest","Shadowflame","Rabadon's Deathcap","Void Staff","Zhonya's Hourglass","Morellonomicon"],    boots:"Sorcerer's Shoes",   runes:['Electrocute','Cheap Shot','Eyeball Collection','Relentless Hunter'], skills:'R > Q > E > W' },
+  // ── JUNGLE ────────────────────────────────────────────────────────
+  masteryi: { lane:'Jungle', items:["Kraken Slayer","Guinsoo's Rageblade","Blade of the Ruined King","Wit's End","Death's Dance","Sterak's Gage"], boots:"Ionian Boots of Lucidity", runes:['Lethal Tempo','Triumph','Legend: Alacrity','Coup de Grace'], skills:'R > Q > E > W' },
+  leesin:   { lane:'Jungle', items:["Duskblade of Draktharr","Youmuu's Ghostblade","Edge of Night","Serpent's Fang","Black Cleaver","Death's Dance"], boots:"Ionian Boots of Lucidity", runes:['Electrocute','Sudden Impact','Eyeball Collection','Relentless Hunter'], skills:'R > Q > E > W' },
+  vi:       { lane:'Jungle', items:["Trinity Force","Black Cleaver","Sterak's Gage","Death's Dance","Dead Man's Plate","Gargoyle Stoneplate"],    boots:"Plated Steelcaps",   runes:['Conqueror','Triumph','Legend: Tenacity','Last Stand'],  skills:'R > Q > E > W' },
+  shyvana:  { lane:'Jungle', items:["Kraken Slayer","Guinsoo's Rageblade","Wit's End","Nashor's Tooth","Rabadon's Deathcap","Void Staff"],         boots:"Plated Steelcaps",   runes:['Lethal Tempo','Triumph','Legend: Alacrity','Last Stand'],  skills:'R > E > Q > W' },
+  xinzhao:  { lane:'Jungle', items:["Trinity Force","Sterak's Gage","Black Cleaver","Death's Dance","Dead Man's Plate","Mortal Reminder"],         boots:"Plated Steelcaps",   runes:['Conqueror','Triumph','Legend: Tenacity','Coup de Grace'], skills:'R > E > Q > W' },
+  evelynn:  { lane:'Jungle', items:["Luden's Tempest","Shadowflame","Rabadon's Deathcap","Void Staff","Zhonya's Hourglass","Cryptbloom"],          boots:"Sorcerer's Shoes",   runes:['Electrocute','Cheap Shot','Eyeball Collection','Relentless Hunter'], skills:'R > W > Q > E' },
+  // ── MID LANE ──────────────────────────────────────────────────────
+  ahri:     { lane:'Mid',    items:["Luden's Tempest","Shadowflame","Rabadon's Deathcap","Void Staff","Zhonya's Hourglass","Cryptbloom"],          boots:"Sorcerer's Shoes",   runes:['Electrocute','Cheap Shot','Eyeball Collection','Relentless Hunter'], skills:'R > Q > E > W' },
+  orianna:  { lane:'Mid',    items:["Luden's Tempest","Rabadon's Deathcap","Void Staff","Zhonya's Hourglass","Shadowflame","Horizon Focus"],       boots:"Sorcerer's Shoes",   runes:['Arcane Comet','Manaflow Band','Transcendence','Scorch'],       skills:'R > Q > W > E' },
+  zed:      { lane:'Mid',    items:["Duskblade of Draktharr","Youmuu's Ghostblade","Edge of Night","Serylda's Grudge","Serpent's Fang","Ravenous Hydra"], boots:"Ionian Boots of Lucidity", runes:['Electrocute','Sudden Impact','Eyeball Collection','Relentless Hunter'], skills:'R > Q > E > W' },
+  yasuo:    { lane:'Mid',    items:["Infinity Edge","Phantom Dancer","Mortal Reminder","Bloodthirster","Death's Dance","Guardian Angel"],           boots:"Plated Steelcaps",   runes:['Lethal Tempo','Triumph','Legend: Alacrity','Coup de Grace'], skills:'R > Q > E > W' },
+  twisted_fate: { lane:'Mid', items:["Luden's Tempest","Shadowflame","Rabadon's Deathcap","Void Staff","Horizon Focus","Zhonya's Hourglass"],      boots:"Sorcerer's Shoes",   runes:['Arcane Comet','Manaflow Band','Transcendence','Gathering Storm'], skills:'R > Q > E > W' },
+  akali:    { lane:'Mid',    items:["Luden's Tempest","Shadowflame","Rabadon's Deathcap","Void Staff","Zhonya's Hourglass","Cryptbloom"],           boots:"Sorcerer's Shoes",   runes:['Electrocute','Sudden Impact','Eyeball Collection','Ultimate Hunter'], skills:'R > Q > E > W' },
+  // ── DRAGON LANE ───────────────────────────────────────────────────
+  jinx:     { lane:'Dragon', items:["Kraken Slayer","Phantom Dancer","Infinity Edge","Runaan's Hurricane","Bloodthirster","Mortal Reminder"],        boots:"Gluttonous Greaves", runes:['Lethal Tempo','Triumph','Legend: Alacrity','Coup de Grace'], skills:'R > Q > W > E' },
+  missfortune: { lane:'Dragon', items:["Kraken Slayer","Essence Reaver","Infinity Edge","Rabadon's Deathcap","Mortal Reminder","Bloodthirster"],   boots:"Gluttonous Greaves", runes:['Lethal Tempo','Triumph','Legend: Bloodline','Coup de Grace'], skills:'R > Q > E > W' },
+  ezreal:   { lane:'Dragon', items:["Trinity Force","Essence Reaver","Navori Quickblades","Serpent's Fang","Bloodthirster","Mortal Reminder"],      boots:"Gluttonous Greaves", runes:['Arcane Comet','Manaflow Band','Transcendence','Gathering Storm'], skills:'R > Q > E > W' },
+  jhin:     { lane:'Dragon', items:["Galeforce","Navori Quickblades","Infinity Edge","Phantom Dancer","Mortal Reminder","Bloodthirster"],            boots:"Gluttonous Greaves", runes:['Fleet Footwork','Triumph','Legend: Bloodline','Coup de Grace'], skills:'R > W > E > Q' },
+  kaisa:    { lane:'Dragon', items:["Kraken Slayer","Guinsoo's Rageblade","Phantom Dancer","Runaan's Hurricane","Infinity Edge","Void Staff"],       boots:"Gluttonous Greaves", runes:['Lethal Tempo','Triumph','Legend: Alacrity','Coup de Grace'], skills:'R > Q > W > E' },
+  // ── SUPPORT ───────────────────────────────────────────────────────
+  thresh:   { lane:'Support', items:["Knight's Vow","Warmog's Armor","Dead Man's Plate","Thornmail","Gargoyle Stoneplate","Abyssal Mask"],          boots:"Ionian Boots of Lucidity", runes:['Aftershock','Shield Bash','Bone Plating','Overgrowth'],        skills:'R > Q > E > W' },
+  lux:      { lane:'Support', items:["Luden's Tempest","Shard of True Ice","Ardent Censer","Staff of Flowing Water","Rabadon's Deathcap","Void Staff"], boots:"Ionian Boots of Lucidity", runes:['Arcane Comet','Manaflow Band','Transcendence','Scorch'],       skills:'R > E > Q > W' },
+  nami:     { lane:'Support', items:["Shard of True Ice","Ardent Censer","Staff of Flowing Water","Redemption","Knight's Vow","Mikael's Blessing"],  boots:"Ionian Boots of Lucidity", runes:['Summon Aery','Manaflow Band','Transcendence','Scorch'],         skills:'R > W > Q > E' },
+  nautilus: { lane:'Support', items:["Knight's Vow","Frostfire Gauntlet","Thornmail","Dead Man's Plate","Abyssal Mask","Gargoyle Stoneplate"],       boots:"Plated Steelcaps",   runes:['Aftershock','Font of Life','Bone Plating','Revitalize'],       skills:'R > Q > W > E' },
+  alistar:  { lane:'Support', items:["Knight's Vow","Warmog's Armor","Thornmail","Dead Man's Plate","Gargoyle Stoneplate","Spirit Visage"],          boots:"Plated Steelcaps",   runes:['Aftershock','Font of Life','Bone Plating','Overgrowth'],       skills:'R > W > Q > E' },
+  seraphine:{ lane:'Support', items:["Shard of True Ice","Ardent Censer","Staff of Flowing Water","Redemption","Locket of the Iron Solari","Mikael's Blessing"], boots:"Ionian Boots of Lucidity", runes:['Summon Aery','Manaflow Band','Transcendence','Gathering Storm'], skills:'R > E > Q > W' },
+  volibear: { lane:'Baron',  items:["Trinity Force","Sterak's Gage","Black Cleaver","Dead Man's Plate","Spirit Visage","Gargoyle Stoneplate"],      boots:"Plated Steelcaps",   runes:['Grasp of the Undying','Shield Bash','Bone Plating','Overgrowth'], skills:'R > Q > E > W' },
+};
+// Key aliases
+BUILDS_DB['miss fortune'] = BUILDS_DB.missfortune;
+BUILDS_DB['master yi']    = BUILDS_DB.masteryi;
+BUILDS_DB['twisted fate'] = BUILDS_DB.twisted_fate;
+BUILDS_DB['xin zhao']     = BUILDS_DB.xinzhao;
+BUILDS_DB['lee sin']      = BUILDS_DB.leesin;
+
+const LANE_COLORS = { Baron:'#8B4513', Jungle:'#228B22', Mid:'#4169E1', Dragon:'#DC143C', Support:'#9370DB' };
+
+async function generateBuildsCard(championName, build) {
+  await fontReady;
+  const W = 900, H = 400;
+  const canvas = createCanvas(W, H);
+  const ctx = canvas.getContext('2d');
+  const laneColor = LANE_COLORS[build.lane] ?? '#00c8ff';
+  const f = (size, bold = false) => `${bold ? 'bold ' : ''}${size}px ${bold ? 'RobotoBold' : 'Roboto'}, sans-serif`;
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#0a0a14'); bg.addColorStop(1, '#141420');
+  ctx.fillStyle = bg; ctx.roundRect(0, 0, W, H, 16); ctx.fill();
+
+  // Lane colour accent
+  ctx.fillStyle = laneColor; ctx.fillRect(0, 0, 6, H);
+
+  // Try to load champion splash as background
+  try {
+    const champId = championName.toLowerCase().replace(/\s/g, '');
+    const splashUrl = `https://cdn.communitydragon.org/latest/champion/${champId}/splash-art/centered`;
+    const splash = await loadImage(splashUrl);
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    ctx.drawImage(splash, W * 0.4, 0, W * 0.6, H);
+    ctx.restore();
+  } catch {}
+
+  // Champion name + lane
+  ctx.fillStyle = '#ffffff'; ctx.font = f(36, true);
+  ctx.fillText(championName.charAt(0).toUpperCase() + championName.slice(1), 24, 52);
+  ctx.fillStyle = laneColor; ctx.font = f(16, true);
+  ctx.fillText(`⚔ ${build.lane.toUpperCase()} LANE  ·  WILD RIFT`, 24, 74);
+
+  // Divider
+  ctx.strokeStyle = '#333345'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(16, 86); ctx.lineTo(W - 16, 86); ctx.stroke();
+
+  // Items section
+  ctx.fillStyle = '#888899'; ctx.font = f(13, true);
+  ctx.fillText('CORE BUILD', 24, 108);
+
+  const allItems = [...build.items, build.boots];
+  const slotSize = 70, slotGap = 10, startX = 24;
+  const startY = 118;
+
+  for (let i = 0; i < allItems.length; i++) {
+    const itemName = allItems[i];
+    const x = startX + i * (slotSize + slotGap);
+    const y = startY;
+    const itemId = ITEM_ICONS[itemName];
+
+    // Slot background
+    ctx.fillStyle = i === allItems.length - 1 ? '#1a1025' : '#141428';
+    ctx.beginPath(); ctx.roundRect(x, y, slotSize, slotSize, 8); ctx.fill();
+    ctx.strokeStyle = i === allItems.length - 1 ? laneColor + '88' : '#2a2a40';
+    ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(x, y, slotSize, slotSize, 8); ctx.stroke();
+
+    if (itemId) {
+      try {
+        const icon = await loadImage(`https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/${itemId}_${itemName.toLowerCase().replace(/[^a-z0-9]/g,'').replace(/\s/g,'')}.png`);
+        ctx.save(); ctx.beginPath(); ctx.roundRect(x + 3, y + 3, slotSize - 6, slotSize - 6, 6); ctx.clip();
+        ctx.drawImage(icon, x + 3, y + 3, slotSize - 6, slotSize - 6); ctx.restore();
+      } catch {
+        // CDragon path failed — try DDragon
+        try {
+          const icon2 = await loadImage(`https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/${itemId}.png`);
+          ctx.save(); ctx.beginPath(); ctx.roundRect(x + 3, y + 3, slotSize - 6, slotSize - 6, 6); ctx.clip();
+          ctx.drawImage(icon2, x + 3, y + 3, slotSize - 6, slotSize - 6); ctx.restore();
+        } catch {
+          // Fallback colored box
+          ctx.fillStyle = laneColor + '55'; ctx.beginPath(); ctx.roundRect(x + 3, y + 3, slotSize - 6, slotSize - 6, 6); ctx.fill();
+          ctx.fillStyle = '#ffffff'; ctx.font = f(11, true); ctx.textAlign = 'center';
+          ctx.fillText(itemName.split(' ').map(w => w[0]).join('').slice(0, 3), x + slotSize/2, y + slotSize/2 + 5);
+          ctx.textAlign = 'left';
+        }
+      }
+    }
+
+    // Item name below slot (truncated)
+    ctx.fillStyle = i === allItems.length - 1 ? laneColor : '#aaaacc';
+    ctx.font = f(10);
+    const short = itemName.length > 11 ? itemName.slice(0, 10) + '…' : itemName;
+    ctx.textAlign = 'center'; ctx.fillText(short, x + slotSize / 2, y + slotSize + 14); ctx.textAlign = 'left';
+  }
+
+  // Divider
+  ctx.strokeStyle = '#333345'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(16, 220); ctx.lineTo(W - 16, 220); ctx.stroke();
+
+  // Runes section
+  ctx.fillStyle = '#888899'; ctx.font = f(13, true);
+  ctx.fillText('RUNES', 24, 242);
+  ctx.fillStyle = '#ccccdd'; ctx.font = f(14);
+  build.runes.forEach((r, i) => {
+    const dot = i === 0 ? '⬟ ' : '◈ ';
+    ctx.fillText(`${dot}${r}`, 24 + (i < 2 ? 0 : 220) + (i % 2) * 220, 260 + Math.floor(i / 2) * 22);
+  });
+
+  // Skill order
+  ctx.fillStyle = '#888899'; ctx.font = f(13, true);
+  ctx.fillText('SKILL ORDER', 500, 242);
+  ctx.fillStyle = '#ccccdd'; ctx.font = f(18, true);
+  ctx.fillText(build.skills, 500, 268);
+
+  // Divider
+  ctx.strokeStyle = '#333345'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(16, 310); ctx.lineTo(W - 16, 310); ctx.stroke();
+
+  // Footer
+  ctx.fillStyle = '#555566'; ctx.font = f(12);
+  ctx.fillText('The League • Wild Rift Build Guide', 24, 330);
+
+  // Bottom accent
+  const line = ctx.createLinearGradient(0, H - 4, W, H - 4);
+  line.addColorStop(0, laneColor); line.addColorStop(1, 'transparent');
+  ctx.fillStyle = line; ctx.fillRect(0, H - 4, W, 4);
+
+  return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'build.png' });
+}
+
 const LANES = [
   { key: 'baron',   name: '🏰 Baron Lane',   emoji: '🏰' },
   { key: 'jungle',  name: '🌿 Jungle',        emoji: '🌿' },
@@ -1400,75 +1604,24 @@ client.on('interactionCreate', async interaction => {
   if (interaction.commandName === 'builds') {
     await interaction.deferReply();
     try {
-      const champion = interaction.options.getString('champion').trim();
+      const input    = interaction.options.getString('champion').trim().toLowerCase();
       const lane     = interaction.options.getString('lane')?.toLowerCase().trim() ?? null;
-      const slug     = champion.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
-      // Try Wild Rift specific sites (server-side rendered)
-      const candidates = [
-        `https://www.wildriftfire.com/champion/${slug}/build`,
-        `https://www.wildriftfire.com/${slug}`,
-        `https://lolwildriftbuild.com/champion/${slug}`,
-        `https://wildriftfire.com/champion/${slug}`,
-        `https://www.wildriftfire.com/champion/${slug}-build`,
-      ];
-      const headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': 'text/html' };
-
-      let res = null, url = null;
-      for (const candidate of candidates) {
-        const r = await fetch(candidate, { headers }).catch(() => null);
-        console.log(`🔍 Tried: ${candidate} → ${r?.status ?? 'error'}`);
-        if (r?.ok) { res = r; url = candidate; break; }
-      }
-      if (!res) return interaction.editReply({ content: `❌ Could not find a build page for **${champion}**.\nCheck the spelling — use the exact in-game name (e.g. \`Miss Fortune\`, \`Twisted Fate\`).\n🔗 Browse manually: <https://www.wildriftfire.com>` });
-
-      const html = await res.text();
-
-      // Log sample HTML to understand structure
-      console.log('🔍 HTML sample (metasrc):', html.slice(0, 3000));
-
-      // metasrc.com item extraction — items appear as alt text on img tags
-      const allImgAlts = [...html.matchAll(/alt="([^"]{3,40})"/gi)].map(m => m[1]);
-      console.log('🔍 All img alts:', allImgAlts.slice(0, 30));
-
-      // Try JSON data embedded in page
-      const jsonMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*({[\s\S]+?});?\s*<\/script>/);
-      if (jsonMatch) console.log('🔍 Found __INITIAL_STATE__, length:', jsonMatch[1].length);
-
-      // Generic item-looking strings (capitalised words, not nav/UI)
-      const itemMatches = allImgAlts.filter(a => /^[A-Z][a-z]/.test(a) && !['Wild', 'Rift', 'Home', 'Back', 'Next', 'Prev', 'Logo', 'Menu', 'Search', 'Share'].includes(a));
-      const uniqueItems = [...new Set(itemMatches)].slice(0, 12);
-
-      const uniqueRunes = [];
-      const titleMatch  = html.match(/<h1[^>]*>([^<]+)<\/h1>/i)?.[1]?.trim();
-      const displayName = titleMatch ?? champion;
-
-      // Try to extract lane info from page
-      const laneText     = lane ? `${lane.charAt(0).toUpperCase() + lane.slice(1)} Lane` : 'All Lanes';
-
-      const embed = new EmbedBuilder()
-        .setTitle(`⚔️ ${displayName} — Best Build`)
-        .setURL(url)
-        .setColor(0x00c8ff)
-        .setFooter({ text: `Source: wildriftfire.com • ${laneText}` })
-        .setTimestamp();
-
-      if (uniqueItems.length) {
-        embed.addFields({ name: '🛡️ Recommended Items', value: uniqueItems.map(i => `• ${i}`).join('\n'), inline: false });
-      }
-      if (uniqueRunes.length) {
-        embed.addFields({ name: '💠 Runes', value: uniqueRunes.map(r => `• ${r}`).join('\n'), inline: false });
-      }
-      if (!uniqueItems.length && !uniqueRunes.length) {
-        embed.setDescription(`Could not parse build data automatically.\n\n🔗 **View full build:** ${url}`);
-      } else {
-        embed.addFields({ name: '🔗 Full Guide', value: url, inline: false });
+      // Look up in local database
+      const build = BUILDS_DB[input] ?? BUILDS_DB[input.replace(/\s/g,'')];
+      if (!build) {
+        const available = Object.keys(BUILDS_DB).filter(k => !['miss fortune','master yi','twisted fate','xin zhao','lee sin'].includes(k));
+        return interaction.editReply({
+          content: `❌ **${input}** isn't in the build database yet.\n\nAvailable: \`${available.join('`, `')}\`\n\nUse the champion's in-game name (e.g. \`miss fortune\`, \`master yi\`).`,
+        });
       }
 
-      await interaction.editReply({ embeds: [embed] });
+      // Generate canvas HUD
+      const card = await generateBuildsCard(input, build);
+      await interaction.editReply({ files: [card] });
     } catch (e) {
       console.error('builds error:', e.message);
-      interaction.editReply({ content: '❌ Failed to fetch build data. Try again later.' }).catch(() => {});
+      interaction.editReply({ content: '❌ Failed to generate build card.' }).catch(() => {});
     }
   }
 
