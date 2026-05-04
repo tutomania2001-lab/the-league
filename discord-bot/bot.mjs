@@ -1373,7 +1373,7 @@ client.on('interactionCreate', async interaction => {
     }
     await member.roles.add(client.roles.verified).catch(() => {});
     // Store Discord ID for rank sync
-    await supabase.from('users').update({ discord_id: interaction.user.id }).eq('id', user.id).catch(() => {});
+    await supabase.from('users').update({ discord_id: interaction.user.id }).eq('id', user.id);
     return interaction.editReply({ content: `✅ Account **${user.riot_id ?? user.username}** verified!\nYou now have the **✅ Verified Player** role 🎉` });
   }
 
@@ -1411,7 +1411,7 @@ client.on('interactionCreate', async interaction => {
     if (rankRoleId) await member.roles.add(rankRoleId).catch(() => {});
 
     // Store Discord ID for rank sync
-    await supabase.from('users').update({ discord_id: interaction.user.id }).eq('id', user.id).catch(() => {});
+    await supabase.from('users').update({ discord_id: interaction.user.id }).eq('id', user.id);
 
     return interaction.editReply({
       content: `🏆 Verified! **${user.riot_id ?? user.username}** is **${actualRank.name}** (${lp} LP).\nYou now have the **${actualRank.name}** role!`
