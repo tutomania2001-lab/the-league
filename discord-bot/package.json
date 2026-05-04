@@ -9,7 +9,8 @@
   "dependencies": {
     "discord.js": "^14.18.0",
     "@supabase/supabase-js": "^2.105.1",
-    "@napi-rs/canvas": "^0.1.44"
+    "@napi-rs/canvas": "^0.1.44",
+    "ws": "^8.18.0"
   },
   "engines": {
     "node": "20.x"

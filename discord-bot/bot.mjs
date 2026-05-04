@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, UserSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType, AttachmentBuilder } from 'discord.js';
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
 
 // Font ready promise — awaited before generating rank cards
@@ -73,7 +74,7 @@ async function fetchWildRiftArticles() {
 
 const TOKEN = process.env.DISCORD_TOKEN?.replace(/\s/g, '');
 const GUILD_ID = process.env.GUILD_ID?.trim();
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, { realtime: { transport: ws } });
 
 if (!TOKEN || !GUILD_ID) { console.error('Missing env vars'); process.exit(1); }
 
