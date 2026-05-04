@@ -424,7 +424,7 @@ client.once('clientReady', async () => {
     { name: 'roll',  description: 'Roll a dice',
       options: [{ name: 'sides', type: 4, description: 'Number of sides (default 6)', required: false }] },
     { name: 'duel',  description: 'Challenge someone to Rock Paper Scissors',
-      options: [{ name: 'user', type: 6, description: 'Player to challenge', required: true }] },
+      options: [{ name: 'user', type: 6, description: 'Player to challenge (leave empty to play vs Bot)', required: false }] },
   ]).catch(e => console.error('⚠️ Slash command registration failed:', e.message));
   console.log('✅ Slash commands registered');
 
@@ -1105,17 +1105,29 @@ client.on('interactionCreate', async interaction => {
   // ── /duel ────────────────────────────────────────────────────────
   if (interaction.commandName === 'duel') {
     const target = interaction.options.getUser('user');
-    if (target.id === interaction.user.id) return interaction.reply({ content: '❌ You can\'t duel yourself!', ephemeral: true });
-    if (target.bot) return interaction.reply({ content: '❌ You can\'t duel a bot.', ephemeral: true });
-
     const gid = newGid();
-    games.set(gid, { type: 'rps', p1: interaction.user.id, p2: target.id, p1pick: null, p2pick: null, status: 'active', channelId: interaction.channelId });
-
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`rps_${gid}_r`).setLabel('✊ Rock').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`rps_${gid}_p`).setLabel('✋ Paper').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`rps_${gid}_s`).setLabel('✌️ Scissors').setStyle(ButtonStyle.Secondary),
     );
+
+    // vs Bot
+    if (!target) {
+      games.set(gid, { type: 'rps', p1: interaction.user.id, p2: BOT_ID, p1pick: null, p2pick: botRPS(), status: 'active', channelId: interaction.channelId });
+      return interaction.reply({ content: `⚔️ **${interaction.user} vs 🤖 Bot — Rock Paper Scissors!**\nPick your move!`, components: [row] });
+    }
+
+    if (target.id === interaction.user.id) return interaction.reply({ content: '❌ You can\'t duel yourself!', ephemeral: true });
+    if (target.bot) return interaction.reply({ content: '❌ Use `/duel` without a user to play the bot.', ephemeral: true });
+
+    // Check target is online
+    const targetMember = await interaction.guild.members.fetch(target.id).catch(() => null);
+    if (!targetMember) return interaction.reply({ content: '❌ That user is not in this server.', ephemeral: true });
+    const presence = targetMember.presence?.status;
+    if (!presence || presence === 'offline') return interaction.reply({ content: `❌ **${targetMember.displayName}** is offline. You can only duel online players.`, ephemeral: true });
+
+    games.set(gid, { type: 'rps', p1: interaction.user.id, p2: target.id, p1pick: null, p2pick: null, status: 'active', channelId: interaction.channelId });
     await interaction.reply({ content: `⚔️ **${interaction.user} challenged ${target} to Rock Paper Scissors!**\nBoth players — pick your move!`, components: [row] });
   }
 
