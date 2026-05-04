@@ -1007,6 +1007,9 @@ client.once('clientReady', async () => {
     { name: 'flip',  description: 'Flip a coin — heads or tails' },
     { name: 'roll',  description: 'Roll a dice',
       options: [{ name: 'sides', type: 4, description: 'Number of sides (default 6)', required: false }] },
+    { name: 'rep',      description: 'Give +1 reputation to a player (once per day)',
+      options: [{ name: 'user', type: 6, description: 'Player to rep', required: true }] },
+    { name: 'repboard', description: 'Show the reputation leaderboard' },
     { name: 'duel',  description: 'Challenge someone to Rock Paper Scissors',
       options: [{ name: 'user', type: 6, description: 'Player to challenge (leave empty to play vs Bot)', required: false }] },
   ]).then(cmds => console.log(`✅ Slash commands registered: ${cmds.map(c=>c.name).join(', ')}`))
@@ -1671,6 +1674,66 @@ client.on('interactionCreate', async interaction => {
     } catch (e) {
       console.error('compare error:', e.message);
       interaction.editReply({ content: '❌ Failed to compare players.' }).catch(() => {});
+    }
+  }
+
+  // ── /rep ─────────────────────────────────────────────────────────
+  if (interaction.commandName === 'rep') {
+    await interaction.deferReply();
+    try {
+      const target = interaction.options.getUser('user');
+      if (target.id === interaction.user.id) return interaction.editReply({ content: '❌ You can\'t rep yourself.' });
+      if (target.bot) return interaction.editReply({ content: '❌ You can\'t rep a bot.' });
+
+      // Check cooldown
+      const { data: cd } = await supabase.from('rep_cooldowns').select('last_given').eq('giver_id', interaction.user.id).maybeSingle();
+      const now = new Date();
+      if (cd) {
+        const hoursSince = (now - new Date(cd.last_given)) / 3600000;
+        if (hoursSince < 20) {
+          const hoursLeft = Math.ceil(20 - hoursSince);
+          return interaction.editReply({ content: `⏳ You already gave rep today! Come back in **${hoursLeft}h**.` });
+        }
+      }
+
+      // Give rep
+      const { data: current } = await supabase.from('reputation').select('rep').eq('discord_id', target.id).maybeSingle();
+      const newRep = (current?.rep ?? 0) + 1;
+      await supabase.from('reputation').upsert({ discord_id: target.id, username: target.username, rep: newRep, updated_at: now.toISOString() });
+      await supabase.from('rep_cooldowns').upsert({ giver_id: interaction.user.id, last_given: now.toISOString() });
+
+      const embed = new EmbedBuilder()
+        .setTitle('👍 Reputation Given!')
+        .setDescription(`${interaction.user} gave +1 rep to ${target}!\n\n${target} now has **${newRep} rep** ⭐`)
+        .setColor(0x00c8ff)
+        .setTimestamp();
+      await interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      console.error('rep error:', e.message);
+      interaction.editReply({ content: '❌ Failed to give rep.' }).catch(() => {});
+    }
+  }
+
+  // ── /repboard ────────────────────────────────────────────────────
+  if (interaction.commandName === 'repboard') {
+    await interaction.deferReply();
+    try {
+      const { data } = await supabase.from('reputation').select('username, rep').order('rep', { ascending: false }).limit(10);
+      const medals = ['🥇','🥈','🥉'];
+      const embed = new EmbedBuilder()
+        .setTitle('⭐ REPUTATION LEADERBOARD')
+        .setDescription(
+          data?.length
+            ? data.map((u, i) => `${medals[i] ?? `**${i+1}.**`} **${u.username ?? 'Unknown'}** — ${u.rep} ⭐`).join('\n')
+            : 'No reputation given yet. Be the first with `/rep @user`!'
+        )
+        .setColor(0x00c8ff)
+        .setFooter({ text: 'Give rep with /rep @user — once every 20 hours' })
+        .setTimestamp();
+      await interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      console.error('repboard error:', e.message);
+      interaction.editReply({ content: '❌ Failed to load leaderboard.' }).catch(() => {});
     }
   }
 
