@@ -1687,14 +1687,14 @@ client.on('interactionCreate', async interaction => {
       if (target.id === interaction.user.id) return interaction.editReply({ content: '❌ You can\'t rep yourself.' });
       if (target.bot) return interaction.editReply({ content: '❌ You can\'t rep a bot.' });
 
-      // Check cooldown
-      const { data: cd } = await supabase.from('rep_cooldowns').select('last_given').eq('giver_id', interaction.user.id).maybeSingle();
+      // Check cooldown — per giver+target pair
+      const { data: cd } = await supabase.from('rep_cooldowns').select('last_given').eq('giver_id', interaction.user.id).eq('target_id', target.id).maybeSingle();
       const now = new Date();
       if (cd) {
         const hoursSince = (now - new Date(cd.last_given)) / 3600000;
         if (hoursSince < 20) {
           const hoursLeft = Math.ceil(20 - hoursSince);
-          return interaction.editReply({ content: `⏳ You already gave rep today! Come back in **${hoursLeft}h**.` });
+          return interaction.editReply({ content: `⏳ You already repped ${target} today! Come back in **${hoursLeft}h**.` });
         }
       }
 
@@ -1702,7 +1702,7 @@ client.on('interactionCreate', async interaction => {
       const { data: current } = await supabase.from('reputation').select('rep').eq('discord_id', target.id).maybeSingle();
       const newRep = (current?.rep ?? 0) + 1;
       await supabase.from('reputation').upsert({ discord_id: target.id, username: target.username, rep: newRep, updated_at: now.toISOString() });
-      await supabase.from('rep_cooldowns').upsert({ giver_id: interaction.user.id, last_given: now.toISOString() });
+      await supabase.from('rep_cooldowns').upsert({ giver_id: interaction.user.id, target_id: target.id, last_given: now.toISOString() });
 
       const embed = new EmbedBuilder()
         .setTitle('👍 Reputation Given!')
