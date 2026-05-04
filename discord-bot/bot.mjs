@@ -565,35 +565,6 @@ client.once('clientReady', async () => {
     console.log('✅ Private rooms setup done');
   }
 
-  // ── GAMES CHANNEL ────────────────────────────────────────────────
-  const allCh2 = await guild.channels.fetch();
-  let gamesCh = allCh2.find(c => c?.name === 'games' && c.type === ChannelType.GuildText);
-  if (!gamesCh) {
-    gamesCh = await guild.channels.create({
-      name: 'games', type: ChannelType.GuildText,
-      permissionOverwrites: [
-        { id: roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
-        { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
-      ],
-    }).catch(() => null);
-  }
-  if (gamesCh) {
-    const existingMsgs = await gamesCh.messages.fetch({ limit: 10 });
-    for (const [, m] of existingMsgs.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
-    const gameRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('game_rps').setLabel('✊ Rock Paper Scissors').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('game_ttt').setLabel('❌ Tic Tac Toe').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('game_c4').setLabel('🟡 Connect 4').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('game_hl').setLabel('🔢 Higher or Lower').setStyle(ButtonStyle.Primary),
-    );
-    const gameEmbed = new EmbedBuilder()
-      .setTitle('◈ MINI GAMES')
-      .setDescription('Challenge a member to a 1v1 game!\n\n**✊ Rock Paper Scissors** — Pick your move, may the best hand win\n**❌ Tic Tac Toe** — Classic 3x3 grid\n**🟡 Connect 4** — Drop pieces, get 4 in a row\n**🔢 Higher or Lower** — Guess the number closest to win')
-      .setColor(0x00c8ff)
-      .setFooter({ text: 'Click a game to challenge someone' });
-    await gamesCh.send({ embeds: [gameEmbed], components: [gameRow] }).catch(() => {});
-    console.log('✅ Games channel ready');
-  }
 
   // ── WILD RIFT NEWS FEED ──────────────────────────────────────────
   const allChFeed = await guild.channels.fetch();
@@ -1819,30 +1790,6 @@ async function syncRanksAndStats() {
       }
     }
 
-    // Refresh player stats channel
-    if (client.statsChannelId) {
-      const statsCh = guild.channels.cache.get(client.statsChannelId);
-      if (statsCh) {
-        const existing = await statsCh.messages.fetch({ limit: 20 });
-        for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
-
-        const sorted = [...users].sort((a, b) => (b.lp ?? 0) - (a.lp ?? 0));
-        const medals = ['🥇','🥈','🥉'];
-        const embed = new EmbedBuilder()
-          .setTitle('◈ VERIFIED PLAYER STATS')
-          .setDescription(
-            sorted.map((u, i) => {
-              const rank = getRankForLP(u.lp ?? 0);
-              return `${medals[i] ?? `**${i+1}.**`} **${u.riot_id ?? u.username}** — ${rank.name} • ${u.lp ?? 0} LP${u.discord_id ? ` • <@${u.discord_id}>` : ''}`;
-            }).join('\n') || 'No verified players yet.'
-          )
-          .setColor(0x00c8ff)
-          .setFooter({ text: `${sorted.length} verified players • syncs every 5 min` })
-          .setTimestamp();
-        await statsCh.send({ embeds: [embed] }).catch(() => {});
-      }
-    }
-
     if (updated) console.log(`🔄 Rank sync complete — ${updated} roles updated`);
   } catch (e) {
     console.error('Rank sync error:', e.message);
@@ -1850,29 +1797,10 @@ async function syncRanksAndStats() {
 }
 
 client.once('ready', async () => {
-  // Set up player stats channel
-  const guild = client.guilds.cache.get(GUILD_ID);
-  if (guild) {
-    const channels = await guild.channels.fetch();
-    let statsCh = channels.find(c => c?.name === 'player-stats' && c.type === ChannelType.GuildText);
-    if (!statsCh) {
-      statsCh = await guild.channels.create({
-        name: 'player-stats',
-        type: ChannelType.GuildText,
-        topic: '📊 Live stats for all verified players — auto-synced every 5 minutes',
-        permissionOverwrites: [
-          { id: guild.roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
-          { id: client.roles?.member ?? guild.roles.everyone, allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.SendMessages] },
-        ],
-      }).catch(() => null);
-    }
-    client.statsChannelId = statsCh?.id ?? null;
-  }
-
-  // Start sync interval
+  // Start rank sync interval
   await syncRanksAndStats();
   setInterval(syncRanksAndStats, 5 * 60 * 1000);
-  console.log('✅ Rank sync + player stats active');
+  console.log('✅ Rank sync active');
 });
 
 client.login(TOKEN);
