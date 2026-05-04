@@ -423,6 +423,8 @@ client.once('clientReady', async () => {
     { name: 'flip',  description: 'Flip a coin — heads or tails' },
     { name: 'roll',  description: 'Roll a dice',
       options: [{ name: 'sides', type: 4, description: 'Number of sides (default 6)', required: false }] },
+    { name: 'duel',  description: 'Challenge someone to Rock Paper Scissors',
+      options: [{ name: 'user', type: 6, description: 'Player to challenge', required: true }] },
   ]).catch(e => console.error('⚠️ Slash command registration failed:', e.message));
   console.log('✅ Slash commands registered');
 
@@ -1098,6 +1100,23 @@ client.on('interactionCreate', async interaction => {
       console.error('compare error:', e.message);
       interaction.editReply({ content: '❌ Failed to compare players.' }).catch(() => {});
     }
+  }
+
+  // ── /duel ────────────────────────────────────────────────────────
+  if (interaction.commandName === 'duel') {
+    const target = interaction.options.getUser('user');
+    if (target.id === interaction.user.id) return interaction.reply({ content: '❌ You can\'t duel yourself!', ephemeral: true });
+    if (target.bot) return interaction.reply({ content: '❌ You can\'t duel a bot.', ephemeral: true });
+
+    const gid = newGid();
+    games.set(gid, { type: 'rps', p1: interaction.user.id, p2: target.id, p1pick: null, p2pick: null, status: 'active', channelId: interaction.channelId });
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`rps_${gid}_r`).setLabel('✊ Rock').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`rps_${gid}_p`).setLabel('✋ Paper').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`rps_${gid}_s`).setLabel('✌️ Scissors').setStyle(ButtonStyle.Secondary),
+    );
+    await interaction.reply({ content: `⚔️ **${interaction.user} challenged ${target} to Rock Paper Scissors!**\nBoth players — pick your move!`, components: [row] });
   }
 
   // ── /flip ────────────────────────────────────────────────────────
