@@ -624,7 +624,8 @@ client.once('clientReady', async () => {
       for (const item of articles) {
         const title = item.title ?? item.header ?? 'Wild Rift Update';
         const url = item.link ?? item.url ?? (item.slug ? `${WILDRIFT_BASE}/en-sg/news/${item.slug}/` : WILDRIFT_NEWS_URL);
-        const desc = (item.description ?? item.summary ?? item.excerpt ?? '').slice(0, 400);
+        const descRaw2 = item.description ?? item.summary ?? item.excerpt ?? '';
+        const desc = (typeof descRaw2 === 'string' ? descRaw2 : descRaw2?.body ?? descRaw2?.text ?? '').slice(0, 400);
         const image = item.image?.url ?? item.banner?.url ?? item.thumbnail?.url ?? item.headerImage?.url ?? null;
         const date = item.date ?? item.publishedAt ?? item.updatedAt ?? null;
 
@@ -1153,10 +1154,14 @@ client.on('interactionCreate', async interaction => {
       const item = articles[0];
       if (!item) return interaction.editReply({ content: '❌ Could not fetch patch notes right now. Check <https://wildrift.leagueoflegends.com/en-sg/news/tags/patch-notes/>' });
 
+      console.log('📰 Patch item keys:', Object.keys(item));
+      console.log('📰 Patch item sample:', JSON.stringify(item).slice(0, 800));
+
       const title = item.title ?? item.header ?? item.heading ?? 'Latest Patch Notes';
-      const rawUrl = item.link ?? item.url ?? item.articleUrl ?? (item.slug ? `${WILDRIFT_BASE}/en-sg/news/${item.slug}/` : null);
+      const rawUrl = item.link ?? item.url ?? item.articleUrl ?? item.path ?? (item.slug ? `${WILDRIFT_BASE}/en-sg/news/${item.slug}/` : null);
       const url = rawUrl ? (rawUrl.startsWith('http') ? rawUrl : `${WILDRIFT_BASE}${rawUrl}`) : WILDRIFT_NEWS_URL;
-      const desc = (item.description ?? item.summary ?? item.excerpt ?? item.blurb ?? '').slice(0, 500);
+      const descRaw = item.description ?? item.summary ?? item.excerpt ?? item.blurb ?? '';
+      const desc = (typeof descRaw === 'string' ? descRaw : descRaw?.body ?? descRaw?.text ?? JSON.stringify(descRaw)).slice(0, 500);
       const imageObj = item.image ?? item.banner ?? item.thumbnail ?? item.backgroundImage ?? item.featuredImage ?? item.headerImage;
       const imageUrl = typeof imageObj === 'string' ? imageObj : imageObj?.url ?? imageObj?.src ?? null;
       const date = item.date ?? item.publishedAt ?? item.updatedAt ?? null;
