@@ -812,10 +812,10 @@ client.once('clientReady', async () => {
 
       for (const item of articles) {
         const title = item.title ?? item.header ?? 'Wild Rift Update';
-        const url = item.link ?? item.url ?? (item.slug ? `${WILDRIFT_BASE}/en-sg/news/${item.slug}/` : WILDRIFT_NEWS_URL);
+        const url = item.action?.payload?.url ? `${WILDRIFT_BASE}${item.action.payload.url}` : (item.link ?? item.url ?? WILDRIFT_NEWS_URL);
         const descRaw2 = item.description ?? item.summary ?? item.excerpt ?? '';
         const desc = (typeof descRaw2 === 'string' ? descRaw2 : descRaw2?.body ?? descRaw2?.text ?? '').slice(0, 400);
-        const image = item.image?.url ?? item.banner?.url ?? item.thumbnail?.url ?? item.headerImage?.url ?? null;
+        const image = item.imageMedia?.url ?? item.media?.url ?? item.image?.url ?? item.banner?.url ?? item.thumbnail?.url ?? item.headerImage?.url ?? null;
         const date = item.date ?? item.publishedAt ?? item.updatedAt ?? null;
 
         const embed = new EmbedBuilder()
@@ -1404,13 +1404,13 @@ client.on('interactionCreate', async interaction => {
       const lane     = interaction.options.getString('lane')?.toLowerCase().trim() ?? null;
       const slug     = champion.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
-      // Try multiple URL patterns across different sites
+      // Try Wild Rift specific sites (server-side rendered)
       const candidates = [
-        `https://www.wildriftfire.com/champion/${slug}`,
-        `https://www.wildriftfire.com/champion/${slug}-wild-rift`,
-        `https://wildriftfire.com/${slug}`,
-        `https://www.metasrc.com/wildrift/champion/${slug}`,
-        `https://app.mobalytics.gg/wild-rift/champions/${slug}/build`,
+        `https://www.wildriftfire.com/champion/${slug}/build`,
+        `https://www.wildriftfire.com/${slug}`,
+        `https://lolwildriftbuild.com/champion/${slug}`,
+        `https://wildriftfire.com/champion/${slug}`,
+        `https://www.wildriftfire.com/champion/${slug}-build`,
       ];
       const headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': 'text/html' };
 
