@@ -464,8 +464,8 @@ client.once('clientReady', async () => {
       options: [{ name: 'sides', type: 4, description: 'Number of sides (default 6)', required: false }] },
     { name: 'duel',  description: 'Challenge someone to Rock Paper Scissors',
       options: [{ name: 'user', type: 6, description: 'Player to challenge (leave empty to play vs Bot)', required: false }] },
-  ]).catch(e => console.error('⚠️ Slash command registration failed:', e.message));
-  console.log('✅ Slash commands registered');
+  ]).then(cmds => console.log(`✅ Slash commands registered: ${cmds.map(c=>c.name).join(', ')}`))
+    .catch(e => console.error('⚠️ Slash command registration failed:', e.message));
 
   // Post role selector in #get-roles
   const getRolesChannel = guildChannels.find(c => c.name === 'get-roles');
