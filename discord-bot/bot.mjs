@@ -739,15 +739,19 @@ client.on('guildMemberAdd', async member => {
   const getRolesId = textChannels.find(c => c.name === 'get-roles')?.id ?? '';
 
   const embed = new EmbedBuilder()
-    .setTitle('◈ A NEW CHALLENGER APPROACHES')
+    .setTitle('⚡ A NEW CHALLENGER APPROACHES')
     .setDescription(
-      `Welcome ${member}, to **The League**! 🎉\n\n` +
-      `→ Read the rules and register in <#${rulesId}>\n` +
-      `→ Pick your roles in <#${getRolesId}>`
+      `Hey ${member}, welcome to **The League**! 🏆\n\n` +
+      `You've just stepped into the home of competitive Wild Rift — where rankings are earned, not given.\n\n` +
+      `**Get started:**\n` +
+      `→ Read the rules & register in <#${rulesId}>\n` +
+      `→ Claim your rank & lane in <#${getRolesId}>\n` +
+      `→ Download the app at **the-leagueapp.netlify.app**\n\n` +
+      `See you on the Rift. 🗡️`
     )
     .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
     .setColor(0x00c8ff)
-    .setFooter({ text: `Member #${member.guild.memberCount}` })
+    .setFooter({ text: `Member #${member.guild.memberCount} • The League` })
     .setTimestamp();
 
   await welcomeChannel.send({ content: `👋 ${member}`, embeds: [embed] })
@@ -1355,6 +1359,8 @@ client.on('interactionCreate', async interaction => {
       return interaction.editReply({ content: `❌ No account found for **${input}**.\nRegister at https://the-leagueapp.netlify.app first.` });
     }
     await member.roles.add(client.roles.verified).catch(() => {});
+    // Store Discord ID for rank sync
+    await supabase.from('users').update({ discord_id: interaction.user.id }).eq('id', user.id).catch(() => {});
     return interaction.editReply({ content: `✅ Account **${user.riot_id ?? user.username}** verified!\nYou now have the **✅ Verified Player** role 🎉` });
   }
 
@@ -1391,10 +1397,106 @@ client.on('interactionCreate', async interaction => {
     const rankRoleId = client.roles[rankKey];
     if (rankRoleId) await member.roles.add(rankRoleId).catch(() => {});
 
+    // Store Discord ID for rank sync
+    await supabase.from('users').update({ discord_id: interaction.user.id }).eq('id', user.id).catch(() => {});
+
     return interaction.editReply({
       content: `🏆 Verified! **${user.riot_id ?? user.username}** is **${actualRank.name}** (${lp} LP).\nYou now have the **${actualRank.name}** role!`
     });
   }
+});
+
+// ── AUTO RANK SYNC + PLAYER STATS ────────────────────────────────
+async function syncRanksAndStats() {
+  try {
+    const guild = client.guilds.cache.get(GUILD_ID);
+    if (!guild) return;
+
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, discord_id, riot_id, username, lp')
+      .not('discord_id', 'is', null);
+
+    if (!users?.length) return;
+
+    let updated = 0;
+    for (const user of users) {
+      const member = await guild.members.fetch(user.discord_id).catch(() => null);
+      if (!member) continue;
+
+      const lp = user.lp ?? 0;
+      const correctRank = getRankForLP(lp);
+      const correctRoleId = client.roles?.[correctRank.key];
+
+      // Check if rank roles need updating
+      const hasCorrect = correctRoleId && member.roles.cache.has(correctRoleId);
+      const hasWrong   = RANKS.some(r => r.key !== correctRank.key && client.roles?.[r.key] && member.roles.cache.has(client.roles[r.key]));
+
+      if (!hasCorrect || hasWrong) {
+        for (const rank of RANKS) {
+          const roleId = client.roles?.[rank.key];
+          if (roleId && member.roles.cache.has(roleId)) await member.roles.remove(roleId).catch(() => {});
+        }
+        if (correctRoleId) await member.roles.add(correctRoleId).catch(() => {});
+        updated++;
+        console.log(`🔄 Rank synced: ${user.username} → ${correctRank.name} (${lp} LP)`);
+      }
+    }
+
+    // Refresh player stats channel
+    if (client.statsChannelId) {
+      const statsCh = guild.channels.cache.get(client.statsChannelId);
+      if (statsCh) {
+        const existing = await statsCh.messages.fetch({ limit: 20 });
+        for (const [, m] of existing.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
+
+        const sorted = [...users].sort((a, b) => (b.lp ?? 0) - (a.lp ?? 0));
+        const medals = ['🥇','🥈','🥉'];
+        const embed = new EmbedBuilder()
+          .setTitle('◈ VERIFIED PLAYER STATS')
+          .setDescription(
+            sorted.map((u, i) => {
+              const rank = getRankForLP(u.lp ?? 0);
+              return `${medals[i] ?? `**${i+1}.**`} **${u.riot_id ?? u.username}** — ${rank.name} • ${u.lp ?? 0} LP${u.discord_id ? ` • <@${u.discord_id}>` : ''}`;
+            }).join('\n') || 'No verified players yet.'
+          )
+          .setColor(0x00c8ff)
+          .setFooter({ text: `${sorted.length} verified players • syncs every 5 min` })
+          .setTimestamp();
+        await statsCh.send({ embeds: [embed] }).catch(() => {});
+      }
+    }
+
+    if (updated) console.log(`🔄 Rank sync complete — ${updated} roles updated`);
+  } catch (e) {
+    console.error('Rank sync error:', e.message);
+  }
+}
+
+client.once('ready', async () => {
+  // Set up player stats channel
+  const guild = client.guilds.cache.get(GUILD_ID);
+  if (guild) {
+    const channels = await guild.channels.fetch();
+    let statsCh = channels.find(c => c?.name === 'player-stats' && c.type === ChannelType.GuildText);
+    if (!statsCh) {
+      statsCh = await guild.channels.create({
+        name: 'player-stats',
+        type: ChannelType.GuildText,
+        topic: '📊 Live stats for all verified players — auto-synced every 5 minutes',
+        permissionOverwrites: [
+          { id: guild.roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
+          { id: client.roles?.member ?? guild.roles.everyone, allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.SendMessages] },
+        ],
+      }).catch(() => null);
+    }
+    client.statsChannelId = statsCh?.id ?? null;
+  }
+
+  // Start sync interval
+  await syncRanksAndStats();
+  setInterval(syncRanksAndStats, 5 * 60 * 1000);
+  console.log('✅ Rank sync + player stats active');
 });
 
 client.login(TOKEN);
