@@ -435,8 +435,10 @@ client.once('clientReady', async () => {
       options: [{ name: 'user', type: 6, description: 'Player to compare with', required: true }] },
     { name: 'patch',  description: 'Show the latest Wild Rift patch notes' },
     { name: 'relink', description: 'Change your linked The League app account' },
-    { name: 'daily',  description: 'Claim your daily coins reward' },
-    { name: 'streak', description: 'Check your daily login streak' },
+    { name: 'daily',   description: 'Claim your daily coins reward' },
+    { name: 'streak',  description: 'Check your daily login streak' },
+    { name: 'gamble',  description: 'Bet your coins — double or nothing',
+      options: [{ name: 'amount', type: 4, description: 'Amount of coins to bet', required: true }] },
     { name: 'flip',  description: 'Flip a coin — heads or tails' },
     { name: 'roll',  description: 'Roll a dice',
       options: [{ name: 'sides', type: 4, description: 'Number of sides (default 6)', required: false }] },
@@ -1129,6 +1131,53 @@ client.on('interactionCreate', async interaction => {
     return interaction.showModal(modal);
   }
 
+  // ── /gamble ──────────────────────────────────────────────────────
+  if (interaction.commandName === 'gamble') {
+    await interaction.deferReply();
+    try {
+      const bet = interaction.options.getInteger('amount');
+      if (bet < 10) return interaction.editReply({ content: '❌ Minimum bet is **10 coins**.' });
+      if (bet > 10000) return interaction.editReply({ content: '❌ Maximum bet is **10,000 coins**.' });
+
+      const eco = await getEconomy(interaction.user.id);
+      if ((eco.coins ?? 0) < bet) return interaction.editReply({ content: `❌ Not enough coins! You have **${eco.coins ?? 0}🪙**.` });
+
+      const roll = Math.random();
+      const win = roll > 0.45; // 55% lose, 45% win to favour the house slightly
+      const bigWin = roll > 0.9; // 10% chance of 3x
+      const multiplier = bigWin ? 3 : win ? 2 : 0;
+      const newCoins = (eco.coins ?? 0) + (win ? bet * (multiplier - 1) : -bet);
+
+      await supabase.from('discord_economy').upsert({
+        discord_id: interaction.user.id,
+        username: interaction.user.username,
+        coins: newCoins,
+        updated_at: new Date().toISOString(),
+      });
+
+      const outcomes = win
+        ? bigWin
+          ? [`🎰 **JACKPOT!** 3x win!`, `+${bet * 2}🪙`, 0x00FF88]
+          : [`🎰 **You won!** Double up!`, `+${bet}🪙`, 0x00c8ff]
+        : [`💀 **You lost!** Better luck next time.`, `-${bet}🪙`, 0xFF4444];
+
+      const embed = new EmbedBuilder()
+        .setTitle(outcomes[0])
+        .setDescription(`${interaction.user} bet **${bet}🪙** and ${win ? `walked away with **${bet * multiplier}🪙**` : `lost it all`}.\n\n**${outcomes[1]}** — Balance: **${newCoins}🪙**`)
+        .setColor(outcomes[2])
+        .setFooter({ text: `Roll: ${(roll * 100).toFixed(1)}` })
+        .setTimestamp();
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`gamble_again_${bet}`).setLabel('🎰 Gamble Again').setStyle(win ? ButtonStyle.Success : ButtonStyle.Danger),
+      );
+      await interaction.editReply({ embeds: [embed], components: [row] });
+    } catch (e) {
+      console.error('gamble error:', e.message);
+      interaction.editReply({ content: '❌ Gamble failed.' }).catch(() => {});
+    }
+  }
+
   // ── /daily ───────────────────────────────────────────────────────
   if (interaction.commandName === 'daily') {
     await interaction.deferReply();
@@ -1308,6 +1357,36 @@ client.on('interactionCreate', async interaction => {
     if (!ok) return interaction.editReply({ content: `❌ Not enough coins! You need **${item.price}🪙** to buy **${item.name}**.` });
     if (roleId) await freshMember.roles.add(roleId).catch(() => {});
     return interaction.editReply({ content: `✅ Purchased **${item.name}**! 🎉 ${roleId ? 'Role applied.' : ''}` });
+  }
+
+  // ── GAMBLE AGAIN ─────────────────────────────────────────────────
+  if (interaction.customId.startsWith('gamble_again_')) {
+    const bet = parseInt(interaction.customId.replace('gamble_again_', ''));
+    const eco = await getEconomy(interaction.user.id);
+    if ((eco.coins ?? 0) < bet) {
+      return interaction.update({ content: `❌ Not enough coins to bet **${bet}🪙** again! You have **${eco.coins ?? 0}🪙**.`, embeds: [], components: [] });
+    }
+    const roll = Math.random();
+    const win = roll > 0.45;
+    const bigWin = roll > 0.9;
+    const multiplier = bigWin ? 3 : win ? 2 : 0;
+    const newCoins = (eco.coins ?? 0) + (win ? bet * (multiplier - 1) : -bet);
+    await supabase.from('discord_economy').upsert({
+      discord_id: interaction.user.id, username: interaction.user.username,
+      coins: newCoins, updated_at: new Date().toISOString(),
+    });
+    const outcomes = win
+      ? bigWin ? [`🎰 **JACKPOT!** 3x win!`, `+${bet * 2}🪙`, 0x00FF88]
+               : [`🎰 **You won!** Double up!`, `+${bet}🪙`, 0x00c8ff]
+      : [`💀 **You lost!** Better luck next time.`, `-${bet}🪙`, 0xFF4444];
+    const embed = new EmbedBuilder()
+      .setTitle(outcomes[0])
+      .setDescription(`${interaction.user} bet **${bet}🪙** and ${win ? `walked away with **${bet * multiplier}🪙**` : `lost it all`}.\n\n**${outcomes[1]}** — Balance: **${newCoins}🪙**`)
+      .setColor(outcomes[2]).setFooter({ text: `Roll: ${(roll * 100).toFixed(1)}` }).setTimestamp();
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`gamble_again_${bet}`).setLabel('🎰 Gamble Again').setStyle(win ? ButtonStyle.Success : ButtonStyle.Danger),
+    );
+    return interaction.update({ embeds: [embed], components: [row] });
   }
 
   // ── REMATCH BUTTONS ──────────────────────────────────────────────
