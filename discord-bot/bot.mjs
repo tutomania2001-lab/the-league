@@ -413,11 +413,15 @@ client.once('clientReady', async () => {
     console.log('✅ Register button posted');
   }
 
-  // Register /rankcard slash command
+  // Register slash commands
   await guild.commands.set([
-    { name: 'rankcard', description: 'Display your rank card' },
+    { name: 'rankcard',    description: 'Display your rank card' },
+    { name: 'stats',       description: 'Show your app & server stats' },
+    { name: 'leaderboard', description: 'Show the top 10 XP leaderboard' },
+    { name: 'compare',     description: 'Compare your rank with another player',
+      options: [{ name: 'user', type: 6, description: 'Player to compare with', required: true }] },
   ]).catch(e => console.error('⚠️ Slash command registration failed:', e.message));
-  console.log('✅ /rankcard command registered');
+  console.log('✅ Slash commands registered');
 
   // Post role selector in #get-roles
   const getRolesChannel = guildChannels.find(c => c.name === 'get-roles');
@@ -990,6 +994,106 @@ client.on('interactionCreate', async interaction => {
     } catch (e) {
       console.error('rankcard error:', e.message);
       interaction.editReply({ content: '❌ Failed to generate rank card.' }).catch(() => {});
+    }
+  }
+
+  // ── /stats ───────────────────────────────────────────────────────
+  if (interaction.commandName === 'stats') {
+    await interaction.deferReply();
+    try {
+      const member = await interaction.guild.members.fetch(interaction.user.id);
+      const eco = await getEconomy(interaction.user.id);
+      const { data: appUser } = await supabase.from('users').select('riot_id, username, lp').eq('discord_id', interaction.user.id).maybeSingle();
+      const rank = getRankForLP(appUser?.lp ?? 0);
+      const { data: lb } = await supabase.from('discord_economy').select('discord_id').order('xp', { ascending: false });
+      const position = (lb ?? []).findIndex(u => u.discord_id === interaction.user.id) + 1 || '?';
+      const level = eco.level ?? 0;
+      const curXP = Math.max(0, (eco.xp ?? 0) - totalXpForLevel(level));
+      const needXP = xpToNextLevel(level);
+
+      const embed = new EmbedBuilder()
+        .setTitle(`📊 ${member.displayName}'s Stats`)
+        .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
+        .setColor(RANK_COLORS[rank.key] ?? 0x00c8ff)
+        .addFields(
+          { name: '🏆 Rank',        value: appUser ? `${rank.name} — ${appUser.lp ?? 0} LP` : 'Not linked', inline: true },
+          { name: '🎮 App Account',  value: appUser?.riot_id ?? appUser?.username ?? 'Not linked', inline: true },
+          { name: '🏅 Server Level', value: `Level ${level}`, inline: true },
+          { name: '⭐ XP',           value: `${(eco.xp ?? 0).toLocaleString()} total`, inline: true },
+          { name: '📊 Progress',     value: `${curXP.toLocaleString()} / ${needXP.toLocaleString()} XP to next level`, inline: true },
+          { name: '🪙 Coins',        value: (eco.coins ?? 0).toLocaleString(), inline: true },
+          { name: '🎖️ Server Rank', value: `#${position} on leaderboard`, inline: true },
+        )
+        .setFooter({ text: 'The League — Wild Rift Tournament Platform' })
+        .setTimestamp();
+      await interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      console.error('stats error:', e.message);
+      interaction.editReply({ content: '❌ Failed to fetch stats.' }).catch(() => {});
+    }
+  }
+
+  // ── /leaderboard ─────────────────────────────────────────────────
+  if (interaction.commandName === 'leaderboard') {
+    await interaction.deferReply();
+    try {
+      const { data } = await supabase.from('discord_economy').select('username, xp, level, coins').order('xp', { ascending: false }).limit(10);
+      const medals = ['🥇','🥈','🥉'];
+      const embed = new EmbedBuilder()
+        .setTitle('◈ XP LEADERBOARD')
+        .setDescription(
+          data?.length
+            ? data.map((u, i) => `${medals[i] ?? `**${i+1}.**`} **${u.username ?? 'Unknown'}** — Lv.${u.level} • ${(u.xp ?? 0).toLocaleString()} XP • 🪙 ${u.coins ?? 0}`).join('\n')
+            : 'No data yet.'
+        )
+        .setColor(0x00c8ff)
+        .setTimestamp()
+        .setFooter({ text: 'Earn XP by chatting and spending time in voice' });
+      await interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      console.error('leaderboard error:', e.message);
+      interaction.editReply({ content: '❌ Failed to fetch leaderboard.' }).catch(() => {});
+    }
+  }
+
+  // ── /compare ─────────────────────────────────────────────────────
+  if (interaction.commandName === 'compare') {
+    await interaction.deferReply();
+    try {
+      const targetUser = interaction.options.getUser('user');
+      if (targetUser.id === interaction.user.id) {
+        return interaction.editReply({ content: '❌ You can\'t compare yourself with yourself!' });
+      }
+      const [m1, m2] = await Promise.all([
+        interaction.guild.members.fetch(interaction.user.id),
+        interaction.guild.members.fetch(targetUser.id).catch(() => null),
+      ]);
+      if (!m2) return interaction.editReply({ content: '❌ That user is not in this server.' });
+
+      const [eco1, eco2] = await Promise.all([getEconomy(interaction.user.id), getEconomy(targetUser.id)]);
+      const [app1, app2] = await Promise.all([
+        supabase.from('users').select('riot_id, lp').eq('discord_id', interaction.user.id).maybeSingle(),
+        supabase.from('users').select('riot_id, lp').eq('discord_id', targetUser.id).maybeSingle(),
+      ]);
+      const rank1 = getRankForLP(app1.data?.lp ?? 0);
+      const rank2 = getRankForLP(app2.data?.lp ?? 0);
+
+      const row = (label, v1, v2) => `**${label}**\n${v1}  vs  ${v2}`;
+      const embed = new EmbedBuilder()
+        .setTitle(`⚔️ ${m1.displayName}  vs  ${m2.displayName}`)
+        .setColor(0x00c8ff)
+        .setDescription([
+          row('🏆 Rank',    `${rank1.name} (${app1.data?.lp ?? 0} LP)`,  `${rank2.name} (${app2.data?.lp ?? 0} LP)`),
+          row('🏅 Level',   `Level ${eco1.level ?? 0}`,                   `Level ${eco2.level ?? 0}`),
+          row('⭐ XP',      `${(eco1.xp ?? 0).toLocaleString()}`,         `${(eco2.xp ?? 0).toLocaleString()}`),
+          row('🪙 Coins',   `${(eco1.coins ?? 0).toLocaleString()}`,      `${(eco2.coins ?? 0).toLocaleString()}`),
+        ].join('\n\n'))
+        .setFooter({ text: 'The League — Wild Rift Tournament Platform' })
+        .setTimestamp();
+      await interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      console.error('compare error:', e.message);
+      interaction.editReply({ content: '❌ Failed to compare players.' }).catch(() => {});
     }
   }
 });
