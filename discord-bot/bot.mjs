@@ -447,6 +447,12 @@ client.once('clientReady', async () => {
     { name: 'streak',  description: 'Check your daily login streak' },
     { name: 'gamble',   description: 'Bet your coins — double or nothing',
       options: [{ name: 'amount', type: 4, description: 'Amount of coins to bet', required: true }] },
+    { name: 'gift',  description: 'Send coins to another player',
+      options: [
+        { name: 'user',   type: 6, description: 'Who to send coins to', required: true },
+        { name: 'amount', type: 4, description: 'Amount to send',        required: true },
+      ]},
+    { name: 'store', description: 'Browse the server store and buy items' },
     { name: 'addcoins', description: 'Admin: add coins to a user',
       options: [
         { name: 'user',   type: 6, description: 'Target user', required: true },
@@ -1149,6 +1155,63 @@ client.on('interactionCreate', async interaction => {
       new TextInputBuilder().setCustomId('relink_input').setLabel('New username or Riot ID from the app').setStyle(TextInputStyle.Short).setPlaceholder('e.g. WildRifter#1234').setRequired(true).setMaxLength(60)
     ));
     return interaction.showModal(modal);
+  }
+
+  // ── /gift ────────────────────────────────────────────────────────
+  if (interaction.commandName === 'gift') {
+    await interaction.deferReply();
+    try {
+      const target = interaction.options.getUser('user');
+      const amount = interaction.options.getInteger('amount');
+      if (target.id === interaction.user.id) return interaction.editReply({ content: '❌ You can\'t gift yourself.' });
+      if (target.bot) return interaction.editReply({ content: '❌ You can\'t gift a bot.' });
+      if (amount < 1) return interaction.editReply({ content: '❌ Amount must be at least 1.' });
+      const eco = await getEconomy(interaction.user.id);
+      if ((eco.coins ?? 0) < amount) return interaction.editReply({ content: `❌ Not enough coins! You have **${eco.coins ?? 0}🪙**.` });
+      const targetEco = await getEconomy(target.id);
+      await supabase.from('discord_economy').upsert({ discord_id: interaction.user.id, username: interaction.user.username, coins: (eco.coins ?? 0) - amount, updated_at: new Date().toISOString() });
+      await supabase.from('discord_economy').upsert({ discord_id: target.id, username: target.username, coins: (targetEco.coins ?? 0) + amount, updated_at: new Date().toISOString() });
+      const embed = new EmbedBuilder()
+        .setTitle('🎁 Coins Sent!')
+        .setDescription(`${interaction.user} gifted **${amount}🪙** to ${target}!\n\nYour balance: **${(eco.coins ?? 0) - amount}🪙**`)
+        .setColor(0x00c8ff)
+        .setTimestamp();
+      await interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      console.error('gift error:', e.message);
+      interaction.editReply({ content: '❌ Gift failed.' }).catch(() => {});
+    }
+  }
+
+  // ── /store ───────────────────────────────────────────────────────
+  if (interaction.commandName === 'store') {
+    await interaction.deferReply({ ephemeral: true });
+    try {
+      const eco = await getEconomy(interaction.user.id);
+      const embed = new EmbedBuilder()
+        .setTitle('◈ THE LEAGUE STORE')
+        .setDescription(STORE_ITEMS.map(i => `${i.name} **${i.desc}** — 🪙 **${i.price} coins**`).join('\n'))
+        .setColor(0x00c8ff)
+        .addFields({ name: '🪙 Your Balance', value: `${eco.coins ?? 0} coins`, inline: true })
+        .setFooter({ text: 'Click a button to purchase' });
+      const rows = [];
+      for (let i = 0; i < STORE_ITEMS.length; i += 3) {
+        const row = new ActionRowBuilder();
+        for (const item of STORE_ITEMS.slice(i, i + 3)) {
+          const canAfford = (eco.coins ?? 0) >= item.price;
+          row.addComponents(new ButtonBuilder()
+            .setCustomId(`buy_${item.id}`)
+            .setLabel(`${item.name} — ${item.price}🪙`)
+            .setStyle(canAfford ? ButtonStyle.Primary : ButtonStyle.Secondary)
+            .setDisabled(!canAfford));
+        }
+        rows.push(row);
+      }
+      await interaction.editReply({ embeds: [embed], components: rows });
+    } catch (e) {
+      console.error('store error:', e.message);
+      interaction.editReply({ content: '❌ Store failed to load.' }).catch(() => {});
+    }
   }
 
   // ── /addcoins (admin) ────────────────────────────────────────────
