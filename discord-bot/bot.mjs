@@ -1403,12 +1403,24 @@ client.on('interactionCreate', async interaction => {
       const champion = interaction.options.getString('champion').trim();
       const lane     = interaction.options.getString('lane')?.toLowerCase().trim() ?? null;
       const slug     = champion.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      const url      = `https://www.wildriftfire.com/champion/${slug}`;
-      console.log(`🔍 Builds fetch: ${url}`);
 
-      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': 'text/html' } });
-      console.log(`🔍 Builds response: ${res.status} for ${url}`);
-      if (!res.ok) return interaction.editReply({ content: `❌ Champion **${champion}** not found (tried: \`${url}\`).\nCheck spelling — use the in-game name e.g. \`Miss Fortune\`, \`Twisted Fate\`.\n🔗 Browse: <https://www.wildriftfire.com>` });
+      // Try multiple URL patterns across different sites
+      const candidates = [
+        `https://www.wildriftfire.com/champion/${slug}`,
+        `https://www.wildriftfire.com/champion/${slug}-wild-rift`,
+        `https://wildriftfire.com/${slug}`,
+        `https://www.metasrc.com/wildrift/champion/${slug}`,
+        `https://app.mobalytics.gg/wild-rift/champions/${slug}/build`,
+      ];
+      const headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': 'text/html' };
+
+      let res = null, url = null;
+      for (const candidate of candidates) {
+        const r = await fetch(candidate, { headers }).catch(() => null);
+        console.log(`🔍 Tried: ${candidate} → ${r?.status ?? 'error'}`);
+        if (r?.ok) { res = r; url = candidate; break; }
+      }
+      if (!res) return interaction.editReply({ content: `❌ Could not find a build page for **${champion}**.\nCheck the spelling — use the exact in-game name (e.g. \`Miss Fortune\`, \`Twisted Fate\`).\n🔗 Browse manually: <https://www.wildriftfire.com>` });
 
       const html = await res.text();
 
