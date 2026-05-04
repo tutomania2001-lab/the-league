@@ -1193,9 +1193,8 @@ client.on('interactionCreate', async interaction => {
   // REGISTER
   if (interaction.customId === 'register') {
     if (freshMember.roles.cache.has(client.roles.member)) {
-      return interaction.reply({ content: '✅ You are already registered!', ephemeral: true });
+      return interaction.editReply({ content: '✅ You are already registered!' });
     }
-    await interaction.deferReply({ ephemeral: true });
     try {
       await freshMember.roles.add(client.roles.member);
       await freshMember.roles.remove(client.roles.newArrival).catch(() => {});
