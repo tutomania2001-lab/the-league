@@ -45,18 +45,19 @@ async function fetchWildRiftArticles() {
   }
 
   const blades = findBlades(data);
+  console.log('📰 findBlades result:', blades ? `found ${blades.length} blades` : 'null');
   if (blades) {
+    console.log('📰 Blade types:', blades.map(b => b?.type).join(', '));
     const grid = blades.find(b => b?.type === 'articleCardGrid');
+    console.log('📰 grid found:', !!grid, 'items length:', grid?.items?.length ?? 'n/a');
     if (grid?.items?.length) {
-      console.log(`📰 Found ${grid.items.length} articles in articleCardGrid`);
-      console.log('📰 Sample keys:', Object.keys(grid.items[0]));
-      console.log('📰 Sample:', JSON.stringify(grid.items[0]).slice(0, 600));
+      console.log('📰 Sample item keys:', Object.keys(grid.items[0]));
+      console.log('📰 Sample item:', JSON.stringify(grid.items[0]).slice(0, 400));
       return grid.items.slice(0, 10);
     }
-    console.log('📰 Blades found but no articleCardGrid with items:', blades.map(b => b?.type).join(', '));
   }
 
-  console.error('📰 No articles found in any blade');
+  console.error('📰 No articles found — data top-level keys:', Object.keys(data));
   return [];
 }
 
