@@ -1,5 +1,6 @@
-import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, UserSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } from 'discord.js';
+import { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, UserSelectMenuBuilder, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType, AttachmentBuilder } from 'discord.js';
 import { createClient } from '@supabase/supabase-js';
+import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
 const WILDRIFT_NEWS_URL = 'https://wildrift.leagueoflegends.com/en-sg/news/tags/patch-notes/';
 const WILDRIFT_BASE = 'https://wildrift.leagueoflegends.com';
 const seenArticles = new Set();
@@ -141,6 +142,98 @@ async function deductCoins(discordId, amount) {
   if ((cur.coins ?? 0) < amount) return false;
   await supabase.from('discord_economy').upsert({ discord_id: discordId, coins: cur.coins - amount, updated_at: new Date().toISOString() });
   return true;
+}
+
+// ── RANK CARD GENERATOR ───────────────────────────────────────────
+const RANK_COLORS = {
+  iron: '#8C8C8C', bronze: '#CD7F32', silver: '#C0C0C0', gold: '#FFD700',
+  platinum: '#00B4D8', emerald: '#50C878', diamond: '#B9F2FF',
+  master: '#9B59B6', grandmaster: '#E74C3C', challenger: '#F1C40F',
+};
+
+async function generateRankCard(member, eco, rank, position) {
+  const W = 900, H = 220;
+  const canvas = createCanvas(W, H);
+  const ctx = canvas.getContext('2d');
+  const rankColor = RANK_COLORS[rank.key] ?? '#00c8ff';
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#0d0d1a');
+  bg.addColorStop(1, '#1a1a2e');
+  ctx.fillStyle = bg;
+  ctx.roundRect(0, 0, W, H, 16);
+  ctx.fill();
+
+  // Rank colour accent bar on left
+  ctx.fillStyle = rankColor;
+  ctx.roundRect(0, 0, 6, H, [16, 0, 0, 16]);
+  ctx.fill();
+
+  // Avatar
+  try {
+    const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 128 });
+    const avatar = await loadImage(avatarUrl);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(100, H / 2, 70, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(avatar, 30, H / 2 - 70, 140, 140);
+    ctx.restore();
+    // Avatar border
+    ctx.strokeStyle = rankColor;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(100, H / 2, 70, 0, Math.PI * 2);
+    ctx.stroke();
+  } catch {}
+
+  // Username
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 30px sans-serif';
+  ctx.fillText(member.displayName, 200, 65);
+
+  // Rank name
+  ctx.fillStyle = rankColor;
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillText(`${rank.name}  •  ${eco.lp ?? eco.xp ?? 0} LP`, 200, 100);
+
+  // XP bar background
+  const barX = 200, barY = 120, barW = 560, barH = 22;
+  ctx.fillStyle = '#2a2a3e';
+  ctx.roundRect(barX, barY, barW, barH, 11);
+  ctx.fill();
+
+  // XP bar fill
+  const level = eco.level ?? 0;
+  const curXP  = (eco.xp ?? 0) - totalXpForLevel(level);
+  const needXP = xpToNextLevel(level);
+  const fill   = Math.max(0, Math.min(1, curXP / needXP));
+  const grad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+  grad.addColorStop(0, rankColor);
+  grad.addColorStop(1, '#00c8ff');
+  ctx.fillStyle = grad;
+  ctx.roundRect(barX, barY, barW * fill, barH, 11);
+  ctx.fill();
+
+  // XP text
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '14px sans-serif';
+  ctx.fillText(`${curXP} / ${needXP} XP`, barX, barY + barH + 18);
+
+  // Level badge
+  ctx.fillStyle = rankColor;
+  ctx.font = 'bold 16px sans-serif';
+  ctx.fillText(`LEVEL ${level}`, barX + barW - 80, barY + barH + 18);
+
+  // Stats row
+  ctx.fillStyle = '#aaaacc';
+  ctx.font = '18px sans-serif';
+  ctx.fillText(`🪙 ${eco.coins ?? 0} coins`, 200, 190);
+  ctx.fillText(`🏆 Rank #${position} on server`, 380, 190);
+
+  return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'rank-card.png' });
 }
 
 const client = new Client({
@@ -326,7 +419,10 @@ client.once('clientReady', async () => {
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('test_welcome').setLabel('🎉 Test Welcome Message').setStyle(ButtonStyle.Primary),
     );
-    await commandsChannel.send({ content: '**Admin Commands**', components: [row] }).catch(() => {});
+    const rankCardRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('rank_card').setLabel('🎴 My Rank Card').setStyle(ButtonStyle.Success),
+    );
+    await commandsChannel.send({ content: '**Commands**', components: [row, rankCardRow] }).catch(() => {});
     console.log('✅ Test welcome button posted in #commands');
   }
 
@@ -893,7 +989,7 @@ client.on('interactionCreate', async interaction => {
   if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
   // Defer immediately for slow interactions (excludes anything that shows a modal)
-  const slowInteractions = ['register', 'eco_profile'];
+  const slowInteractions = ['register', 'eco_profile', 'rank_card'];
   const isSlow = slowInteractions.includes(interaction.customId) || interaction.customId.startsWith('buy_');
   if (isSlow) await interaction.deferReply({ ephemeral: true }).catch(() => {});
 
@@ -901,6 +997,18 @@ client.on('interactionCreate', async interaction => {
   const freshMember = await interaction.guild.members.fetch(interaction.user.id);
 
   // ── ECONOMY PROFILE ──────────────────────────────────────────────
+  // ── RANK CARD ─────────────────────────────────────────────────────
+  if (interaction.customId === 'rank_card') {
+    const eco = await getEconomy(interaction.user.id);
+    const { data: appUser } = await supabase.from('users').select('lp').eq('discord_id', interaction.user.id).maybeSingle();
+    eco.lp = appUser?.lp ?? null;
+    const rank = getRankForLP(appUser?.lp ?? 0);
+    const { data: lb } = await supabase.from('discord_economy').select('discord_id').order('xp', { ascending: false });
+    const position = (lb ?? []).findIndex(u => u.discord_id === interaction.user.id) + 1 || '?';
+    const card = await generateRankCard(freshMember, eco, rank, position);
+    return interaction.editReply({ files: [card] });
+  }
+
   if (interaction.customId === 'eco_profile') {
     const eco = await getEconomy(interaction.user.id);
     const level = eco.level ?? 0;
