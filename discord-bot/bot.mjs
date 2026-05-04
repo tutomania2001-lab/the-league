@@ -110,12 +110,26 @@ const voiceJoins        = new Map(); // userId → voice join timestamp
 const newMemberCooldowns = new Map(); // userId → join timestamp (5 min block)
 
 const STORE_ITEMS = [
-  { id: 'red',    name: '🔴 Red',    desc: 'Red username color',    price: 200, color: 0xFF4444 },
-  { id: 'blue',   name: '🔵 Blue',   desc: 'Blue username color',   price: 200, color: 0x4488FF },
-  { id: 'purple', name: '🟣 Purple', desc: 'Purple username color', price: 250, color: 0x9B59B6 },
-  { id: 'gold',   name: '🟡 Gold',   desc: 'Gold username color',   price: 300, color: 0xF1C40F },
-  { id: 'vip',    name: '💎 VIP',    desc: 'Exclusive VIP lounge',  price: 500, color: 0x00C8FF },
+  // Colour roles
+  { id: 'red',    name: '🔴 Red',    desc: 'Red username color',    price: 200,  color: 0xFF4444, type: 'role' },
+  { id: 'blue',   name: '🔵 Blue',   desc: 'Blue username color',   price: 200,  color: 0x4488FF, type: 'role' },
+  { id: 'purple', name: '🟣 Purple', desc: 'Purple username color', price: 250,  color: 0x9B59B6, type: 'role' },
+  { id: 'gold',   name: '🟡 Gold',   desc: 'Gold username color',   price: 300,  color: 0xF1C40F, type: 'role' },
+  { id: 'vip',    name: '💎 VIP',    desc: 'Exclusive VIP lounge',  price: 500,  color: 0x00C8FF, type: 'role' },
+  // Server perks
+  { id: 'shoutout', name: '📣 Shoutout',      desc: 'Bot hypes you in #announcements',    price: 300,  type: 'perk' },
+  { id: 'shield',   name: '🛡️ Gamble Shield', desc: 'Block one gambling loss',            price: 250,  type: 'perk' },
+  { id: 'charm',    name: '🔮 Lucky Charm',   desc: 'Boost gamble win rate for 1 hour',   price: 500,  type: 'perk' },
+  { id: 'xpboost',  name: '💎 XP Boost',      desc: '2x XP earned for 24 hours',         price: 750,  type: 'perk' },
 ];
+
+// Active perk tracking (in-memory — resets on bot restart)
+const activePerks = new Map(); // userId → { shield: bool, charmExpires: Date, xpBoostExpires: Date }
+function getPerks(uid) { return activePerks.get(uid) ?? {}; }
+function setPerks(uid, data) { activePerks.set(uid, { ...getPerks(uid), ...data }); }
+function hasShield(uid) { return !!getPerks(uid).shield; }
+function hasCharm(uid)  { const p = getPerks(uid); return p.charmExpires && new Date() < new Date(p.charmExpires); }
+function hasXPBoost(uid){ const p = getPerks(uid); return p.xpBoostExpires && new Date() < new Date(p.xpBoostExpires); }
 
 function xpToNextLevel(n) { return 100 * (n + 1); }
 function totalXpForLevel(n) { return n * (n + 1) / 2 * 100; }
@@ -824,7 +838,8 @@ client.on('messageCreate', async msg => {
   const now = Date.now();
   if (msgCooldowns.has(uid) && now - msgCooldowns.get(uid) < 60_000) return;
   msgCooldowns.set(uid, now);
-  const xp    = Math.floor(Math.random() * 11) + 10; // 10–20
+  const baseXp = Math.floor(Math.random() * 11) + 10; // 10–20
+  const xp    = hasXPBoost(msg.author.id) ? baseXp * 2 : baseXp;
   const coins = Math.floor(Math.random() * 6)  + 5;  // 5–10
   const { leveledUp, newLevel } = await addActivity(uid, msg.author.username, xp, coins).catch(() => ({}));
   if (leveledUp && client.announcementsChannel) {
@@ -1333,10 +1348,18 @@ client.on('interactionCreate', async interaction => {
       if ((eco.coins ?? 0) < bet) return interaction.editReply({ content: `❌ Not enough coins! You have **${eco.coins ?? 0}🪙**.` });
 
       const roll = Math.random();
-      const win = roll > 0.45; // 55% lose, 45% win to favour the house slightly
-      const bigWin = roll > 0.9; // 10% chance of 3x
+      const charmActive = hasCharm(interaction.user.id);
+      const shieldActive = hasShield(interaction.user.id);
+      const win = roll > (charmActive ? 0.30 : 0.45);
+      const bigWin = roll > 0.9;
       const multiplier = bigWin ? 3 : win ? 2 : 0;
-      const newCoins = (eco.coins ?? 0) + (win ? bet * multiplier : -bet);
+      let newCoins = (eco.coins ?? 0) + (win ? bet * multiplier : -bet);
+
+      // Shield blocks one loss
+      if (!win && shieldActive) {
+        setPerks(interaction.user.id, { shield: false });
+        newCoins = eco.coins ?? 0;
+      }
 
       await supabase.from('discord_economy').upsert({
         discord_id: interaction.user.id,
@@ -1345,11 +1368,14 @@ client.on('interactionCreate', async interaction => {
         updated_at: new Date().toISOString(),
       });
 
+      const shieldUsed = !win && shieldActive;
       const outcomes = win
         ? bigWin
-          ? [`🎰 **JACKPOT!** 3x win!`, `+${bet * 2}🪙`, 0x00FF88]
-          : [`🎰 **You won!** Double up!`, `+${bet}🪙`, 0x00c8ff]
-        : [`💀 **You lost!** Better luck next time.`, `-${bet}🪙`, 0xFF4444];
+          ? [`🎰 **JACKPOT!** 3x win!${charmActive ? ' 🔮' : ''}`, `+${bet * multiplier}🪙`, 0x00FF88]
+          : [`🎰 **You won!** Double up!${charmActive ? ' 🔮' : ''}`, `+${bet * multiplier}🪙`, 0x00c8ff]
+        : shieldUsed
+          ? [`🛡️ **Shield blocked your loss!**`, `+0🪙 (shield consumed)`, 0xFFAA00]
+          : [`💀 **You lost!** Better luck next time.`, `-${bet}🪙`, 0xFF4444];
 
       const embed = new EmbedBuilder()
         .setTitle(outcomes[0])
@@ -1539,14 +1565,46 @@ client.on('interactionCreate', async interaction => {
     const itemId = interaction.customId.replace('buy_', '');
     const item = STORE_ITEMS.find(i => i.id === itemId);
     if (!item) return interaction.editReply({ content: '❌ Item not found.' });
-    const roleId = client.ecoRoles?.[`store_${itemId}`];
-    if (roleId && freshMember.roles.cache.has(roleId)) {
-      return interaction.editReply({ content: `✅ You already own **${item.name}**!` });
+
+    // Role items — check if already owned
+    if (item.type === 'role') {
+      const roleId = client.ecoRoles?.[`store_${itemId}`];
+      if (roleId && freshMember.roles.cache.has(roleId)) return interaction.editReply({ content: `✅ You already own **${item.name}**!` });
+      const ok = await deductCoins(interaction.user.id, item.price);
+      if (!ok) return interaction.editReply({ content: `❌ Not enough coins! You need **${item.price}🪙** to buy **${item.name}**.` });
+      if (roleId) await freshMember.roles.add(roleId).catch(() => {});
+      return interaction.editReply({ content: `✅ Purchased **${item.name}**! Role applied. 🎉` });
     }
-    const ok = await deductCoins(interaction.user.id, item.price);
-    if (!ok) return interaction.editReply({ content: `❌ Not enough coins! You need **${item.price}🪙** to buy **${item.name}**.` });
-    if (roleId) await freshMember.roles.add(roleId).catch(() => {});
-    return interaction.editReply({ content: `✅ Purchased **${item.name}**! 🎉 ${roleId ? 'Role applied.' : ''}` });
+
+    // Perk items
+    if (item.type === 'perk') {
+      // Check if already active
+      if (itemId === 'shield'  && hasShield(interaction.user.id))  return interaction.editReply({ content: '🛡️ You already have a **Gamble Shield** active!' });
+      if (itemId === 'charm'   && hasCharm(interaction.user.id))   return interaction.editReply({ content: '🔮 You already have a **Lucky Charm** active!' });
+      if (itemId === 'xpboost' && hasXPBoost(interaction.user.id)) return interaction.editReply({ content: '💎 You already have an **XP Boost** active!' });
+
+      const ok = await deductCoins(interaction.user.id, item.price);
+      if (!ok) return interaction.editReply({ content: `❌ Not enough coins! You need **${item.price}🪙** to buy **${item.name}**.` });
+
+      if (itemId === 'shoutout') {
+        if (client.announcementsChannel) {
+          await client.announcementsChannel.send(`📣 **SHOUTOUT** to ${freshMember}! 🔥 Big up to one of The League's finest — keep grinding! 🏆`).catch(() => {});
+        }
+        return interaction.editReply({ content: '📣 Your shoutout has been posted in **#announcements**!' });
+      }
+      if (itemId === 'shield') {
+        setPerks(interaction.user.id, { shield: true });
+        return interaction.editReply({ content: '🛡️ **Gamble Shield** activated! Your next gambling loss will be blocked.' });
+      }
+      if (itemId === 'charm') {
+        setPerks(interaction.user.id, { charmExpires: new Date(Date.now() + 3600000).toISOString() });
+        return interaction.editReply({ content: '🔮 **Lucky Charm** activated! Your gamble win rate is boosted for **1 hour**.' });
+      }
+      if (itemId === 'xpboost') {
+        setPerks(interaction.user.id, { xpBoostExpires: new Date(Date.now() + 86400000).toISOString() });
+        return interaction.editReply({ content: '💎 **XP Boost** activated! You\'ll earn **2x XP** for the next **24 hours**.' });
+      }
+    }
   }
 
   // ── CRASH CASH OUT ───────────────────────────────────────────────
@@ -1606,10 +1664,11 @@ client.on('interactionCreate', async interaction => {
       return interaction.update({ content: `❌ Not enough coins to bet **${bet}🪙** again! You have **${eco.coins ?? 0}🪙**.`, embeds: [], components: [] });
     }
     const roll = Math.random();
-    const win = roll > 0.45;
+    const win = roll > (hasCharm(interaction.user.id) ? 0.30 : 0.45);
     const bigWin = roll > 0.9;
     const multiplier = bigWin ? 3 : win ? 2 : 0;
-    const newCoins = (eco.coins ?? 0) + (win ? bet * multiplier : -bet);
+    let newCoins = (eco.coins ?? 0) + (win ? bet * multiplier : -bet);
+    if (!win && hasShield(interaction.user.id)) { setPerks(interaction.user.id, { shield: false }); newCoins = eco.coins ?? 0; }
     await supabase.from('discord_economy').upsert({
       discord_id: interaction.user.id, username: interaction.user.username,
       coins: newCoins, updated_at: new Date().toISOString(),
