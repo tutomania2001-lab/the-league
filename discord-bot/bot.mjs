@@ -17,65 +17,29 @@ async function fetchWildRiftArticles() {
 
   const data = JSON.parse(nextMatch[1]);
 
-  // Find the page object that has 'blades'
-  const articles = [];
-  function findInBlades(obj) {
-    if (!obj || typeof obj !== 'object') return;
-    if (Array.isArray(obj)) { obj.forEach(findInBlades); return; }
-
-    // If this object has blades, search inside them for article cards
-    if (Array.isArray(obj.blades)) {
-      for (const blade of obj.blades) {
-        if (!blade || typeof blade !== 'object') continue;
-        // Look for arrays of items inside each blade
-        for (const val of Object.values(blade)) {
-          if (!Array.isArray(val)) continue;
-          for (const item of val) {
-            if (!item || typeof item !== 'object') continue;
-            // Article cards have a title + some kind of URL/path + image
-            const hasTitle = item.title || item.heading;
-            const hasUrl = item.link || item.url || item.slug || item.path || item.articleUrl;
-            const hasMedia = item.image || item.banner || item.thumbnail || item.backgroundImage || item.featuredImage;
-            if (hasTitle && hasUrl && hasMedia) {
-              articles.push(item);
-            }
-          }
-        }
-      }
-      return; // don't recurse further once we found blades
-    }
-    Object.values(obj).forEach(findInBlades);
-  }
-  findInBlades(data);
-
-  if (articles.length) {
-    console.log(`📰 Found ${articles.length} articles in blades`);
-    console.log('📰 Sample keys:', Object.keys(articles[0]));
-    console.log('📰 Sample:', JSON.stringify(articles[0]).slice(0, 600));
-    return articles.slice(0, 10);
-  }
-
-  // Direct search for articleCardGrid blade
-  function findGrid(obj, depth = 0) {
-    if (!obj || typeof obj !== 'object' || depth > 8) return null;
-    if (Array.isArray(obj.blades)) {
-      for (const blade of obj.blades) {
-        if (blade?.type === 'articleCardGrid' && Array.isArray(blade.items)) return blade.items;
-      }
-    }
+  // Navigate known __NEXT_DATA__ structure to find articleCardGrid blade
+  function findBlades(obj, depth = 0) {
+    if (!obj || typeof obj !== 'object' || depth > 10) return null;
+    if (Array.isArray(obj.blades)) return obj.blades;
     for (const val of Object.values(obj)) {
-      const r = findGrid(val, depth + 1);
+      const r = findBlades(val, depth + 1);
       if (r) return r;
     }
     return null;
   }
-  const gridItems = findGrid(data);
-  if (gridItems?.length) {
-    console.log(`📰 Found ${gridItems.length} articles in articleCardGrid`);
-    console.log('📰 Sample keys:', Object.keys(gridItems[0]));
-    console.log('📰 Sample:', JSON.stringify(gridItems[0]).slice(0, 500));
-    return gridItems.slice(0, 10);
+
+  const blades = findBlades(data);
+  if (blades) {
+    const grid = blades.find(b => b?.type === 'articleCardGrid');
+    if (grid?.items?.length) {
+      console.log(`📰 Found ${grid.items.length} articles in articleCardGrid`);
+      console.log('📰 Sample keys:', Object.keys(grid.items[0]));
+      console.log('📰 Sample:', JSON.stringify(grid.items[0]).slice(0, 600));
+      return grid.items.slice(0, 10);
+    }
+    console.log('📰 Blades found but no articleCardGrid with items:', blades.map(b => b?.type).join(', '));
   }
+
   console.error('📰 No articles found in any blade');
   return [];
 }
@@ -374,13 +338,14 @@ client.once('clientReady', async () => {
         if (roles.newArrival) await channel.permissionOverwrites.edit(roles.newArrival, { ViewChannel: true, SendMessages: false });
         if (roles.member)     await channel.permissionOverwrites.edit(roles.member,     { ViewChannel: true, SendMessages: false });
       } else {
-        await channel.permissionOverwrites.edit(roles.everyone,   { ViewChannel: false });
+        // Deny New Arrival role instead of @everyone — avoids Onboarding conflict
         if (roles.newArrival) await channel.permissionOverwrites.edit(roles.newArrival, { ViewChannel: false });
         if (roles.member)     await channel.permissionOverwrites.edit(roles.member,     { ViewChannel: true });
-        if (channel.name === 'general') console.log('🔒 Locked #general — overwrites applied');
+        // Also deny @everyone where possible (may fail on some channels due to Onboarding)
+        await channel.permissionOverwrites.edit(roles.everyone, { ViewChannel: false }).catch(() => {});
       }
     } catch (e) {
-      if (channel.name === 'general') console.error('❌ Failed to lock #general:', e.message);
+      console.error(`❌ Failed to lock #${channel.name}:`, e.message);
     }
   }
 
