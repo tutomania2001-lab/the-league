@@ -55,17 +55,28 @@ async function fetchWildRiftArticles() {
     return articles.slice(0, 10);
   }
 
-  // Fallback: log full blades for debugging
-  function logBlades(obj, depth = 0) {
-    if (!obj || typeof obj !== 'object' || depth > 5) return;
+  // Direct search for articleCardGrid blade
+  function findGrid(obj, depth = 0) {
+    if (!obj || typeof obj !== 'object' || depth > 8) return null;
     if (Array.isArray(obj.blades)) {
-      console.log('📰 Blades found:', obj.blades.map(b => b?.type ?? b?._type ?? '?').join(', '));
-      obj.blades.forEach((b,i) => console.log(`  Blade[${i}] keys:`, Object.keys(b || {})));
-      return;
+      for (const blade of obj.blades) {
+        if (blade?.type === 'articleCardGrid' && Array.isArray(blade.items)) return blade.items;
+      }
     }
-    Object.values(obj).forEach(v => logBlades(v, depth + 1));
+    for (const val of Object.values(obj)) {
+      const r = findGrid(val, depth + 1);
+      if (r) return r;
+    }
+    return null;
   }
-  logBlades(data);
+  const gridItems = findGrid(data);
+  if (gridItems?.length) {
+    console.log(`📰 Found ${gridItems.length} articles in articleCardGrid`);
+    console.log('📰 Sample keys:', Object.keys(gridItems[0]));
+    console.log('📰 Sample:', JSON.stringify(gridItems[0]).slice(0, 500));
+    return gridItems.slice(0, 10);
+  }
+  console.error('📰 No articles found in any blade');
   return [];
 }
 
