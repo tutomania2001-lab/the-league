@@ -420,6 +420,9 @@ client.once('clientReady', async () => {
     { name: 'leaderboard', description: 'Show the top 10 XP leaderboard' },
     { name: 'compare',     description: 'Compare your rank with another player',
       options: [{ name: 'user', type: 6, description: 'Player to compare with', required: true }] },
+    { name: 'flip',  description: 'Flip a coin — heads or tails' },
+    { name: 'roll',  description: 'Roll a dice',
+      options: [{ name: 'sides', type: 4, description: 'Number of sides (default 6)', required: false }] },
   ]).catch(e => console.error('⚠️ Slash command registration failed:', e.message));
   console.log('✅ Slash commands registered');
 
@@ -1095,6 +1098,20 @@ client.on('interactionCreate', async interaction => {
       console.error('compare error:', e.message);
       interaction.editReply({ content: '❌ Failed to compare players.' }).catch(() => {});
     }
+  }
+
+  // ── /flip ────────────────────────────────────────────────────────
+  if (interaction.commandName === 'flip') {
+    const result = Math.random() < 0.5 ? '🪙 **Heads!**' : '🪙 **Tails!**';
+    await interaction.reply({ content: `${interaction.user} flipped a coin — ${result}` });
+  }
+
+  // ── /roll ────────────────────────────────────────────────────────
+  if (interaction.commandName === 'roll') {
+    const sides = interaction.options.getInteger('sides') ?? 6;
+    if (sides < 2 || sides > 1000) return interaction.reply({ content: '❌ Sides must be between 2 and 1000.', ephemeral: true });
+    const result = Math.floor(Math.random() * sides) + 1;
+    await interaction.reply({ content: `🎲 ${interaction.user} rolled a **${result}** (d${sides})` });
   }
 });
 
