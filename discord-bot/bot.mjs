@@ -250,6 +250,80 @@ BUILDS_DB['kha zix']      = BUILDS_DB.khazix;
 
 const LANE_COLORS = { Baron:'#8B4513', Jungle:'#228B22', Mid:'#4169E1', Dragon:'#DC143C', Support:'#9370DB' };
 
+// ── MILESTONE REWARDS ─────────────────────────────────────────────
+const MILESTONE_ROLES = {
+  10: { name: '🌱 Level 10', color: 0x00AA44 },
+  25: { name: '⚡ Level 25', color: 0x0099FF },
+  50: { name: '💎 Level 50', color: 0xAA00FF },
+  75: { name: '🔥 Level 75', color: 0xFF6600 },
+  100:{ name: '👑 Level 100',color: 0xFFD700 },
+};
+
+function getMilestoneReward(level) {
+  const isMajor = level % 5 === 0;
+  if (!isMajor && level > 0) return { coins: level * 10, major: false };      // Every level: small
+  const table = {
+    5:   { coins: 150,  label: 'First Milestone!' },
+    10:  { coins: 400,  label: 'Level 10 Veteran!',    role: '🌱 Level 10' },
+    15:  { coins: 600,  label: 'Level 15 Grinder!' },
+    20:  { coins: 900,  label: 'Level 20 Dedicated!' },
+    25:  { coins: 1200, label: 'Level 25 Elite!',      role: '⚡ Level 25' },
+    30:  { coins: 1500, label: 'Level 30 Hardcore!' },
+    35:  { coins: 1800, label: 'Level 35 Unstoppable!' },
+    40:  { coins: 2200, label: 'Level 40 Dominator!' },
+    45:  { coins: 2600, label: 'Level 45 Apex!' },
+    50:  { coins: 3000, label: 'Level 50 LEGEND!',     role: '💎 Level 50' },
+    60:  { coins: 4000, label: 'Level 60 Mythic!' },
+    75:  { coins: 6000, label: 'Level 75 Immortal!',   role: '🔥 Level 75' },
+    100: { coins: 10000,label: 'Level 100 CHAMPION!',  role: '👑 Level 100' },
+  };
+  return { ...(table[level] ?? { coins: level * 25, label: `Level ${level} Milestone!` }), major: true };
+}
+
+async function handleLevelUp(userId, username, newLevel, guild) {
+  try {
+    const reward = getMilestoneReward(newLevel);
+    // Award coins
+    const eco = await getEconomy(userId);
+    await supabase.from('discord_economy').upsert({
+      discord_id: userId, username,
+      coins: (eco.coins ?? 0) + reward.coins,
+      updated_at: new Date().toISOString(),
+    });
+
+    // Assign milestone role if applicable
+    if (reward.role && guild) {
+      let role = guild.roles.cache.find(r => r.name === reward.role);
+      if (!role) role = await guild.roles.create({ name: reward.role, color: MILESTONE_ROLES[newLevel]?.color ?? 0x00c8ff, reason: 'Milestone reward' }).catch(() => null);
+      if (role) {
+        const member = await guild.members.fetch(userId).catch(() => null);
+        if (member) {
+          // Remove old milestone roles
+          for (const r of Object.values(MILESTONE_ROLES)) {
+            const old = guild.roles.cache.find(gr => gr.name === r.name);
+            if (old && member.roles.cache.has(old.id)) await member.roles.remove(old).catch(() => {});
+          }
+          await member.roles.add(role).catch(() => {});
+        }
+      }
+    }
+
+    // Announce
+    if (client.announcementsChannel) {
+      if (reward.major) {
+        const embed = new EmbedBuilder()
+          .setTitle(`🎉 ${reward.label}`)
+          .setDescription(`<@${userId}> reached **Level ${newLevel}** and earned **+${reward.coins}🪙**!${reward.role ? `\nNew role: **${reward.role}**` : ''}`)
+          .setColor(MILESTONE_ROLES[newLevel]?.color ?? 0x00c8ff)
+          .setTimestamp();
+        await client.announcementsChannel.send({ embeds: [embed] }).catch(() => {});
+      } else {
+        await client.announcementsChannel.send(`⬆️ <@${userId}> reached **Level ${newLevel}**! +${reward.coins}🪙`).catch(() => {});
+      }
+    }
+  } catch (e) { console.error('handleLevelUp error:', e.message); }
+}
+
 async function generateBuildsCard(championName, build) {
   await fontReady;
   const W = 900, H = 420;
@@ -1306,8 +1380,9 @@ client.on('messageCreate', async msg => {
   const xp    = hasXPBoost(msg.author.id) ? baseXp * 2 : baseXp;
   const coins = Math.floor(Math.random() * 6)  + 5;  // 5–10
   const { leveledUp, newLevel } = await addActivity(uid, msg.author.username, xp, coins).catch(() => ({}));
-  if (leveledUp && client.announcementsChannel) {
-    client.announcementsChannel.send(`🎉 <@${uid}> leveled up to **Level ${newLevel}**! Keep it up! 🚀`).catch(() => {});
+  if (leveledUp && newLevel) {
+    const guild = client.guilds.cache.get(GUILD_ID);
+    handleLevelUp(uid, msg.author.username, newLevel, guild);
   }
 });
 
@@ -1386,8 +1461,9 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
       if (mins >= 1) {
         const xp = mins * 5, coins = mins * 2;
         const { leveledUp, newLevel } = await addActivity(member.id, member.user.username, xp, coins).catch(() => ({}));
-        if (leveledUp && client.announcementsChannel) {
-          client.announcementsChannel.send(`🎉 <@${member.id}> leveled up to **Level ${newLevel}**! 🚀`).catch(() => {});
+        if (leveledUp && newLevel) {
+          const guild = client.guilds.cache.get(GUILD_ID);
+          handleLevelUp(member.id, member.user.username, newLevel, guild);
         }
       }
     }
