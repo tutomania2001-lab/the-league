@@ -368,7 +368,7 @@ client.once('clientReady', async () => {
     if (role.name.includes('Verified Player')) roles.verified = id;
     if (role.name.includes('Admin'))           roles.admin = id;
     if (role.name === '@everyone')             roles.everyone = id;
-    if (role.name === 'FredBoat♪♪')           roles.fredboat = id;
+    if (role.name.toLowerCase().includes('fredboat')) { roles.fredboat = id; console.log('🎵 FredBoat role found:', role.name, id); }
     // Map rank roles
     for (const rank of RANKS) {
       if (role.name.toLowerCase().includes(rank.key)) roles[rank.key] = id;
@@ -405,9 +405,11 @@ client.once('clientReady', async () => {
         if (roles.member)     await channel.permissionOverwrites.edit(roles.member,     { ViewChannel: true });
         // Also deny @everyone where possible (may fail on some channels due to Onboarding)
         await channel.permissionOverwrites.edit(roles.everyone, { ViewChannel: false }).catch(() => {});
-        // Allow FredBoat to connect and speak in voice channels
-        if (roles.fredboat && channel.type === ChannelType.GuildVoice) {
-          await channel.permissionOverwrites.edit(roles.fredboat, { ViewChannel: true, Connect: true, Speak: true }).catch(() => {});
+        // Allow FredBoat full access to all channels
+        if (roles.fredboat) {
+          const perms = { ViewChannel: true };
+          if (channel.type === ChannelType.GuildVoice) Object.assign(perms, { Connect: true, Speak: true });
+          await channel.permissionOverwrites.edit(roles.fredboat, perms).catch(() => {});
         }
       }
     } catch (e) {
