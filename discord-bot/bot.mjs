@@ -3488,6 +3488,19 @@ client.once('ready', async () => {
   await syncRanksAndStats();
   setInterval(syncRanksAndStats, 5 * 60 * 1000);
   console.log('✅ Rank sync active');
+
+  // Retroactively award achievements to all existing users
+  setTimeout(async () => {
+    try {
+      const { data: users } = await supabase.from('discord_economy').select('discord_id, username, xp, level, coins, streak');
+      if (!users?.length) return;
+      console.log(`🏅 Checking achievements for ${users.length} existing users...`);
+      for (const u of users) {
+        await checkAchievements(u.discord_id, u.username ?? 'Unknown', {}).catch(() => {});
+      }
+      console.log('✅ Retroactive achievement check complete');
+    } catch (e) { console.error('Retroactive achievements error:', e.message); }
+  }, 10000); // wait 10s after startup so everything is ready
 });
 
 client.login(TOKEN);
