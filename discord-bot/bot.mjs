@@ -415,8 +415,8 @@ client.once('clientReady', async () => {
     const rankCardRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('rank_card').setLabel('🎴 My Rank Card').setStyle(ButtonStyle.Success),
     );
-    await commandsChannel.send({ content: '**Commands**', components: [row, rankCardRow] }).catch(() => {});
-    console.log('✅ Test welcome button posted in #commands');
+    const sendResult = await commandsChannel.send({ content: '**Commands**', components: [row, rankCardRow] }).catch(e => { console.error('❌ Commands send failed:', e.message); return null; });
+    console.log(sendResult ? '✅ Commands buttons posted (test_welcome + rank_card)' : '❌ Commands send failed');
   }
 
   // Post role selector in #get-roles
@@ -589,7 +589,9 @@ client.once('clientReady', async () => {
 
   async function refreshNewsChannel(channel) {
     try {
+      console.log('📰 Fetching articles...');
       const articles = await fetchWildRiftArticles();
+      console.log(`📰 fetchWildRiftArticles returned ${articles.length} items`);
       if (!articles.length) { console.log('📰 No articles found'); return; }
 
       // Clear old bot messages and repost latest 10
