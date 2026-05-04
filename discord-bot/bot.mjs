@@ -1318,6 +1318,8 @@ client.on('interactionCreate', async interaction => {
   }
 
   await interaction.deferReply({ ephemeral: true });
+
+  try {
   const guild = interaction.guild;
   const member = await guild.members.fetch(interaction.user.id);
 
@@ -1421,6 +1423,11 @@ client.on('interactionCreate', async interaction => {
     return interaction.editReply({
       content: `🏆 Verified! **${user.riot_id ?? user.username}** is **${actualRank.name}** (${lp} LP).\nYou now have the **${actualRank.name}** role!`
     });
+  }
+
+  } catch (e) {
+    console.error('Modal handler error:', e);
+    interaction.editReply({ content: '❌ Something went wrong. Please try again.' }).catch(() => {});
   }
 });
 
