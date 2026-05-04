@@ -412,11 +412,15 @@ client.once('clientReady', async () => {
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('test_welcome').setLabel('🎉 Test Welcome Message').setStyle(ButtonStyle.Primary),
     );
+    const sendResult = await commandsChannel.send({ content: '**Admin Commands**', components: [row] }).catch(e => { console.error('❌ Commands send failed:', e.message); return null; });
+    console.log(sendResult ? '✅ Admin commands posted' : '❌ Commands send failed');
+
+    // Rank card — separate message for all members
     const rankCardRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('rank_card').setLabel('🎴 My Rank Card').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('rank_card').setLabel('🎴 View My Rank Card').setStyle(ButtonStyle.Success),
     );
-    const sendResult = await commandsChannel.send({ content: '**Commands**', components: [row, rankCardRow] }).catch(e => { console.error('❌ Commands send failed:', e.message); return null; });
-    console.log(sendResult ? '✅ Commands buttons posted (test_welcome + rank_card)' : '❌ Commands send failed');
+    await commandsChannel.send({ content: '**🎴 Generate your personal rank card:**', components: [rankCardRow] }).catch(e => console.error('❌ Rank card button failed:', e.message));
+    console.log('✅ Rank card button posted');
   }
 
   // Post role selector in #get-roles
