@@ -1190,12 +1190,13 @@ client.on('interactionCreate', async interaction => {
     if (freshMember.roles.cache.has(client.roles.member)) {
       return interaction.reply({ content: '✅ You are already registered!', ephemeral: true });
     }
+    await interaction.deferReply({ ephemeral: true });
     try {
       await freshMember.roles.add(client.roles.member);
       await freshMember.roles.remove(client.roles.newArrival).catch(() => {});
-      return interaction.reply({ content: '🎉 Welcome to **The League**! You now have access to all channels.\nHead to **#get-roles** to pick your roles.', ephemeral: true });
+      return interaction.editReply({ content: '🎉 Welcome to **The League**! You now have access to all channels.\nHead to **#get-roles** to pick your roles.' });
     } catch (e) {
-      return interaction.reply({ content: '❌ Registration failed — contact staff.', ephemeral: true });
+      return interaction.editReply({ content: '❌ Registration failed — contact staff.' });
     }
   }
 
