@@ -1566,6 +1566,7 @@ client.once('clientReady', async () => {
     };
     client.devTasksCh   = await ensureCh('dev-tasks');
     client.bugReportsCh = await ensureCh('bug-reports');
+    client.devPollsCh   = await ensureCh('dev-polls');
 
     // Feature requests lives in Support — visible to all members
     const allChSupport = await guild.channels.fetch();
@@ -2534,12 +2535,13 @@ client.on('interactionCreate', async interaction => {
   // ── /devpoll ─────────────────────────────────────────────────────
   if (interaction.commandName === 'devpoll') {
     if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
-    await interaction.deferReply();
+    if (!client.devPollsCh) return interaction.reply({ content: '❌ Dev polls channel not set up yet — redeploy the bot first.', ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
     const question = interaction.options.getString('question');
     const opt1     = interaction.options.getString('option1');
     const opt2     = interaction.options.getString('option2');
     const embed = new EmbedBuilder()
-      .setTitle(`🗳️ Dev Poll`)
+      .setTitle('🗳️ Dev Poll')
       .setDescription(`**${question}**\n\nVote below — results update live.`)
       .addFields({ name: `1️⃣ ${opt1}`, value: '0 votes', inline: true }, { name: `2️⃣ ${opt2}`, value: '0 votes', inline: true })
       .setColor(0x00c8ff).setTimestamp().setFooter({ text: `Poll by ${interaction.user.displayName}` });
@@ -2547,7 +2549,8 @@ client.on('interactionCreate', async interaction => {
       new ButtonBuilder().setCustomId(`devpoll_1_0_0`).setLabel(`1️⃣ ${opt1}`).setStyle(ButtonStyle.Primary),
       new ButtonBuilder().setCustomId(`devpoll_2_0_0`).setLabel(`2️⃣ ${opt2}`).setStyle(ButtonStyle.Secondary),
     );
-    await interaction.editReply({ embeds: [embed], components: [row] });
+    await client.devPollsCh.send({ embeds: [embed], components: [row] }).catch(() => {});
+    await interaction.editReply({ content: `✅ Poll posted in <#${client.devPollsCh.id}>!` });
   }
 
   // ── /achievements ────────────────────────────────────────────────
