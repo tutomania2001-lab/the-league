@@ -1811,6 +1811,11 @@ client.on('interactionCreate', async interaction => {
 });
 
 // ── TASK BOARD ───────────────────────────────────────────────────
+async function deleteLinkedTasks(sourceType, sourceId) {
+  await supabase.from('tasks').delete().eq('source_type', sourceType).eq('source_id', sourceId);
+  await refreshTaskBoard();
+}
+
 async function refreshTaskBoard() {
   if (!client.devTasksCh) return;
   const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: true });
@@ -2567,7 +2572,8 @@ client.on('interactionCreate', async interaction => {
       const msg = msgs.find(m => m.embeds?.[0]?.footer?.text?.includes(`#${id}`) || m.embeds?.[0]?.title?.includes(`#${id}`));
       if (msg) await msg.delete().catch(() => {});
     }
-    return interaction.editReply({ content: `✅ Bug report #${id} deleted.` });
+    await deleteLinkedTasks('bug', id);
+    return interaction.editReply({ content: `✅ Bug report #${id} deleted and removed from task board.` });
   }
 
   // ── /deleterequest ────────────────────────────────────────────────
@@ -2591,7 +2597,8 @@ client.on('interactionCreate', async interaction => {
       if (devMsg) await devMsg.delete().catch(() => {});
     }
     await supabase.from('feature_requests').delete().eq('id', id);
-    return interaction.editReply({ content: `✅ Feature request #${id} deleted from all channels.` });
+    await deleteLinkedTasks('feature', id);
+    return interaction.editReply({ content: `✅ Feature request #${id} deleted from all channels and task board.` });
   }
 
   // ── /clearbugs ───────────────────────────────────────────────────
@@ -2606,7 +2613,9 @@ client.on('interactionCreate', async interaction => {
       const msgs = await bugCh.messages.fetch({ limit: 100 });
       for (const [, m] of msgs.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
     }
-    return interaction.editReply({ content: '✅ All bug reports deleted.' });
+    await supabase.from('tasks').delete().eq('source_type', 'bug');
+    await refreshTaskBoard();
+    return interaction.editReply({ content: '✅ All bug reports deleted and removed from task board.' });
   }
 
   // ── /clearrequests ────────────────────────────────────────────────
@@ -2630,7 +2639,9 @@ client.on('interactionCreate', async interaction => {
       const msgs = await devCh.messages.fetch({ limit: 100 });
       for (const [, m] of msgs.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
     }
-    return interaction.editReply({ content: '✅ All feature requests deleted from both channels.' });
+    await supabase.from('tasks').delete().eq('source_type', 'feature');
+    await refreshTaskBoard();
+    return interaction.editReply({ content: '✅ All feature requests deleted from both channels and task board.' });
   }
 
   // ── /devpoll ─────────────────────────────────────────────────────
@@ -3128,8 +3139,8 @@ client.on('interactionCreate', async interaction => {
 
     if (isBug) {
       await supabase.from('bug_reports').delete().eq('id', id);
+      await deleteLinkedTasks('bug', id);
     } else {
-      // Delete public suggestions post too
       const { data: req } = await supabase.from('feature_requests').select('public_message_id, public_channel_id').eq('id', id).maybeSingle();
       if (req?.public_message_id && req?.public_channel_id) {
         const pubCh = interaction.guild.channels.cache.get(req.public_channel_id);
@@ -3137,8 +3148,8 @@ client.on('interactionCreate', async interaction => {
         if (pubMsg) await pubMsg.delete().catch(() => {});
       }
       await supabase.from('feature_requests').delete().eq('id', id);
+      await deleteLinkedTasks('feature', id);
     }
-    // Delete the dev channel message
     await interaction.message.delete().catch(() => {});
     return interaction.reply({ content: `✅ ${isBug ? 'Bug report' : 'Feature request'} #${id} deleted.`, ephemeral: true });
   }
@@ -3149,7 +3160,7 @@ client.on('interactionCreate', async interaction => {
     const reqId = parseInt(interaction.customId.replace('req_addtask_', ''));
     const { data: req } = await supabase.from('feature_requests').select('title').eq('id', reqId).maybeSingle();
     if (!req) return interaction.reply({ content: '❌ Feature request not found.', ephemeral: true });
-    await supabase.from('tasks').insert({ title: `[Feature] ${req.title}`, priority: 'normal', created_by: interaction.user.id, status: 'todo' });
+    await supabase.from('tasks').insert({ title: `[Feature] ${req.title}`, priority: 'normal', created_by: interaction.user.id, status: 'todo', source_type: 'feature', source_id: reqId });
     await refreshTaskBoard();
     return interaction.reply({ content: `✅ Added **"${req.title}"** to the dev task board!`, ephemeral: true });
   }
