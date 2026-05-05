@@ -1536,12 +1536,26 @@ client.once('clientReady', async () => {
 
   // ── DEV CHANNELS ────────────────────────────────────────────────
   const allChDev = await guild.channels.fetch();
-  const adminPerms = [
+
+  // Ensure Developer role exists
+  let devRole = (await guild.roles.fetch()).find(r => r.name === '👨‍💻 Developer');
+  if (!devRole) {
+    devRole = await guild.roles.create({ name: '👨‍💻 Developer', color: 0x5865F2, hoist: true, reason: 'Dev team role' }).catch(() => null);
+    console.log('✅ Developer role created — assign it to your dev team manually');
+  }
+  roles.developer = devRole?.id ?? null;
+
+  const devPerms = [
     { id: roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
-    { id: roles.admin,    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+    ...(roles.developer ? [{ id: roles.developer, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }] : []),
   ];
   let devCat = allChDev.find(c => c?.name === '◈ Dev' && c.type === ChannelType.GuildCategory);
-  if (!devCat) devCat = await guild.channels.create({ name: '◈ Dev', type: ChannelType.GuildCategory, permissionOverwrites: adminPerms }).catch(() => null);
+  if (!devCat) devCat = await guild.channels.create({ name: '◈ Dev', type: ChannelType.GuildCategory, permissionOverwrites: devPerms }).catch(() => null);
+  else if (devCat && roles.developer) {
+    // Update existing category permissions
+    await devCat.permissionOverwrites.set(devPerms).catch(() => {});
+  }
+  const adminPerms = devPerms; // reuse for channel-level perms
 
   if (devCat) {
     const devChs = await guild.channels.fetch();
