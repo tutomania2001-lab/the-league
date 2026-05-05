@@ -1173,6 +1173,8 @@ client.once('clientReady', async () => {
       options: [{ name: 'id', type: 4, description: 'Bug report ID', required: true }] },
     { name: 'deleterequest', description: 'Delete a feature request by ID (admin only)',
       options: [{ name: 'id', type: 4, description: 'Feature request ID', required: true }] },
+    { name: 'clearbugs',     description: 'Delete ALL bug reports (admin only)' },
+    { name: 'clearrequests', description: 'Delete ALL feature requests (admin only)' },
     { name: 'devpoll', description: 'Post a dev team decision poll (admin only)',
       options: [
         { name: 'question', type: 3, description: 'Question to vote on', required: true },
@@ -2590,6 +2592,45 @@ client.on('interactionCreate', async interaction => {
     }
     await supabase.from('feature_requests').delete().eq('id', id);
     return interaction.editReply({ content: `✅ Feature request #${id} deleted from all channels.` });
+  }
+
+  // ── /clearbugs ───────────────────────────────────────────────────
+  if (interaction.commandName === 'clearbugs') {
+    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
+    await supabase.from('bug_reports').delete().neq('id', 0);
+    // Bulk delete all bot messages in #bug-reports
+    let bugCh = client.bugReportsCh;
+    if (!bugCh) { const chs = await interaction.guild.channels.fetch(); bugCh = chs.find(c => c?.name === 'bug-reports') ?? null; }
+    if (bugCh) {
+      const msgs = await bugCh.messages.fetch({ limit: 100 });
+      for (const [, m] of msgs.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
+    }
+    return interaction.editReply({ content: '✅ All bug reports deleted.' });
+  }
+
+  // ── /clearrequests ────────────────────────────────────────────────
+  if (interaction.commandName === 'clearrequests') {
+    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
+    // Fetch all requests to delete their public posts first
+    const { data: reqs } = await supabase.from('feature_requests').select('public_message_id, public_channel_id, dev_message_id');
+    for (const req of reqs ?? []) {
+      if (req.public_message_id && req.public_channel_id) {
+        const pubCh = interaction.guild.channels.cache.get(req.public_channel_id);
+        const pubMsg = await pubCh?.messages.fetch(req.public_message_id).catch(() => null);
+        if (pubMsg) await pubMsg.delete().catch(() => {});
+      }
+    }
+    await supabase.from('feature_requests').delete().neq('id', 0);
+    // Bulk delete all bot messages in dev #feature-requests
+    let devCh = client.featureReqCh;
+    if (!devCh) { const chs = await interaction.guild.channels.fetch(); devCh = chs.find(c => c?.name === 'feature-requests') ?? null; }
+    if (devCh) {
+      const msgs = await devCh.messages.fetch({ limit: 100 });
+      for (const [, m] of msgs.filter(m => m.author.id === client.user.id)) await m.delete().catch(() => {});
+    }
+    return interaction.editReply({ content: '✅ All feature requests deleted from both channels.' });
   }
 
   // ── /devpoll ─────────────────────────────────────────────────────
