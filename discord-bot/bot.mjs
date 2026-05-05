@@ -1169,6 +1169,10 @@ client.once('clientReady', async () => {
       ]},
     { name: 'bug',     description: 'Report a bug in the app' },
     { name: 'request', description: 'Submit a feature request' },
+    { name: 'deletebug',     description: 'Delete a bug report by ID (admin only)',
+      options: [{ name: 'id', type: 4, description: 'Bug report ID', required: true }] },
+    { name: 'deleterequest', description: 'Delete a feature request by ID (admin only)',
+      options: [{ name: 'id', type: 4, description: 'Feature request ID', required: true }] },
     { name: 'devpoll', description: 'Post a dev team decision poll (admin only)',
       options: [
         { name: 'question', type: 3, description: 'Question to vote on', required: true },
@@ -2543,6 +2547,49 @@ client.on('interactionCreate', async interaction => {
       new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('req_desc').setLabel('Describe the feature').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000)),
     );
     return interaction.showModal(modal);
+  }
+
+  // ── /deletebug ───────────────────────────────────────────────────
+  if (interaction.commandName === 'deletebug') {
+    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
+    const id = interaction.options.getInteger('id');
+    const { data: bug } = await supabase.from('bug_reports').select('message_id').eq('id', id).maybeSingle();
+    if (!bug) return interaction.editReply({ content: `❌ Bug report #${id} not found.` });
+    await supabase.from('bug_reports').delete().eq('id', id);
+    // Try to delete the message in #bug-reports
+    let bugCh = client.bugReportsCh;
+    if (!bugCh) { const chs = await interaction.guild.channels.fetch(); bugCh = chs.find(c => c?.name === 'bug-reports') ?? null; }
+    if (bugCh) {
+      const msgs = await bugCh.messages.fetch({ limit: 50 });
+      const msg = msgs.find(m => m.embeds?.[0]?.footer?.text?.includes(`#${id}`) || m.embeds?.[0]?.title?.includes(`#${id}`));
+      if (msg) await msg.delete().catch(() => {});
+    }
+    return interaction.editReply({ content: `✅ Bug report #${id} deleted.` });
+  }
+
+  // ── /deleterequest ────────────────────────────────────────────────
+  if (interaction.commandName === 'deleterequest') {
+    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
+    const id = interaction.options.getInteger('id');
+    const { data: req } = await supabase.from('feature_requests').select('public_message_id, public_channel_id, dev_message_id').eq('id', id).maybeSingle();
+    if (!req) return interaction.editReply({ content: `❌ Feature request #${id} not found.` });
+    // Delete public post
+    if (req.public_message_id && req.public_channel_id) {
+      const pubCh = interaction.guild.channels.cache.get(req.public_channel_id);
+      const pubMsg = await pubCh?.messages.fetch(req.public_message_id).catch(() => null);
+      if (pubMsg) await pubMsg.delete().catch(() => {});
+    }
+    // Delete dev post
+    let devCh = client.featureReqCh;
+    if (!devCh) { const chs = await interaction.guild.channels.fetch(); devCh = chs.find(c => c?.name === 'feature-requests') ?? null; }
+    if (devCh && req.dev_message_id) {
+      const devMsg = await devCh.messages.fetch(req.dev_message_id).catch(() => null);
+      if (devMsg) await devMsg.delete().catch(() => {});
+    }
+    await supabase.from('feature_requests').delete().eq('id', id);
+    return interaction.editReply({ content: `✅ Feature request #${id} deleted from all channels.` });
   }
 
   // ── /devpoll ─────────────────────────────────────────────────────
