@@ -1153,6 +1153,21 @@ client.once('clientReady', async () => {
     { name: 'crash',    description: 'Bet coins on a rising multiplier — cash out before it crashes!',
       options: [{ name: 'amount', type: 4, description: 'Amount to bet', required: true }] },
     { name: 'achievements', description: 'View your unlocked achievements' },
+    { name: 'task',    description: 'Manage dev tasks (admin only)',
+      options: [
+        { name: 'action',   type: 3, description: 'add / done / delete / list', required: true },
+        { name: 'title',    type: 3, description: 'Task title (for add)',        required: false },
+        { name: 'id',       type: 4, description: 'Task ID (for done/delete)',   required: false },
+        { name: 'priority', type: 3, description: 'low / normal / high / critical', required: false },
+      ]},
+    { name: 'bug',     description: 'Report a bug in the app' },
+    { name: 'request', description: 'Submit a feature request' },
+    { name: 'devpoll', description: 'Post a dev team decision poll (admin only)',
+      options: [
+        { name: 'question', type: 3, description: 'Question to vote on', required: true },
+        { name: 'option1',  type: 3, description: 'First option',        required: true },
+        { name: 'option2',  type: 3, description: 'Second option',       required: true },
+      ]},
     { name: 'slots',    description: 'Spin the slot machine!',
       options: [{ name: 'amount', type: 4, description: 'Amount to bet', required: true }] },
     { name: 'flip',  description: 'Flip a coin — heads or tails' },
@@ -1519,6 +1534,44 @@ client.once('clientReady', async () => {
     }
   }
 
+  // ── DEV CHANNELS ────────────────────────────────────────────────
+  const allChDev = await guild.channels.fetch();
+  const adminPerms = [
+    { id: roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
+    { id: roles.admin,    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+  ];
+  let devCat = allChDev.find(c => c?.name === '◈ Dev' && c.type === ChannelType.GuildCategory);
+  if (!devCat) devCat = await guild.channels.create({ name: '◈ Dev', type: ChannelType.GuildCategory, permissionOverwrites: adminPerms }).catch(() => null);
+
+  if (devCat) {
+    const devChs = await guild.channels.fetch();
+    const ensureCh = async (name, extra = []) => {
+      let ch = devChs.find(c => c?.name === name && c?.parentId === devCat.id);
+      if (!ch) ch = await guild.channels.create({ name, type: ChannelType.GuildText, parent: devCat.id, permissionOverwrites: [...adminPerms, ...extra] }).catch(() => null);
+      return ch;
+    };
+    client.devTasksCh      = await ensureCh('dev-tasks');
+    client.bugReportsCh    = await ensureCh('bug-reports');
+    client.featureReqCh    = await ensureCh('feature-requests', [
+      { id: roles.member, allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.SendMessages] },
+    ]);
+    // Post feature request button in feature-requests channel
+    if (client.featureReqCh) {
+      const frMsgs = await client.featureReqCh.messages.fetch({ limit: 5 });
+      const hasBtn = frMsgs.some(m => m.author.id === client.user.id && m.components?.length);
+      if (!hasBtn) {
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('submit_feature').setLabel('💡 Submit Feature Request').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId('submit_bug').setLabel('🐛 Report a Bug').setStyle(ButtonStyle.Danger),
+        );
+        await client.featureReqCh.send({ content: '**📋 Community Board** — submit ideas and bug reports below:', components: [row] }).catch(() => {});
+      }
+    }
+    // Post/refresh task board
+    if (client.devTasksCh) await refreshTaskBoard();
+    console.log('✅ Dev channels ready');
+  }
+
   } catch (e) {
     console.error('❌ clientReady error:', e);
   }
@@ -1707,6 +1760,26 @@ client.on('interactionCreate', async interaction => {
   });
   games.set(gid, { type, p1: interaction.user.id, p2: opponent, status: 'pending' });
 });
+
+// ── TASK BOARD ───────────────────────────────────────────────────
+async function refreshTaskBoard() {
+  if (!client.devTasksCh) return;
+  const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: true });
+  const todo     = tasks?.filter(t => t.status === 'todo')        ?? [];
+  const doing    = tasks?.filter(t => t.status === 'in_progress') ?? [];
+  const done     = tasks?.filter(t => t.status === 'done')        ?? [];
+  const priEmoji = { low: '🟢', normal: '🔵', high: '🟡', critical: '🔴' };
+  const fmt = (t) => `${priEmoji[t.priority] ?? '🔵'} \`#${t.id}\` ${t.title}`;
+  const embed = new EmbedBuilder()
+    .setTitle('📋 Dev Task Board')
+    .addFields(
+      { name: `📌 To Do (${todo.length})`,       value: todo.length    ? todo.map(fmt).join('\n')  : '*Nothing here*', inline: false },
+      { name: `⚙️ In Progress (${doing.length})`, value: doing.length   ? doing.map(fmt).join('\n') : '*Nothing here*', inline: false },
+      { name: `✅ Done (${done.length})`,         value: done.length    ? done.slice(-5).map(fmt).join('\n') : '*Nothing here*', inline: false },
+    )
+    .setColor(0x00c8ff).setTimestamp().setFooter({ text: 'Use /task add, /task done, /task delete' });
+  await upsertMessage(client.devTasksCh, { embeds: [embed] });
+}
 
 // ── SLASH COMMANDS ───────────────────────────────────────────────
 client.on('interactionCreate', async interaction => {
@@ -2368,6 +2441,86 @@ client.on('interactionCreate', async interaction => {
     }
   }
 
+  // ── /task ────────────────────────────────────────────────────────
+  if (interaction.commandName === 'task') {
+    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
+    const action   = interaction.options.getString('action').toLowerCase();
+    const title    = interaction.options.getString('title');
+    const id       = interaction.options.getInteger('id');
+    const priority = interaction.options.getString('priority') ?? 'normal';
+    try {
+      if (action === 'add') {
+        if (!title) return interaction.editReply({ content: '❌ Provide a title: `/task add title:My task`' });
+        await supabase.from('tasks').insert({ title, priority, created_by: interaction.user.id, status: 'todo' });
+        await refreshTaskBoard();
+        return interaction.editReply({ content: `✅ Task added: **${title}** [${priority}]` });
+      }
+      if (action === 'done') {
+        if (!id) return interaction.editReply({ content: '❌ Provide an ID: `/task done id:3`' });
+        await supabase.from('tasks').update({ status: 'done' }).eq('id', id);
+        await refreshTaskBoard();
+        return interaction.editReply({ content: `✅ Task #${id} marked as done.` });
+      }
+      if (action === 'progress') {
+        if (!id) return interaction.editReply({ content: '❌ Provide an ID.' });
+        await supabase.from('tasks').update({ status: 'in_progress' }).eq('id', id);
+        await refreshTaskBoard();
+        return interaction.editReply({ content: `⚙️ Task #${id} moved to In Progress.` });
+      }
+      if (action === 'delete') {
+        if (!id) return interaction.editReply({ content: '❌ Provide an ID.' });
+        await supabase.from('tasks').delete().eq('id', id);
+        await refreshTaskBoard();
+        return interaction.editReply({ content: `🗑️ Task #${id} deleted.` });
+      }
+      if (action === 'list') {
+        const { data } = await supabase.from('tasks').select('*').neq('status', 'done').order('created_at');
+        return interaction.editReply({ content: data?.length ? data.map(t => `\`#${t.id}\` [${t.status}] [${t.priority}] ${t.title}`).join('\n') : 'No open tasks.' });
+      }
+      return interaction.editReply({ content: '❌ Unknown action. Use: add / done / progress / delete / list' });
+    } catch (e) { console.error('task error:', e.message); interaction.editReply({ content: '❌ Task command failed.' }).catch(() => {}); }
+  }
+
+  // ── /bug ─────────────────────────────────────────────────────────
+  if (interaction.commandName === 'bug') {
+    const modal = new ModalBuilder().setCustomId('bug_modal').setTitle('🐛 Report a Bug');
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('bug_title').setLabel('Bug title (short summary)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('bug_desc').setLabel('Describe the bug in detail').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000)),
+    );
+    return interaction.showModal(modal);
+  }
+
+  // ── /request ─────────────────────────────────────────────────────
+  if (interaction.commandName === 'request') {
+    const modal = new ModalBuilder().setCustomId('request_modal').setTitle('💡 Feature Request');
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('req_title').setLabel('Feature title').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('req_desc').setLabel('Describe the feature').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000)),
+    );
+    return interaction.showModal(modal);
+  }
+
+  // ── /devpoll ─────────────────────────────────────────────────────
+  if (interaction.commandName === 'devpoll') {
+    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
+    await interaction.deferReply();
+    const question = interaction.options.getString('question');
+    const opt1     = interaction.options.getString('option1');
+    const opt2     = interaction.options.getString('option2');
+    const embed = new EmbedBuilder()
+      .setTitle(`🗳️ Dev Poll`)
+      .setDescription(`**${question}**\n\nVote below — results update live.`)
+      .addFields({ name: `1️⃣ ${opt1}`, value: '0 votes', inline: true }, { name: `2️⃣ ${opt2}`, value: '0 votes', inline: true })
+      .setColor(0x00c8ff).setTimestamp().setFooter({ text: `Poll by ${interaction.user.displayName}` });
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`devpoll_1_0_0`).setLabel(`1️⃣ ${opt1}`).setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`devpoll_2_0_0`).setLabel(`2️⃣ ${opt2}`).setStyle(ButtonStyle.Secondary),
+    );
+    await interaction.editReply({ embeds: [embed], components: [row] });
+  }
+
   // ── /achievements ────────────────────────────────────────────────
   if (interaction.commandName === 'achievements') {
     await interaction.deferReply({ ephemeral: true });
@@ -2743,6 +2896,69 @@ client.on('interactionCreate', async interaction => {
         return interaction.editReply({ content: '💎 **XP Boost** activated! You\'ll earn **2x XP** for the next **24 hours**.' });
       }
     }
+  }
+
+  // ── DEV BOARD BUTTONS ────────────────────────────────────────────
+  if (interaction.customId === 'submit_feature') {
+    const modal = new ModalBuilder().setCustomId('request_modal').setTitle('💡 Feature Request');
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('req_title').setLabel('Feature title').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('req_desc').setLabel('Describe the feature').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000)),
+    );
+    return interaction.showModal(modal);
+  }
+  if (interaction.customId === 'submit_bug') {
+    const modal = new ModalBuilder().setCustomId('bug_modal').setTitle('🐛 Report a Bug');
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('bug_title').setLabel('Bug title').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('bug_desc').setLabel('Describe the bug').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000)),
+    );
+    return interaction.showModal(modal);
+  }
+
+  // ── DEVPOLL VOTE ──────────────────────────────────────────────────
+  if (interaction.customId.startsWith('devpoll_')) {
+    const [, choice, v1str, v2str] = interaction.customId.split('_');
+    let v1 = parseInt(v1str), v2 = parseInt(v2str);
+    if (choice === '1') v1++; else v2++;
+    const msg = interaction.message;
+    const embed = EmbedBuilder.from(msg.embeds[0]);
+    const total = v1 + v2;
+    embed.setFields(
+      { name: msg.embeds[0].fields[0].name, value: `${v1} vote${v1 !== 1 ? 's' : ''} (${total ? Math.round(v1/total*100) : 0}%)`, inline: true },
+      { name: msg.embeds[0].fields[1].name, value: `${v2} vote${v2 !== 1 ? 's' : ''} (${total ? Math.round(v2/total*100) : 0}%)`, inline: true },
+    );
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`devpoll_1_${v1}_${v2}`).setLabel(msg.components[0].components[0].label).setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`devpoll_2_${v1}_${v2}`).setLabel(msg.components[0].components[1].label).setStyle(ButtonStyle.Secondary),
+    );
+    return interaction.update({ embeds: [embed], components: [row] });
+  }
+
+  // ── FEATURE UPVOTE ───────────────────────────────────────────────
+  if (interaction.customId.startsWith('req_vote_')) {
+    const reqId = parseInt(interaction.customId.replace('req_vote_', ''));
+    const { data: req } = await supabase.from('feature_requests').select('votes').eq('id', reqId).maybeSingle();
+    const newVotes = (req?.votes ?? 0) + 1;
+    await supabase.from('feature_requests').update({ votes: newVotes }).eq('id', reqId);
+    const msg = interaction.message;
+    const embed = EmbedBuilder.from(msg.embeds[0]);
+    const fields = embed.data.fields?.map(f => f.name.includes('Votes') ? { ...f, value: String(newVotes) } : f) ?? [];
+    embed.setFields(fields);
+    return interaction.update({ embeds: [embed], components: msg.components });
+  }
+
+  // ── BUG/FEATURE STATUS BUTTONS ────────────────────────────────────
+  if (interaction.customId.startsWith('bug_status_') || interaction.customId.startsWith('req_status_')) {
+    if (!freshMember.permissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
+    const [type, , id, status] = interaction.customId.split('_');
+    const table = type === 'bug' ? 'bug_reports' : 'feature_requests';
+    await supabase.from(table).update({ status }).eq('id', parseInt(id));
+    const statusEmoji = { open:'🔴', investigating:'🟡', fixed:'✅', wontfix:'⛔', planned:'🔵', in_progress:'⚙️', done:'✅', rejected:'❌' };
+    const msg = interaction.message;
+    const embed = EmbedBuilder.from(msg.embeds[0]).setColor(status === 'fixed' || status === 'done' ? 0x00FF88 : status === 'wontfix' || status === 'rejected' ? 0xFF4444 : 0xFFAA00);
+    embed.setFooter({ text: `Status: ${statusEmoji[status] ?? ''} ${status.toUpperCase()} — updated by ${interaction.user.displayName}` });
+    return interaction.update({ embeds: [embed], components: msg.components });
   }
 
   // ── CLAN INVITE RESPONSE ─────────────────────────────────────────
@@ -3360,6 +3576,49 @@ client.on('interactionCreate', async interaction => {
       ViewChannel: true, Connect: true,
     }).catch(() => {});
     return interaction.editReply({ content: `✅ Access granted! Join **${voiceChannel.name}** in the Private Rooms section.` });
+  }
+
+  // BUG REPORT modal
+  if (interaction.customId === 'bug_modal') {
+    const title = interaction.fields.getTextInputValue('bug_title').trim();
+    const desc  = interaction.fields.getTextInputValue('bug_desc').trim();
+    const { data: bug } = await supabase.from('bug_reports').insert({ title, description: desc, reporter_id: interaction.user.id, status: 'open', priority: 'normal' }).select().maybeSingle();
+    const embed = new EmbedBuilder()
+      .setTitle(`🐛 Bug #${bug?.id}: ${title}`)
+      .setDescription(desc)
+      .addFields({ name: '👤 Reporter', value: `<@${interaction.user.id}>`, inline: true }, { name: '📊 Status', value: '🔴 Open', inline: true }, { name: '⚡ Priority', value: '🔵 Normal', inline: true })
+      .setColor(0xFF4444).setTimestamp();
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`bug_status_${bug?.id}_investigating`).setLabel('🟡 Investigating').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`bug_status_${bug?.id}_fixed`).setLabel('✅ Fixed').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`bug_status_${bug?.id}_wontfix`).setLabel('⛔ Won\'t Fix').setStyle(ButtonStyle.Danger),
+    );
+    if (client.bugReportsCh) await client.bugReportsCh.send({ embeds: [embed], components: [row] }).catch(() => {});
+    await supabase.from('bug_reports').update({ message_id: 'sent' }).eq('id', bug?.id ?? 0);
+    return interaction.editReply({ content: `✅ Bug report submitted! Our dev team will investigate.\n**${title}**` });
+  }
+
+  // FEATURE REQUEST modal
+  if (interaction.customId === 'request_modal') {
+    const title = interaction.fields.getTextInputValue('req_title').trim();
+    const desc  = interaction.fields.getTextInputValue('req_desc').trim();
+    const { data: req } = await supabase.from('feature_requests').insert({ title, description: desc, requester_id: interaction.user.id, votes: 0, status: 'pending' }).select().maybeSingle();
+    const embed = new EmbedBuilder()
+      .setTitle(`💡 Feature #${req?.id}: ${title}`)
+      .setDescription(desc)
+      .addFields({ name: '👤 Requested by', value: `<@${interaction.user.id}>`, inline: true }, { name: '⭐ Votes', value: '0', inline: true }, { name: '📊 Status', value: '⏳ Pending', inline: true })
+      .setColor(0x00c8ff).setTimestamp();
+    const voteRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`req_vote_${req?.id}`).setLabel('👍 Upvote').setStyle(ButtonStyle.Primary),
+    );
+    const adminRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`req_status_${req?.id}_planned`).setLabel('🔵 Planned').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`req_status_${req?.id}_in_progress`).setLabel('⚙️ In Progress').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`req_status_${req?.id}_done`).setLabel('✅ Done').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`req_status_${req?.id}_rejected`).setLabel('❌ Rejected').setStyle(ButtonStyle.Danger),
+    );
+    if (client.featureReqCh) await client.featureReqCh.send({ embeds: [embed], components: [voteRow, adminRow] }).catch(() => {});
+    return interaction.editReply({ content: `✅ Feature request submitted! Members can upvote it in #feature-requests.\n**${title}**` });
   }
 
   // RELINK modal
