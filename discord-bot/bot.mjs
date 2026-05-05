@@ -997,6 +997,17 @@ function botC4(board) {
   return pref[0]??0;
 }
 
+// Global helper — edit existing bot message or send new one
+async function upsertMessage(channel, payload) {
+  if (!channel) return;
+  try {
+    const msgs = await channel.messages.fetch({ limit: 20 });
+    const botMsg = msgs.find(m => m.author.id === client.user.id);
+    if (botMsg) { await botMsg.edit(payload).catch(() => {}); return; }
+    await channel.send(payload).catch(() => {});
+  } catch {}
+}
+
 client.once('clientReady', async () => {
   console.log(`✅ Bot online: ${client.user.tag}`);
 
@@ -1076,12 +1087,7 @@ client.once('clientReady', async () => {
   }
 
   // Helper: edit existing bot message or send new one (avoids notification spam)
-  async function upsertMessage(channel, payload) {
-    const msgs = await channel.messages.fetch({ limit: 20 });
-    const botMsg = msgs.find(m => m.author.id === client.user.id);
-    if (botMsg) { await botMsg.edit(payload).catch(() => {}); return; }
-    await channel.send(payload).catch(() => {});
-  }
+  // upsertMessage is defined globally below clientReady
 
   // Post Register button in #rules
   const rulesChannel = guildChannels.find(c => c.name === 'rules');
@@ -3632,7 +3638,15 @@ client.on('interactionCreate', async interaction => {
       new ButtonBuilder().setCustomId(`bug_status_${bug?.id}_fixed`).setLabel('✅ Fixed').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`bug_status_${bug?.id}_wontfix`).setLabel('⛔ Won\'t Fix').setStyle(ButtonStyle.Danger),
     );
-    if (client.bugReportsCh) await client.bugReportsCh.send({ embeds: [embed], components: [row] }).catch(() => {});
+    // Find bug-reports channel — fallback search if client ref is null
+    let bugCh = client.bugReportsCh;
+    if (!bugCh) {
+      const chs = await interaction.guild.channels.fetch();
+      bugCh = chs.find(c => c?.name === 'bug-reports' && c.type === ChannelType.GuildText) ?? null;
+      if (bugCh) client.bugReportsCh = bugCh;
+    }
+    if (bugCh) await bugCh.send({ embeds: [embed], components: [row] }).catch(e => console.error('Bug report send failed:', e.message));
+    else console.error('Bug reports channel not found!');
     await supabase.from('bug_reports').update({ message_id: 'sent' }).eq('id', bug?.id ?? 0);
     return interaction.editReply({ content: `✅ Bug report submitted! Our dev team will investigate.\n**${title}**` });
   }
