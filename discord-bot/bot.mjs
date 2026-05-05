@@ -3032,6 +3032,29 @@ client.on('interactionCreate', async interaction => {
     }
   }
 
+  // ── DELETE BUG / FEATURE REQUEST ────────────────────────────────
+  if (interaction.customId.startsWith('bug_delete_') || interaction.customId.startsWith('req_delete_')) {
+    if (!freshMember.permissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
+    const isBug = interaction.customId.startsWith('bug_delete_');
+    const id    = parseInt(interaction.customId.replace(isBug ? 'bug_delete_' : 'req_delete_', ''));
+
+    if (isBug) {
+      await supabase.from('bug_reports').delete().eq('id', id);
+    } else {
+      // Delete public suggestions post too
+      const { data: req } = await supabase.from('feature_requests').select('public_message_id, public_channel_id').eq('id', id).maybeSingle();
+      if (req?.public_message_id && req?.public_channel_id) {
+        const pubCh = interaction.guild.channels.cache.get(req.public_channel_id);
+        const pubMsg = await pubCh?.messages.fetch(req.public_message_id).catch(() => null);
+        if (pubMsg) await pubMsg.delete().catch(() => {});
+      }
+      await supabase.from('feature_requests').delete().eq('id', id);
+    }
+    // Delete the dev channel message
+    await interaction.message.delete().catch(() => {});
+    return interaction.reply({ content: `✅ ${isBug ? 'Bug report' : 'Feature request'} #${id} deleted.`, ephemeral: true });
+  }
+
   // ── ADD TO DEV TASKS ─────────────────────────────────────────────
   if (interaction.customId.startsWith('req_addtask_')) {
     if (!freshMember.permissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
@@ -3674,6 +3697,7 @@ client.on('interactionCreate', async interaction => {
       new ButtonBuilder().setCustomId(`bug_status_${bug?.id}_investigating`).setLabel('🟡 Investigating').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`bug_status_${bug?.id}_fixed`).setLabel('✅ Fixed').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`bug_status_${bug?.id}_wontfix`).setLabel('⛔ Won\'t Fix').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`bug_delete_${bug?.id}`).setLabel('🗑️ Delete').setStyle(ButtonStyle.Danger),
     );
     // Find bug-reports channel — fallback search if client ref is null
     let bugCh = client.bugReportsCh;
@@ -3741,6 +3765,7 @@ client.on('interactionCreate', async interaction => {
     );
     const addTaskRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`req_addtask_${reqId}`).setLabel('📋 Add to Dev Tasks').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`req_delete_${reqId}`).setLabel('🗑️ Delete').setStyle(ButtonStyle.Danger),
     );
 
     let devCh = client.featureReqCh;
