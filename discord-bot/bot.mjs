@@ -919,6 +919,7 @@ const client = new Client({
 // In-memory store for private rooms: channelId → { ownerId, password, lobbyMessageId }
 const privateRooms = new Map();
 const clanInvites  = new Map(); // targetId → { clanId, inviterId }
+const pollVoters   = new Map(); // messageId → Set<userId>
 
 // Crash game state: userId → { bet, multiplier, crashAt, interval, coins, msg }
 const crashGames = new Map();
@@ -2950,6 +2951,12 @@ client.on('interactionCreate', async interaction => {
 
   // ── DEVPOLL VOTE ──────────────────────────────────────────────────
   if (interaction.customId.startsWith('devpoll_')) {
+    const msgId = interaction.message.id;
+    if (!pollVoters.has(msgId)) pollVoters.set(msgId, new Set());
+    if (pollVoters.get(msgId).has(interaction.user.id)) {
+      return interaction.reply({ content: '❌ You already voted on this poll!', ephemeral: true });
+    }
+    pollVoters.get(msgId).add(interaction.user.id);
     const [, choice, v1str, v2str] = interaction.customId.split('_');
     let v1 = parseInt(v1str), v2 = parseInt(v2str);
     if (choice === '1') v1++; else v2++;
