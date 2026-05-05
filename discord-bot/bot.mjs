@@ -1550,11 +1550,26 @@ client.once('clientReady', async () => {
       if (!ch) ch = await guild.channels.create({ name, type: ChannelType.GuildText, parent: devCat.id, permissionOverwrites: [...adminPerms, ...extra] }).catch(() => null);
       return ch;
     };
-    client.devTasksCh      = await ensureCh('dev-tasks');
-    client.bugReportsCh    = await ensureCh('bug-reports');
-    client.featureReqCh    = await ensureCh('feature-requests', [
-      { id: roles.member, allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.SendMessages] },
-    ]);
+    client.devTasksCh   = await ensureCh('dev-tasks');
+    client.bugReportsCh = await ensureCh('bug-reports');
+
+    // Feature requests lives in Support — visible to all members
+    const allChSupport = await guild.channels.fetch();
+    let featureReqCh = allChSupport.find(c => c?.name === 'feature-requests' && c.type === ChannelType.GuildText);
+    if (!featureReqCh) {
+      featureReqCh = await guild.channels.create({
+        name: 'feature-requests',
+        type: ChannelType.GuildText,
+        topic: '💡 Submit feature ideas and vote on them',
+        permissionOverwrites: [
+          { id: roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
+          { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.SendMessages] },
+          { id: roles.admin,    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+        ],
+      }).catch(() => null);
+    }
+    client.featureReqCh = featureReqCh;
+
     // Post feature request button in feature-requests channel
     if (client.featureReqCh) {
       const frMsgs = await client.featureReqCh.messages.fetch({ limit: 5 });
