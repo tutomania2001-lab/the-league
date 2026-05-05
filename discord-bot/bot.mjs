@@ -1575,14 +1575,17 @@ client.once('clientReady', async () => {
     client.bugReportsCh = await ensureCh('bug-reports');
     client.devPollsCh   = await ensureCh('dev-polls');
 
-    // Feature requests lives in Support — visible to all members
-    const allChSupport = await guild.channels.fetch();
-    let featureReqCh = allChSupport.find(c => c?.name === 'feature-requests' && c.type === ChannelType.GuildText);
-    if (!featureReqCh) {
-      featureReqCh = await guild.channels.create({
-        name: 'feature-requests',
+    // Private dev feature-requests channel
+    client.featureReqCh = await ensureCh('feature-requests');
+
+    // Public suggestions channel — visible to all members, threads enabled
+    const allChPub = await guild.channels.fetch();
+    let suggCh = allChPub.find(c => c?.name === 'suggestions' && c.type === ChannelType.GuildText);
+    if (!suggCh) {
+      suggCh = await guild.channels.create({
+        name: 'suggestions',
         type: ChannelType.GuildText,
-        topic: '💡 Submit feature ideas and vote on them',
+        topic: '💡 Submit feature ideas, upvote and discuss — best ideas get built!',
         permissionOverwrites: [
           { id: roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
           { id: roles.member,   allow: [PermissionFlagsBits.ViewChannel], deny: [PermissionFlagsBits.SendMessages] },
@@ -1590,18 +1593,21 @@ client.once('clientReady', async () => {
         ],
       }).catch(() => null);
     }
-    client.featureReqCh = featureReqCh;
+    client.suggestionsCh = suggCh;
 
-    // Post feature request button in feature-requests channel
-    if (client.featureReqCh) {
-      const frMsgs = await client.featureReqCh.messages.fetch({ limit: 5 });
-      const hasBtn = frMsgs.some(m => m.author.id === client.user.id && m.components?.length);
+    // Post submit button in suggestions channel
+    if (client.suggestionsCh) {
+      const sMsgs = await client.suggestionsCh.messages.fetch({ limit: 5 });
+      const hasBtn = sMsgs.some(m => m.author.id === client.user.id && m.components?.length);
       if (!hasBtn) {
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId('submit_feature').setLabel('💡 Submit Feature Request').setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId('submit_bug').setLabel('🐛 Report a Bug').setStyle(ButtonStyle.Danger),
         );
-        await client.featureReqCh.send({ content: '**📋 Community Board** — submit ideas and bug reports below:', components: [row] }).catch(() => {});
+        const embed = new EmbedBuilder()
+          .setTitle('💡 Feature Requests')
+          .setDescription('Have an idea to improve The League app or Discord server?\n\nClick below to submit it. Members can upvote and discuss — top ideas get built by the dev team.')
+          .setColor(0x00c8ff);
+        await client.suggestionsCh.send({ embeds: [embed], components: [row] }).catch(() => {});
       }
     }
     // Post/refresh task board
@@ -2996,14 +3002,45 @@ client.on('interactionCreate', async interaction => {
   // ── BUG/FEATURE STATUS BUTTONS ────────────────────────────────────
   if (interaction.customId.startsWith('bug_status_') || interaction.customId.startsWith('req_status_')) {
     if (!freshMember.permissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
-    const [type, , id, status] = interaction.customId.split('_');
+    const parts = interaction.customId.split('_');
+    const type = parts[0], id = parseInt(parts[2]), status = parts[3];
     const table = type === 'bug' ? 'bug_reports' : 'feature_requests';
-    await supabase.from(table).update({ status }).eq('id', parseInt(id));
-    const statusEmoji = { open:'🔴', investigating:'🟡', fixed:'✅', wontfix:'⛔', planned:'🔵', in_progress:'⚙️', done:'✅', rejected:'❌' };
+    await supabase.from(table).update({ status }).eq('id', id);
+    const statusLabel = { open:'🔴 Open', investigating:'🟡 Investigating', fixed:'✅ Fixed', wontfix:'⛔ Won\'t Fix', planned:'🔵 Planned', in_progress:'⚙️ In Progress', done:'✅ Done', rejected:'❌ Rejected' };
+    const color = ['fixed','done'].includes(status) ? 0x00FF88 : ['wontfix','rejected'].includes(status) ? 0xFF4444 : 0xFFAA00;
+
+    // Update dev message
     const msg = interaction.message;
-    const embed = EmbedBuilder.from(msg.embeds[0]).setColor(status === 'fixed' || status === 'done' ? 0x00FF88 : status === 'wontfix' || status === 'rejected' ? 0xFF4444 : 0xFFAA00);
-    embed.setFooter({ text: `Status: ${statusEmoji[status] ?? ''} ${status.toUpperCase()} — updated by ${interaction.user.displayName}` });
-    return interaction.update({ embeds: [embed], components: msg.components });
+    const devEmbed = EmbedBuilder.from(msg.embeds[0]).setColor(color);
+    const devFields = devEmbed.data.fields?.map(f => f.name.includes('Status') ? { ...f, value: statusLabel[status] ?? status } : f) ?? [];
+    devEmbed.setFields(devFields).setFooter({ text: `Updated by ${interaction.user.displayName}` });
+    await interaction.update({ embeds: [devEmbed], components: msg.components });
+
+    // Sync status back to public #suggestions post
+    if (type === 'req') {
+      const { data: req } = await supabase.from('feature_requests').select('public_message_id, public_channel_id, votes').eq('id', id).maybeSingle();
+      if (req?.public_message_id && req?.public_channel_id) {
+        const pubCh = interaction.guild.channels.cache.get(req.public_channel_id);
+        const pubMsg = await pubCh?.messages.fetch(req.public_message_id).catch(() => null);
+        if (pubMsg) {
+          const pubEmbed = EmbedBuilder.from(pubMsg.embeds[0]);
+          const pubFields = pubEmbed.data.fields?.map(f => f.name.includes('Status') ? { ...f, value: statusLabel[status] ?? status } : f) ?? [];
+          pubEmbed.setFields(pubFields).setColor(color);
+          await pubMsg.edit({ embeds: [pubEmbed], components: pubMsg.components }).catch(() => {});
+        }
+      }
+    }
+  }
+
+  // ── ADD TO DEV TASKS ─────────────────────────────────────────────
+  if (interaction.customId.startsWith('req_addtask_')) {
+    if (!freshMember.permissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admins only.', ephemeral: true });
+    const reqId = parseInt(interaction.customId.replace('req_addtask_', ''));
+    const { data: req } = await supabase.from('feature_requests').select('title').eq('id', reqId).maybeSingle();
+    if (!req) return interaction.reply({ content: '❌ Feature request not found.', ephemeral: true });
+    await supabase.from('tasks').insert({ title: `[Feature] ${req.title}`, priority: 'normal', created_by: interaction.user.id, status: 'todo' });
+    await refreshTaskBoard();
+    return interaction.reply({ content: `✅ Added **"${req.title}"** to the dev task board!`, ephemeral: true });
   }
 
   // ── CLAN INVITE RESPONSE ─────────────────────────────────────────
@@ -3656,22 +3693,73 @@ client.on('interactionCreate', async interaction => {
     const title = interaction.fields.getTextInputValue('req_title').trim();
     const desc  = interaction.fields.getTextInputValue('req_desc').trim();
     const { data: req } = await supabase.from('feature_requests').insert({ title, description: desc, requester_id: interaction.user.id, votes: 0, status: 'pending' }).select().maybeSingle();
-    const embed = new EmbedBuilder()
-      .setTitle(`💡 Feature #${req?.id}: ${title}`)
+    const reqId = req?.id;
+
+    // ── Public post in #suggestions ──────────────────────────────
+    const publicEmbed = new EmbedBuilder()
+      .setTitle(`💡 ${title}`)
       .setDescription(desc)
-      .addFields({ name: '👤 Requested by', value: `<@${interaction.user.id}>`, inline: true }, { name: '⭐ Votes', value: '0', inline: true }, { name: '📊 Status', value: '⏳ Pending', inline: true })
-      .setColor(0x00c8ff).setTimestamp();
+      .addFields(
+        { name: '👤 Submitted by', value: `<@${interaction.user.id}>`, inline: true },
+        { name: '👍 Votes',        value: '0',                          inline: true },
+        { name: '📊 Status',       value: '⏳ Under Review',            inline: true },
+      )
+      .setColor(0x00c8ff).setFooter({ text: `Feature #${reqId}` }).setTimestamp();
     const voteRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`req_vote_${req?.id}`).setLabel('👍 Upvote').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`req_vote_${reqId}`).setLabel('👍 Upvote').setStyle(ButtonStyle.Primary),
     );
+
+    let publicMsg = null;
+    let suggCh = client.suggestionsCh;
+    if (!suggCh) {
+      const chs = await interaction.guild.channels.fetch();
+      suggCh = chs.find(c => c?.name === 'suggestions' && c.type === ChannelType.GuildText) ?? null;
+      if (suggCh) client.suggestionsCh = suggCh;
+    }
+    if (suggCh) {
+      publicMsg = await suggCh.send({ embeds: [publicEmbed], components: [voteRow] }).catch(() => null);
+      // Create a discussion thread on the public post
+      if (publicMsg) await publicMsg.startThread({ name: `💬 ${title.slice(0, 90)}`, autoArchiveDuration: 10080 }).catch(() => {});
+    }
+
+    // ── Dev post in #feature-requests (private) ─────────────────
+    const devEmbed = new EmbedBuilder()
+      .setTitle(`💡 Feature #${reqId}: ${title}`)
+      .setDescription(desc)
+      .addFields(
+        { name: '👤 Submitted by', value: `<@${interaction.user.id}>`, inline: true },
+        { name: '👍 Votes',        value: '0',                          inline: true },
+        { name: '📊 Status',       value: '⏳ Under Review',            inline: true },
+        { name: '🔗 Public Post',  value: publicMsg ? `[View in #suggestions](${publicMsg.url})` : 'N/A', inline: false },
+      )
+      .setColor(0x5865F2).setTimestamp();
     const adminRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`req_status_${req?.id}_planned`).setLabel('🔵 Planned').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`req_status_${req?.id}_in_progress`).setLabel('⚙️ In Progress').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`req_status_${req?.id}_done`).setLabel('✅ Done').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`req_status_${req?.id}_rejected`).setLabel('❌ Rejected').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`req_status_${reqId}_planned`).setLabel('🔵 Planned').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`req_status_${reqId}_in_progress`).setLabel('⚙️ In Progress').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`req_status_${reqId}_done`).setLabel('✅ Done').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`req_status_${reqId}_rejected`).setLabel('❌ Rejected').setStyle(ButtonStyle.Danger),
     );
-    if (client.featureReqCh) await client.featureReqCh.send({ embeds: [embed], components: [voteRow, adminRow] }).catch(() => {});
-    return interaction.editReply({ content: `✅ Feature request submitted! Members can upvote it in #feature-requests.\n**${title}**` });
+    const addTaskRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`req_addtask_${reqId}`).setLabel('📋 Add to Dev Tasks').setStyle(ButtonStyle.Primary),
+    );
+
+    let devCh = client.featureReqCh;
+    if (!devCh) {
+      const chs = await interaction.guild.channels.fetch();
+      devCh = chs.find(c => c?.name === 'feature-requests' && c.type === ChannelType.GuildText) ?? null;
+      if (devCh) client.featureReqCh = devCh;
+    }
+    let devMsg = null;
+    if (devCh) devMsg = await devCh.send({ embeds: [devEmbed], components: [adminRow, addTaskRow] }).catch(() => null);
+
+    // Store message IDs
+    await supabase.from('feature_requests').update({
+      public_message_id: publicMsg?.id ?? null,
+      dev_message_id:    devMsg?.id    ?? null,
+      public_channel_id: suggCh?.id   ?? null,
+    }).eq('id', reqId);
+
+    return interaction.editReply({ content: `✅ Feature request submitted!\n**${title}**\n\n${suggCh ? `View and discuss in <#${suggCh.id}>` : ''}` });
   }
 
   // RELINK modal
