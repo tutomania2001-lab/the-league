@@ -92,6 +92,13 @@ const RANKS = [
   { key: 'challenger',  name: '⚡ Challenger',   minLP: 4800, maxLP: 999999 },
 ];
 
+function getMilestone(count) {
+  if (count <= 50) {
+    return [10, 20, 30, 40, 50].includes(count) ? count : null;
+  }
+  return count % 50 === 0 ? count : null;
+}
+
 function getRankForLP(lp) {
   return RANKS.slice().reverse().find(r => lp >= r.minLP) ?? RANKS[0];
 }
