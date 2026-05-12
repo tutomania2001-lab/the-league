@@ -1709,6 +1709,7 @@ client.on('guildMemberAdd', async member => {
     .catch(e => console.error('❌ Welcome send failed:', e.message));
 
   // ── MEMBER MILESTONE ANNOUNCEMENT ────────────────────────────────
+  await member.guild.fetch().catch(() => {});
   const milestone = getMilestone(member.guild.memberCount);
   if (milestone) {
     const { error: dbError } = await supabase
@@ -1738,6 +1739,7 @@ client.on('guildMemberAdd', async member => {
         .then(() => console.log(`✅ Milestone announcement sent: ${milestone} members`))
         .catch(e => console.error(`❌ Milestone announcement failed:`, e.message));
     } else {
+      // milestone row already inserted — if channel is missing now, it won't retry
       console.warn(`⚠️ Milestone ${milestone} hit but announcementsChannel not cached`);
     }
   }
