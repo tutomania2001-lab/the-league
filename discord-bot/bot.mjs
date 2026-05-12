@@ -1707,6 +1707,40 @@ client.on('guildMemberAdd', async member => {
   await welcomeChannel.send({ content: `👋 ${member}`, embeds: [embed] })
     .then(() => console.log('✅ Welcome message sent'))
     .catch(e => console.error('❌ Welcome send failed:', e.message));
+
+  // ── MEMBER MILESTONE ANNOUNCEMENT ────────────────────────────────
+  const milestone = getMilestone(member.guild.memberCount);
+  if (milestone) {
+    const { error: dbError } = await supabase
+      .from('member_milestones')
+      .insert({ milestone });
+
+    if (dbError) {
+      if (dbError.code !== '23505') {
+        console.error(`❌ Milestone DB error (${milestone}):`, dbError.message);
+      }
+    } else if (client.announcementsChannel) {
+      const milestoneEmbed = new EmbedBuilder()
+        .setTitle(`🎉 WE HIT ${milestone} MEMBERS!`)
+        .setDescription(
+          `${milestone} legends strong and growing! 🏆\n\n` +
+          `Every single one of you has helped build **The League** into what it is today. ` +
+          `Whether you're climbing the ranks, dropping knowledge in chat, or just vibing on voice — ` +
+          `you're part of something real.\n\n` +
+          `Here's to the next milestone. Let's keep rising. ⚡`
+        )
+        .setColor(0xFFD700)
+        .setFooter({ text: 'The League' })
+        .setTimestamp();
+
+      await client.announcementsChannel
+        .send({ content: '@everyone', embeds: [milestoneEmbed] })
+        .then(() => console.log(`✅ Milestone announcement sent: ${milestone} members`))
+        .catch(e => console.error(`❌ Milestone announcement failed:`, e.message));
+    } else {
+      console.warn(`⚠️ Milestone ${milestone} hit but announcementsChannel not cached`);
+    }
+  }
 });
 
 
